@@ -1,0 +1,78 @@
+
+
+<template id="save-image-dialog">
+	<div class="save-image-dialog">
+		<table>
+			<tr>
+				<td class="title">Формат:</td>
+				<td class="data">
+					<label><input type="radio" name="format" value="trd" />&nbsp;TRD</label>
+					<label><input type="radio" name="format" value="scl" />&nbsp;SCL</label>
+					<label><input type="radio" name="format" value="fdi" />&nbsp;FDI</label>
+				</td>
+			</tr>
+		</table>
+	</div>
+</template>
+
+<script type="text/javascript">
+	function SaveImageDialog ( on_format_selected, compatible_formats ) {
+		'use strict';
+		
+		var $dlg = null;
+		init();
+
+		function init() {
+			var temp_div = document.createElement('div');
+			temp_div.innerHTML = "<?=save-image-dialog?>";
+
+			$dlg = $(temp_div).children('.save-image-dialog');
+			$dlg.dialog({
+				autoOpen: true,
+				title: 'Select image format',
+				modal: true,
+				width: 400,
+				height: 200,
+				buttons: [
+					{ text: 'Save', click: save },
+					{ text: 'Cancel', click: cancel }
+				]
+			});
+			$dlg.on('keydown', function(e) { e.stopPropagation(); });
+			$dlg.on('keyup', function(e) { e.stopPropagation(); });
+
+			$dlg.find('[name=format][value=trd]')
+				.prop('disabled', !$.grep(compatible_formats, function(e, i) { return (e == 'trd') }).length);
+
+			$dlg.find('[name=format][value=fdi]')
+				.prop('disabled', !$.grep(compatible_formats, function(e, i) { return (e == 'fdi') }).length);
+
+			$dlg.find('[name=format][value=scl]')
+				.prop('disabled', !$.grep(compatible_formats, function(e, i) { return (e == 'scl') }).length);
+		}
+
+		function destroy() {
+			$dlg.dialog('close');
+			$dlg.dialog('destroy');
+			$dlg = null;
+		}
+
+		function save() {
+			var $format = $dlg.find('[name=format]:checked');
+			if (!$format.length) {
+				alert('You have to choice image format.')
+				return;
+			}
+
+			on_format_selected({
+				format: $format.val()
+			});
+
+			destroy();
+		}
+
+		function cancel() {
+			destroy();
+		}
+	}
+</script>

@@ -1,0 +1,41 @@
+<style>
+</style>
+
+<template id="about-dialog">
+	<div class="about-dialog">
+		<p>Данная страница представляет собой эмулятор некогда популярного ПК ZX Spectrum.</p>
+		<p>Эмулятор написан на JavaScript с нуля. Эмулируется процессор Z80, дисплей с возможностью переключения банка памяти (5 и 7), интерфейс BetaDisk на КР1818ВГ93, расширенная память объемом 512 Кб через порт #7ffd. Также есть виртуальная клавиатура и мышь :)</p>
+
+		<p>На данный момент возможно открывать образы дисков FDI, TRD и SCL. Кроме того, можно сохранить образ в другом формате, если это позволяет текущая разметка диска.</p>
+
+		<p>Также возможно открытие и сохранение файлов SNA, содержащих снимок памяти, состояние	процессора и некоторые другие данные.</p>
+
+		<p>Клавиши на виртуальной клавиатуре можно "зажимать" колесом мыши до следующего нажатия
+		клавиши или насовсем.</p>
+	</div>
+</template>
+
+<script type="text/javascript">
+	function AboutDialog() {
+		var $dlg = $("<?=about-dialog?>");
+		$dlg.dialog({
+			autoOpen: true,
+			title: 'Об эмуляторе',
+			modal: true,
+			width: 700,
+			height: 520,
+			buttons: [
+				{ text: 'Закрыть', click: close }
+			]
+		});
+		$dlg.on('keydown', function (e) { e.stopPropagation(); });
+		$dlg.on('keyup', function (e) { e.stopPropagation(); });
+		$dlg.css('padding', '0 0.5em');
+
+		function close() {
+			$dlg.dialog('close');
+			$dlg.dialog('destroy')
+			$dlg = null;
+		}		
+	}
+</script>

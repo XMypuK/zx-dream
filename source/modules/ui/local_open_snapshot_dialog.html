@@ -1,0 +1,34 @@
+<template id="local-open-snapshot-dlg">
+	<div class="local-open-snapshot-dlg">
+		<input type="file" name="snapshot" />
+	</div>
+</template>
+
+<script type="text/javascript">
+	function LocalOpenSnapshotDialog( on_file_selected ) {
+		'use strict';
+
+		var $dlg = $("<?=local-open-snapshot-dlg?>");
+		$dlg
+			.dialog({
+				autoOpen: true,
+				title: 'Выберите снимок SNA',
+				modal: true,
+				width: 400,
+				height: 150
+			})
+			.on('keydown', function (e) { e.stopPropagation(); })
+			.on('keyup', function (e) { e.stopPropagation(); });
+
+		var $snapshot = $dlg.find('input[name=snapshot]');
+		$snapshot.on('change', function (e) {
+			on_file_selected(e.target);
+			
+			$dlg
+				.dialog('close')
+				.dialog('destroy');
+
+			$dlg = null;
+		});
+	}
+</script>

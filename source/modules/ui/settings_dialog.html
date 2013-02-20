@@ -1,0 +1,128 @@
+<style>
+	.settings-dialog table {
+		width: 100%;
+	}
+
+	.settings-dialog tr th {
+		text-align: right;
+	}
+
+	.settings-dialog tr:first-child th {
+		text-align: center;
+	}
+
+	.settings-dialog input[type=text] {
+		width: 80px;
+		text-align: center;
+	}
+</style>
+
+<template id="settings-dialog">
+	<div class="settings-dialog">
+		<table>
+			<tr>
+				<th></th>
+				<th>норма</th>
+				<th>турбо</th>
+			</tr>
+			<tr>
+				<th>Минимум тактов за прерывание:</th>
+				<td align="center"><input type="text" id="settings_tstates_per_int_min" /></td>
+				<td align="center"><input type="text" id="settings_turbo_tstates_per_int_min" /></td>
+			</tr>
+			<tr>
+				<th>Максимум тактов за прерывание:</th>
+				<td align="center"><input type="text" id="settings_tstates_per_int_max" /></td>
+				<td align="center"><input type="text" id="settings_turbo_tstates_per_int_max" /></td>
+			</tr>
+			<tr>
+				<td colspan="3"><hr /></td>
+			</tr>
+			<tr>
+				<th>Период прерываний:</th>
+				<td colspan="2"><input type="text" id="settings_int_period" /></td>
+			</tr>
+			<tr>
+				<th>Турбо-режим:</th>
+				<td colspan="2"><input type="checkbox" id="settings_turbo_mode" /></td>
+			</tr>
+			<tr>
+				<th>Включить полутона:</th>
+				<td colspan="2"><input type="checkbox" id="settings_use_bright_bit" /></td>
+			</tr>
+			<tr>
+				<th>Расширенная память:</th>
+				<td colspan="2">
+					<select id="settings_extended_memory">
+						<option value="0">выключена</option>
+						<option value="1">pentagon</option>
+					</select>
+				</td>
+			</tr>
+		</table>
+	</div>
+</template>
+
+<script type="text/javascript">
+	function SettingsDialog( settings, on_apply ) {
+		$dlg = $("<?=settings-dialog?>");
+		$dlg.dialog({
+			autoOpen: true,
+			title: 'Настройки',
+			modal: true,
+			width: 600,
+			height: 340,
+			buttons: [
+				{ text: 'Применить', click: apply },
+				{ text: 'Отмена', click: cancel }
+			]
+		});
+		$dlg.on('keydown', function (e) { e.stopPropagation(); });
+		$dlg.on('keyup', function (e) { e.stopPropagation(); });
+
+		$tstates_per_int_min = $dlg.find('#settings_tstates_per_int_min');
+		$tstates_per_int_max = $dlg.find('#settings_tstates_per_int_max');
+		$turbo_tstates_per_int_min = $dlg.find('#settings_turbo_tstates_per_int_min');
+		$turbo_tstates_per_int_max = $dlg.find('#settings_turbo_tstates_per_int_max');
+		$int_period = $dlg.find('#settings_int_period');
+		$turbo_mode = $dlg.find('#settings_turbo_mode');
+		$use_bright_bit = $dlg.find('#settings_use_bright_bit');
+		$extended_memory = $dlg.find('#settings_extended_memory');
+
+		init();
+
+		function init() {
+			$tstates_per_int_min.val(settings.tstates_per_int_min);
+			$tstates_per_int_max.val(settings.tstates_per_int_max);
+			$turbo_tstates_per_int_min.val(settings.turbo_tstates_per_int_min);
+			$turbo_tstates_per_int_max.val(settings.turbo_tstates_per_int_max);
+			$int_period.val(settings.int_period);
+			$turbo_mode.prop('checked', settings.turbo_mode);
+			$use_bright_bit.prop('checked', settings.use_bright_bit);
+			$extended_memory.val(settings.extended_memory);
+		}
+
+		function apply() {
+			settings.tstates_per_int_min = parseInt($tstates_per_int_min.val()) || 0;
+			settings.tstates_per_int_max = parseInt($tstates_per_int_max.val()) || 0;
+			settings.turbo_tstates_per_int_min = parseInt($turbo_tstates_per_int_min.val()) || 0;
+			settings.turbo_tstates_per_int_max = parseInt($turbo_tstates_per_int_max.val()) || 0;
+			settings.int_period = parseInt($int_period.val()) || 0;
+			settings.turbo_mode = $turbo_mode.prop('checked');
+			settings.use_bright_bit = $use_bright_bit.prop('checked');
+			settings.extended_memory = parseInt($extended_memory.val()) || 0;
+
+			on_apply();
+
+			$dlg.dialog('close');
+			$dlg.dialog('destroy')
+			$dlg = null;
+		}
+
+		function cancel() {
+			$dlg.dialog('close');
+			$dlg.dialog('destroy')
+			$dlg = null;
+		}
+	}
+</script>

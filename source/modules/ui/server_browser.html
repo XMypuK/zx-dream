@@ -1,0 +1,185 @@
+<style>
+	.server-browser .filter {
+		float: left;
+		width: 200px;
+		overflow: hidden;
+	}
+
+	.server-browser ul.tags {
+		list-style-type: none;
+		margin: 0;
+		padding: 0;
+
+	}
+
+	.server-browser ul.tags li {
+		margin: 0;
+		padding: 0;
+	}
+
+	.server-browser ul.files {
+		list-style-type: none;
+		margin: 0;
+		padding: 0;
+		overflow: auto;
+	}
+
+	.server-browser ul.files li {
+		margin: 0;
+		padding: 0;
+	}
+
+	.server-browser ul.files li a {
+		cursor: pointer;
+		padding: 2px 5px;
+		display: block;
+	}
+
+	.server-browser ul.files li a:hover {
+		background-color: #0088ff;
+		color: #ffffff;
+	}
+</style>
+
+<template id="server-browser">
+	<div class="server-browser">
+		<div class="filter">
+			<input type="text" class="filter-text" />
+			<ul class="tags">
+			</ul>
+		</div>
+		<ul class="files">
+		</ul>
+	</div>
+</template>
+
+<script type="text/javascript">
+	function ServerBrowser( on_file_selected ) {
+		'use strict';
+		
+		var $dlg = $("<?=server-browser?>");
+		$dlg.dialog({
+			autoOpen: true,
+			title: 'Выберите образ TRD, FDI или SCL',
+			modal: true,
+			width: 600,
+			height: 400
+		});
+		$dlg.on('keydown', function(e) { e.stopPropagation(); });
+		$dlg.on('keyup', function(e) { e.stopPropagation(); });
+		
+		var $file_list = $dlg.find('ul.files');
+		var $filter_text = $dlg.find('input.filter-text');
+		var $tag_list = $dlg.find('ul.tags');
+
+		var files = [];
+
+		// загрузка каталога с сервера
+		$.get('get_catalog.php', [], function(data) {
+			if ( data && data.length !== undefined ) {
+				files = data;
+				refresh_tags();
+				refresh_files();
+			}
+			else {
+				alert('Неожиданный ответ от сервера.');
+			}
+		}, 'json');
+
+		// обработка клика на файле
+		$file_list.on('click', function (e) {
+			var filename = $(e.target).attr('data-filename');
+			var format = $(e.target).attr('data-filetype');
+			if ( !filename || !format ) {
+				return;
+			}
+
+			on_file_selected(filename, format);
+
+			$dlg.dialog('close');
+			$dlg.dialog('destroy');
+			$dlg = null;			
+		});
+
+		$filter_text
+			.on('keyup', refresh_files)
+			.on('cut', refresh_files)
+			.on('paste', refresh_files);
+
+		$tag_list
+			.on('click', 'input[type=checkbox]', function ( e ) {
+				var $tag = $(e.target);
+
+				var tag_all = $tag.val() == 'all';
+				var checked = $tag.prop('checked');
+
+				// при включении тэга "все" флаги с других тэгов снимаются
+				if ( tag_all && checked ) {
+					$tag_list
+						.find('input[type=checkbox][value!=all]')
+						.prop('checked', false);
+				}
+
+				// при включении конкретного тэга флаг с тэга "все" снимается
+				if ( !tag_all && checked ) {
+					$tag_list
+						.find('input[type=checkbox][value=all]')
+						.prop('checked', false);
+				}
+
+				// повторная фильтрация файлов
+				setTimeout(refresh_files, 0);
+			});
+
+		function refresh_tags() {
+			var tags = [];
+
+			$.each(files, function ( i, file ) {
+				$.each(file.tags, function ( j, tag ) {
+					if ( $.inArray(tag, tags) == -1 ) {
+						tags.push(tag);
+					}
+				});
+			});
+
+			$tag_list.empty();
+			$tag_list.append('<li><label><input type="checkbox" value="all" checked /> все</label></li>');
+			$.each(tags, function ( i, tag ) {
+				$tag_list.append('<li><label><input type="checkbox" value="' + tag + '" /> ' + tag + '</label></li>');
+			});
+		}
+
+		function refresh_files() {
+			var filtered_files = [];
+
+			var filter_text = $filter_text.val().toUpperCase();
+			var filter_tags = $.map($tag_list.find(':checked'), function ( tag_input, i ) { return $(tag_input).val(); });
+
+			$.each(files, function( i, file ) {
+				var text_match = !filter_text || file.name.toUpperCase().search(filter_text) >= 0;
+				var tags_match = $.inArray('all', filter_tags) != -1 || $.grep(filter_tags, function ( tag, i ) { return $.inArray(tag, file.tags) != -1; }).length;
+
+				if ( text_match && tags_match ) {
+					filtered_files.push(file);
+				}
+			});
+
+			filtered_files.sort(function ( file_a, file_b ) {
+				if ( file_a.name < file_b.name ) {
+					return -1;
+				}
+				else if ( file_a.name > file_b.name ) {
+					return 1;
+				}
+				else {
+					return 0;
+				}
+			});
+
+			$file_list.empty();
+			$.each(filtered_files, function ( i, file ) {
+				$file_list.append('<li><a data-filetype="' + file.type + '" data-filename="' + file.name + '">' + file.name + '</a></li>');
+			});
+		}
+	}
+</script>

@@ -1,0 +1,33 @@
+<style>
+</style>
+
+<template id="local-browser">
+	<div class="local-browser">
+		<input type="file" name="image" />
+	</div>
+</template>
+
+<script type="text/javascript">
+	function LocalBrowser( on_file_selected ) {
+		'use strict';
+
+		var $dlg = $("<?=local-browser?>");
+		$dlg.dialog({
+			autoOpen: true,
+			title: 'Выберите образ TRD, FDI или SCL',
+			modal: true,
+			width: 400,
+			height: 150
+		});
+		$dlg.on('keydown', function(e) { e.stopPropagation(); });
+		$dlg.on('keyup', function(e) { e.stopPropagation(); });		
+
+		var $image = $dlg.find('[name=image]');
+		$image.on('change', function (e) {
+			on_file_selected(e.target);
+			$dlg.dialog('close');
+			$dlg.dialog('destroy');
+			$dlg = null;
+		});
+	}
+</script>

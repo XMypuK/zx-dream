@@ -1,0 +1,254 @@
+<style>
+	.virtual-keyboard {
+		border: 1px solid #a0a0a0;
+		border-radius: 5px;
+		display: inline-block;
+		background-color: #c0c0c0;
+		font: 1em Verdana;
+		box-shadow: 1px 1px #a0a0a0;
+	}
+
+	.virtual-keyboard .keyline {
+		margin: 0.4em 0;
+	}
+
+	.virtual-keyboard .keyplace {
+		display: inline-block;
+		color: #404040;
+		width: 4em;
+	}
+
+	.virtual-keyboard .keyplace .sup {
+		text-align: center;
+		text-transform: uppercase;
+		color: #408040;
+		font-size: 0.6em;
+		min-height: 1em;
+	}
+
+	.virtual-keyboard .keyplace .inf {
+		text-align: center;
+		color: #804040;
+		font-size: 0.6em;
+		min-height: 1em;
+	}
+
+	.virtual-keyboard .keyplace .key {
+		border: 1px solid #a0a0a0;
+		border-radius: 3px;
+		background-color: #e8e8e8;
+		box-shadow: 1px 1px #a0a0a0;
+		cursor: pointer;
+		width: 2.7em;
+		height: 2.2em;
+		margin: auto;
+		position: relative;
+		display: block;
+	}
+
+	.virtual-keyboard .pressed .key {
+		box-shadow: inset 1px 1px #a0a0a0;
+		background-color: #3c85ff;
+	}
+
+	.virtual-keyboard .keyplace .main {
+		position: absolute;
+		padding-left: 3px;
+		font-weight: bold;
+		font-size: 0.8em;
+	}
+
+	.virtual-keyboard .keyplace .ss {
+		color: #804040;
+		padding-right: 3px;
+		text-align: right;
+		font-size: 0.52em;
+		line-height: 2.4em;
+	}
+
+	.virtual-keyboard .keyplace .ext {
+		font-size: 0.52em;
+		text-align: center;
+		line-height: 1.6em;
+	}
+
+	.virtual-keyboard .symbol-shift-keyplace .main {
+		color: #804040;
+	}
+
+	.virtual-keyboard .edit-keyplace .sup {
+		font-weight: bold;
+	}
+
+</style>
+
+<template id="keyboard">
+	<div class="virtual-keyboard">
+
+	</div>
+</template>
+
+<template id="keyline">
+	<div class="keyline">
+
+	</div>
+</template>
+
+<template id="keyplace">
+	<div class="keyplace">
+		<div class="sup"></div>
+		<a class="key">
+			<div class="main"></div>
+			<div class="ss"></div>
+			<div class="ext"></div>
+		</a>
+		<div class="inf"></div>
+	</div>
+</template>
+
+<script type="text/javascript">
+	function VirtualKeyboard( container, on_keystatechange ) {
+		// public
+		this.keyStateChanged = keyStateChanged;
+
+		// private
+		var fast_access = [[],[],[],[],[],[],[],[]];
+
+		var $vkeyb = $("<?=keyboard?>").appendTo(container);
+		$vkeyb.on('mousedown', mousedown);
+		$vkeyb.on('mouseup', mouseup);
+		$vkeyb.on('mousewheel', mousewheel);
+		$vkeyb.on('DOMMouseScroll', mousewheel); // Firefox does not have event onmousewheel
+
+		var $line1 = $("<?=keyline?>").appendTo($vkeyb);
+		createKey(3, 0,	'1', '!', '', 'Edit',		'DEF FN'	, 'edit-keyplace').appendTo($line1);
+		createKey(3, 1,	'2', '@', '', 'Caps Lock',	'FN'		).appendTo($line1);
+		createKey(3, 2,	'3', '#', '', 'T. Video',	'LINE'		).appendTo($line1);
+		createKey(3, 3,	'4', '$', '', 'Inv Video',	'OPEN#'		).appendTo($line1);
+		createKey(3, 4,	'5', '%', '', 'Left',		'CLOSE#'	).appendTo($line1);
+		createKey(4, 4,	'6', '&', '', 'Down',		'MOVE'		).appendTo($line1);
+		createKey(4, 3,	'7', '\'','', 'Up',			'ERASE'		).appendTo($line1);
+		createKey(4, 2,	'8', '(', '', 'Right',		'POINT'		).appendTo($line1);
+		createKey(4, 1,	'9', ')', '', 'Graphics',	'CAT'		).appendTo($line1);
+		createKey(4, 0,	'0', '_', '', 'Delete',		'FORMAT'	).appendTo($line1);
+
+		var $line2 = $("<?=keyline?>").appendTo($vkeyb);
+		createKey(2, 0,	'Q', '<=',	'PLOT',		'SIN',	'ASN'	).appendTo($line2);
+		createKey(2, 1,	'W', '<>',	'DRAW',		'COS',	'ACS'	).appendTo($line2);
+		createKey(2, 2,	'E', '>=',	'REM',		'TAN',	'ATN'	).appendTo($line2);
+		createKey(2, 3,	'R', '<',	'RUN',		'INT',	'VERIFY').appendTo($line2);
+		createKey(2, 4,	'T', '>',	'RAND',		'RND',	'MERGE'	).appendTo($line2);
+		createKey(5, 4,	'Y', 'AND',	'RETURN',	'STR$',	'['		).appendTo($line2);
+		createKey(5, 3,	'U', 'OR',	'IF',		'CHR$',	']'		).appendTo($line2);
+		createKey(5, 2,	'I', 'AT',	'INPUT',	'CODE',	'IN'	).appendTo($line2);
+		createKey(5, 1,	'O', ';',	'POKE',		'PEEK',	'OUT'	).appendTo($line2);
+		createKey(5, 0,	'P', '"',	'PRINT',	'TAB',	'©'		).appendTo($line2);
+
+		var $line3 = $("<?=keyline?>").appendTo($vkeyb);
+		createKey(1, 0,	'A', 'STOP',	'NEW',		'READ',		'~'			).appendTo($line3);
+		createKey(1, 1,	'S', 'NOT',		'SAVE',		'RESTORE',	'|'			).appendTo($line3);
+		createKey(1, 2,	'D', 'STEP',	'DIM',		'DATA',		'\\'		).appendTo($line3);
+		createKey(1, 3,	'F', 'TO',		'FOR',		'SGN',		'{'			).appendTo($line3);
+		createKey(1, 4,	'G', 'THEN',	'GOTO',		'ABS',		'}'			).appendTo($line3);
+		createKey(6, 4,	'H', '^',		'GOSUB',	'SQR',		'CIRCLE'	).appendTo($line3);
+		createKey(6, 3,	'J', '-',		'LOAD',		'VAL',		'VAL$'		).appendTo($line3);
+		createKey(6, 2,	'K', '+',		'LIST',		'LEN',		'SCREEN$'	).appendTo($line3);
+		createKey(6, 1,	'L', '=',		'LET',		'USR',		'ATTR'		).appendTo($line3);
+		createKey(6, 0,	'Enter', '',	'',			'',			''			, 'enter-keyplace').appendTo($line3);
+
+		var $line4 = $("<?=keyline?>").appendTo($vkeyb);
+		createKey(0, 0,	'CS',	'',			'',			'',			''			, 'caps-shift-keyplace').appendTo($line4);
+		createKey(0, 1,	'Z',	':',		'COPY',		'LN',		'BEEP'		).appendTo($line4);
+		createKey(0, 2,	'X',	'\u00a3',	'CLEAR',	'EXP',		'INK'		).appendTo($line4);
+		createKey(0, 3,	'C',	'?',		'CONT',		'L PRINT',	'PAPER'		).appendTo($line4);
+		createKey(0, 4,	'V',	'/',		'CLS',		'L LIST',	'FLASH'		).appendTo($line4);
+		createKey(7, 4,	'B',	'*',		'BORDER',	'BIN',		'BRIGHT'	).appendTo($line4);
+		createKey(7, 3,	'N',	',',		'NEXT',		'IN KEY$',	'OVER'		).appendTo($line4);
+		createKey(7, 2,	'M',	'.',		'PAUSE',	'PI',		'INVERSE'	).appendTo($line4);
+		createKey(7, 1,	'SS',	'',			'',			'',			''			, 'symbol-shift-keyplace').appendTo($line4);
+		createKey(7, 0,	'BR',	'',			'',			'',			''			, 'break-space-keyplace').appendTo($line4);
+
+		function createKey( index, bit, main, ss, ext, sup, inf, className ) {
+			var $key = $("<?=keyplace?>");
+
+			$key.find('.key').data({ index: index, bit: bit });
+			$key.find('.sup').text(sup);
+			$key.find('.inf').text(inf);
+			$key.find('.main').text(main);
+			$key.find('.ss').text(ss);
+			$key.find('.ext').text(ext);
+
+			if ( className ) {
+				$key.addClass(className);
+			}
+
+			fast_access[index][bit] = $key;
+
+			return $key;
+		}
+
+		function mousedown (e) {
+			var key = $(e.target).closest('.key').data();
+			if ( key && key.index !== undefined && key.bit !== undefined ) {
+				on_keystatechange(key, true);
+				return false;
+			}
+		}
+
+		function mouseup (e) {
+			var key = $(e.target).closest('.key').data();
+			if ( key && key.index !== undefined && key.bit !== undefined ) {
+				if ( e.which == 1 ) {
+					on_keystatechange(key, false);
+				}
+			}
+		}
+
+		function mousewheel (e) {
+			// jquery не транслирует whellDelta в свой объект события
+			e.wheelDelta = ( e.originalEvent.wheelDelta ) || ( -40 * e.originalEvent.detail );
+
+			var key = $(e.target).closest('.key').data();
+			if ( key && key.index !== undefined && key.bit !== undefined ) {
+				on_keystatechange(key, true);
+				if ( e.wheelDelta > 0 ) {
+					queue_to_release(key);
+				}
+			}			
+			e.preventDefault ? e.preventDefault() : (e.returnValue = false);
+		}
+
+		function keyStateChanged( key, pressed ) {
+			if ( pressed ) {
+				fast_access[key.index][key.bit].addClass('pressed');
+			}
+			else {
+				fast_access[key.index][key.bit].removeClass('pressed');
+				release_locked_keys();
+			}
+		}
+
+		var release_queue = [];
+		var releasing = false;
+
+		function queue_to_release ( key ) {
+			var already_locked = $.grep(release_queue, function (e, i) { return e.index == key.index && e.bit == key.bit; }).length;
+			if ( !already_locked ) {
+				release_queue.push(key);
+			}
+		}
+
+		function release_locked_keys () {
+			if ( releasing ) {
+				return;
+			}
+
+			releasing = true;
+			$.each(release_queue, function (i, e) {
+				on_keystatechange(e, false);
+			});
+			release_queue.splice(0, release_queue.length);
+			releasing = false;
+		}
+	}
+</script>
