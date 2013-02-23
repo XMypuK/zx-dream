@@ -1,0 +1,1 @@
+PowerShell -ExecutionPolicy RemoteSigned -File .\utils\BuildAll.ps1 -SourceDirectoryName source -PublishDirectoryName publish
