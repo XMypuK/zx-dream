@@ -47,15 +47,38 @@
 				<td colspan="2"><input type="checkbox" id="settings_turbo_mode" /></td>
 			</tr>
 			<tr>
-				<th>Включить полутона:</th>
-				<td colspan="2"><input type="checkbox" id="settings_use_bright_bit" /></td>
-			</tr>
-			<tr>
 				<th>Расширенная память:</th>
 				<td colspan="2">
 					<select id="settings_extended_memory">
 						<option value="0">выключена</option>
 						<option value="1">pentagon</option>
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="3"><hr /></td>
+			</tr>			
+			<tr>
+				<th>Включить полутона:</th>
+				<td colspan="2"><input type="checkbox" id="settings_use_bright_bit" /></td>
+			</tr>
+			<tr>
+				<th>Отрисовка:</th>
+				<td colspan="2">
+					<select id="settings_renderer_type">
+						<option value="1">метод putImageData</option>
+						<option value="2">метод drawImage</option>
+						<option value="3">WebGL</option>
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<th>Масштабирование:</th>
+				<td colspan="2">
+					<select id="settings_scale_type">
+						<option value="1">Предварительное</option>
+						<option value="2">При отрисовке</option>
+						<option value="3">Последующее</option>
 					</select>
 				</td>
 			</tr>
@@ -71,7 +94,7 @@
 			title: 'Настройки',
 			modal: true,
 			width: 600,
-			height: 340,
+			height: 410,
 			buttons: [
 				{ text: 'Применить', click: apply },
 				{ text: 'Отмена', click: cancel }
@@ -86,8 +109,10 @@
 		$turbo_tstates_per_int_max = $dlg.find('#settings_turbo_tstates_per_int_max');
 		$int_period = $dlg.find('#settings_int_period');
 		$turbo_mode = $dlg.find('#settings_turbo_mode');
-		$use_bright_bit = $dlg.find('#settings_use_bright_bit');
 		$extended_memory = $dlg.find('#settings_extended_memory');
+		$use_bright_bit = $dlg.find('#settings_use_bright_bit');
+		$renderer_type = $dlg.find('#settings_renderer_type');
+		$scale_type = $dlg.find('#settings_scale_type');
 
 		init();
 
@@ -98,8 +123,10 @@
 			$turbo_tstates_per_int_max.val(settings.turbo_tstates_per_int_max);
 			$int_period.val(settings.int_period);
 			$turbo_mode.prop('checked', settings.turbo_mode);
-			$use_bright_bit.prop('checked', settings.use_bright_bit);
 			$extended_memory.val(settings.extended_memory);
+			$use_bright_bit.prop('checked', settings.use_bright_bit);
+			$renderer_type.val(settings.renderer_type);
+			$scale_type.val(settings.scale_type);;
 		}
 
 		function apply() {
@@ -109,8 +136,10 @@
 			settings.turbo_tstates_per_int_max = parseInt($turbo_tstates_per_int_max.val()) || 0;
 			settings.int_period = parseInt($int_period.val()) || 0;
 			settings.turbo_mode = $turbo_mode.prop('checked');
-			settings.use_bright_bit = $use_bright_bit.prop('checked');
 			settings.extended_memory = parseInt($extended_memory.val()) || 0;
+			settings.use_bright_bit = $use_bright_bit.prop('checked');
+			settings.renderer_type = parseInt($renderer_type.val()) || 0;
+			settings.scale_type = parseInt($scale_type.val()) || 0;
 
 			on_apply();
 

@@ -48,6 +48,13 @@
 		height: 448px;
 		margin: 0 auto;
 	}
+
+	#display .error-message {
+		text-align: center;
+		color: #ff0000;
+		padding: 2em;
+	}
+
 	#vkeyb {
 		margin: 5px auto;
 		text-align: center;
@@ -121,7 +128,13 @@ $(window).load(function() {
 	};
 
 	var z80 = new Z80(bus);
-	var settings = ZX_Settings.get_local_settings();
+
+	var useDefaultSettings = /(\?|&)default=?(&|$)/.test(window.location.search);
+	var settings = 
+		useDefaultSettings ? 
+		ZX_Settings.get_default_settings() :
+		ZX_Settings.get_local_settings();
+
 	var workloop = new ZX_WorkLoop(settings, z80, display);
 
 	apply_settings( true );
@@ -166,6 +179,8 @@ $(window).load(function() {
 	function apply_settings( load_images ) {
 		ram.mode( settings.extended_memory );
 		display.semicolors( settings.use_bright_bit );
+		display.rendererType( settings.renderer_type );
+		display.scaleType( settings.scale_type );
 
 		if ( load_images ) {
 			if ( settings.drive_a ) load_image(0, settings.drive_a);
@@ -570,7 +585,7 @@ $(window).load(function() {
 		handler();
 	}
 
-	var debug_mode = (/(\&|\?)debug=/).test(window.location.search);
+	var debug_mode = (/(\&|\?)debug=?/).test(window.location.search);
 
 	function start() {
 		if ( debug_mode ) {

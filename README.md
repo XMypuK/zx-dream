@@ -22,6 +22,7 @@
 
 - открытие и сохранение образов в форматах TRD, FDI, SCL
 - открытие и сохранение снимков SNA
+- выбор способа отрисовки ( *putImageData*, *drawImage*, *WebGL* ) и масштабирования
 
 Вы можете взглянуть на эмулятор здесь: [ZX Spectrum online emulator](http://zx.researcher.su/)
 
@@ -58,8 +59,9 @@ Other capabilities:
 
 - open and save images in TRD, FDI, SCL formats
 - open and save SNA snapshots
+- select the rendering method ( *putImageData*, *drawImage*, *WebGL* ) and the scaling method
 
-You can take a look on the emulator here: [ZX Spectrum online emulator](http://zx.researcher.su/)
+You can take a look at the emulator here: [ZX Spectrum online emulator](http://zx.researcher.su/)
 
 ### Source file format
 
@@ -73,4 +75,4 @@ being performed the entire result code goes into the *css\spectrum.css* and *js\
 To build, the PowerShell 2.0 must be installed. Also JS code will be minified into the *js\spectrum.min.js* file if
 Java runtime environment is presented on the computer. In order to build the project, you have to run *build.cmd* 
 file that is placed at the top directory. (Probably also the next command must be executed in the shell: 
-*Set-ExecutionPolicy-ExecutionPolicy RemoteSigned*.)
+*Set-ExecutionPolicy -ExecutionPolicy RemoteSigned*.)

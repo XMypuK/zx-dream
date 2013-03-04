@@ -1,5 +1,8 @@
 function ZX_Settings() {
 	this.use_bright_bit = true;
+	this.renderer_type = ScreenConstants.RENDERER_TYPE_DRAW_IMAGE;
+	this.scale_type = ScreenConstants.SCALE_TYPE_RENDER;
+
 	// интервал в тактах процессора, не ранее которого происходит прерывание
 	this.tstates_per_int_min = 70000;
 	// количество тактов процессора, после которых выполнение приостанавливается до следующего прерывания
@@ -18,11 +21,17 @@ function ZX_Settings() {
 	this.extended_memory = 1;
 }
 
+ZX_Settings.get_default_settings = function() {
+	return new ZX_Settings();
+}
+
 ZX_Settings.get_local_settings = function() {
 	var settings = new ZX_Settings();
 
 	if ( localStorage ) {
 		settings.use_bright_bit				= value_or_default(localStorage.settings_use_bright_bit,			settings.use_bright_bit);
+		settings.renderer_type				= value_or_default(localStorage.settings_renderer_type,				settings.renderer_type);
+		settings.scale_type					= value_or_default(localStorage.settings_scale_type,				settings.scale_type);
 		settings.tstates_per_int_min		= value_or_default(localStorage.settings_tstates_per_int_min,		settings.tstates_per_int_min);
 		settings.tstates_per_int_max		= value_or_default(localStorage.settings_tstates_per_int_max,		settings.tstates_per_int_max);
 		settings.turbo_mode					= value_or_default(localStorage.settings_turbo_mode,				settings.turbo_mode);
@@ -55,6 +64,8 @@ ZX_Settings.get_local_settings = function() {
 ZX_Settings.store_local_settings = function( settings ) {
 	if ( localStorage ) {
 		localStorage.settings_use_bright_bit			= settings.use_bright_bit;
+		localStorage.settings_renderer_type				= settings.renderer_type;
+		localStorage.settings_scale_type				= settings.scale_type;
 		localStorage.settings_tstates_per_int_min		= settings.tstates_per_int_min;
 		localStorage.settings_tstates_per_int_max		= settings.tstates_per_int_max;
 		localStorage.settings_turbo_mode				= settings.turbo_mode;
