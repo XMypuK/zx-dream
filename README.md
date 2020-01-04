@@ -76,3 +76,7 @@ To build, the PowerShell 2.0 must be installed. Also JS code will be minified in
 Java runtime environment is presented on the computer. In order to build the project, you have to run *build.cmd* 
 file that is placed at the top directory. (Probably also the next command must be executed in the shell: 
 *Set-ExecutionPolicy -ExecutionPolicy RemoteSigned*.)
+
+## License
+
+This project is under [MIT License](LICENSE)
