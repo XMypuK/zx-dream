@@ -2255,8 +2255,8 @@
 
                 result.addr = read_memory_word(bus, result.next);
                 result.next += 2;
-                result.bytes.push(addr & 0xff);
-                result.bytes.push(addr >> 8);
+                result.bytes.push(result.addr & 0xff);
+                result.bytes.push(result.addr >> 8);
 		        result.mn = 'CALL addr';
 		        return result;
 		    }
@@ -2281,8 +2281,8 @@
 
                 result.addr = read_memory_word(bus, result.next);
                 result.next += 2;
-                result.bytes.push(addr & 0xff);
-                result.bytes.push(addr >> 8);
+                result.bytes.push(result.addr & 0xff);
+                result.bytes.push(result.addr >> 8);
 		        result.mn = 'CALL ' + condition + ', addr';
 		        return result;
 		    }
