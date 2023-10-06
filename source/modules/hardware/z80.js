@@ -651,7 +651,7 @@ function Z80 (bus) {
 
                 ts_cnt += 5;
 
-                if ( repeat && !cur_bc && !cmp_res ) {
+                if ( repeat && cur_bc && cmp_res ) {
                     pc = ( pc - 2 ) & 0xffff;
                     ts_cnt += 5;
                 }
