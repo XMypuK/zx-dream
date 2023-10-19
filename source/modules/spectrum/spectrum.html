@@ -55,7 +55,7 @@ $(window).load(function() {
 	function start() {
 		if ( debugMode ) {
 			$debug.show();
-			zxdebug.debug($debug[0], ZXContext.hw.cpu, ZXContext.hw.bus, ZXContext.ui.workspace.get_display(), ZXContext.settings);
+			zxdebug.debug($debug[0], ZXContext.hw.cpu, ZXContext.hw.bus, ZXContext.hw.display, ZXContext.settings);
 			ZXContext.ui.workspace.adjustWorkspaceLayout();
 		}
 		else {
