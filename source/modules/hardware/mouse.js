@@ -1,88 +1,60 @@
 function ZX_Mouse () {
-	var b1 = 1;
-	var b2 = 1;
-	var b3 = 1;
-	var b4 = 1;
-	var scroll_pos = 0; // 0 - 15
-	var x_pos = 1; // 0 - 255
-	var y_pos = 2; // 0 - 255
-	var monitors = [];
+	var buttons = 0x0f;
+	var scrollPos = 0; // 0 - 15
+	var x = 1; // 0 - 255
+	var y = 2; // 0 - 255
+	var listeners = [];
 	
-	var device = new ZX_Device({
-		id: 'mouse',
-		iorq: function ( state, bus ) {
-			if ( state.read ) {
-				switch ( state.address ) {
-					// кнопки
-					case 0xfadf:
-						state.data = ( scroll_pos << 4 ) | ( b4 << 3 ) | ( b3 << 2 ) | ( b2 << 1 ) | b1;
-						break;
+	function io_read(address) {
+		if (address == 0xfadf)
+			return ( scrollPos << 4 ) | buttons;
+		if (address == 0xfbdf)
+			return x;
+		if (address == 0xffdf)
+			return y;
+	}
 
-					// x
-					case 0xfbdf:
-						state.data = x_pos;
-						break;
-
-					// y
-					case 0xffdf:
-						state.data = y_pos;
-						break;
-				}
-			}
-		}
-	});
-
-	function notify_monitors( state ) {
-		for ( var i = 0; i < monitors.length; i++ ) {
-			monitors[i](state);
+	function notifyListeners( state ) {
+		for ( var i = 0; i < listeners.length; i++ ) {
+			listeners[i](state);
 		}
 	}	
 
-	device.switch_button = function ( num, pressed ) {
-		switch ( num ) {
-			case 1: b1 = pressed ? 0 : 1; break;
-			case 2: b2 = pressed ? 0 : 1; break;
-			case 3: b3 = pressed ? 0 : 1; break;
-			case 4: b4 = pressed ? 0 : 1; break;
-		}
-		notify_monitors({ type: 'key', num: num, pressed: pressed });
+	this.switchButton = function ( num, pressed ) {
+		var idx = num - 1;
+		var cur = (buttons & (1 << idx)) ? 1 : 0;
+		var value = pressed ? 0 : 1;
+		if (cur == value)
+			return;
+		if (value)
+			buttons |= (1 << idx) & 0x0f;
+		else
+			buttons &= ~(1 << idx) & 0x0f;
+		notifyListeners({ type: 'key', num: num, pressed: !!pressed });
 	}
 
-	device.wheel_up = function ( diff ) {
-		scroll_pos = ( scroll_pos + diff ) & 0x0f;
-		notify_monitors({ type: 'wheel', diff: diff });
+	this.wheel = function (diff) {
+		scrollPos = (scrollPos + diff) & 0x0f;
+		notifyListeners({ type: 'wheel', diff: diff });
 	}
 
-	device.wheel_down = function ( diff ) {
-		scroll_pos = ( scroll_pos - diff ) & 0x0f;
-		notify_monitors({ type: 'wheel', diff: -diff });
+	this.moveX = function (diff) {
+		x = ( x + diff ) & 0xff;
+		notifyListeners({ type: 'move-x', diff: diff });
 	}
 
-	device.move_up = function ( diff ) {
-		y_pos = ( y_pos + diff ) & 0xff;
-		notify_monitors({ type: 'vmove', diff: diff });
+	this.moveY = function (diff) {
+		y = ( y + diff ) & 0xff;
+		notifyListeners({ type: 'move-y', diff: diff });
 	}
 
-	device.move_down = function ( diff ) {
-		y_pos = ( y_pos - diff ) & 0xff;
-		notify_monitors({ type: 'vmove', diff: -diff });
-	}
-
-	device.move_left = function ( diff ) {
-		x_pos = ( x_pos - diff ) & 0xff;
-		notify_monitors({ type: 'hmove', diff: -diff });
-	}
-
-	device.move_right = function ( diff ) {
-		x_pos = ( x_pos + diff ) & 0xff;
-		notify_monitors({ type: 'hmove', diff: diff });
-	}
-
-	device.monitor = function ( listener ) {
+	this.subscribe = function ( listener ) {
 		if ( typeof listener == 'function' ) {
-			monitors.push(listener);
+			listeners.push(listener);
 		}
 	}
 
-	return device;
+	this.connect = function (bus) {
+		bus.on_io_read(io_read);
+	}
 }

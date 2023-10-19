@@ -1,58 +1,58 @@
 <style>
 	.drive-box {
+		box-sizing: border-box;
 		display: block;
-		width: 270px;
+		width: 100%;
 		border: 1px solid #cccccc;
-		height: 1.5em;
-		line-height: 1.5em;
+		height: 24px;
+		line-height: 24px;
 		position: relative;
-		margin: 5px;
+		margin: 10px 0;
 	}
 
 	.drive-box .letter {
-		float: left;
 		width: 20px;
-		text-align: right;
+		text-align: center;
+		display: inline-block;
+		vertical-align: middle;
 	}
 
 	.drive-box .action-button {
 		display: block;
-		border-left: 1px solid #cccccc;
+		height: 24px;
+		line-height: 24px;
 		cursor: pointer;
-		width: 16px;
-		height: 1.5em;
-		text-align: center;
-		position: absolute;
-		right: 0;
-		top: 0;
-		background: #e0e0e0 url('../img/dropdown.png') no-repeat center center;
-	}	
+		white-space: nowrap;
+		border: 1px solid #75a9f9;
+		border-radius: 3px;
+		font-family: Arial;
+		background: #e0e0e0 url('../img/dropdown.png') no-repeat right center;
+		overflow: hidden;
+	}
 
 	.drive-box .title {
 		overflow: hidden;
 		white-space: nowrap;
-		float: left;
-		width: 233px;
+		display: inline-block;
+		vertical-align: middle;
 	}
 
 	.drive-box .status {
 		display: none;
-		width: 1.5em;
-		height: 1.5em;
-		line-height: 1.5em;
+		width: 16px;
+		height: 24px;
 		background-color: transparent;
 		background-position: center center;
 		background-repeat: no-repeat;
-		position: absolute;
-		left: 270px;
-		top: 0;
+		vertical-align: middle;
+		display: inline-block;
 	}
 	.drive-box .error {
-		display: block;
+		display: inline-block;
 		background-image: url('../img/error.png');
 	}
-	.drive-box .process {
-		display: block;
+	.drive-box .loading {
+		display: inline-block;
 		background-image: url('../img/process.gif');
 	}
 
@@ -90,22 +90,26 @@
 
 <template id="drive-box">
 	<div class="drive-box">
-		<div class="letter"></div>
-		<div class="title"></div>
-		<a class="action-button"></a>
-		<div class="status"></div>
+		<a class="action-button"><!--
+			--><div class="letter"></div><!--
+			--><div class="title"></div><!--
+			--><div class="status"></div><!--
+		--></a>
 		<ul class="action-list">
-			<li><a data-action="image-open">открыть с сервера...</a></li>
-			<li><a data-action="image-open-local">открыть с диска...</a></li>
-			<li><a data-action="image-save-local">сохранить на диск...</a></li>
-			<li><a data-action="image-create">создать...</a></li>
-			<li><a data-action="image-eject">излечь</a></li>
 		</ul>			
 	</div>
 </template>
 
 <script type="text/javascript">
-	function DriveBox( container, on_action, drive_code, title ) {
+	var DriveBoxStatus = {
+		empty: 0,
+		loading: 1,
+		loaded: 2,
+		modified: 3,
+		error: 4
+	};
+
+	function DriveBox( container, driveIndex, onCommand ) {
 		'use strict';
 		
 		////////////
@@ -113,104 +117,130 @@
 		////////////
 
 		this.set_title = set_title;
-		this.load_start = load_start;
-		this.load_end = load_end;
-		this.error = error;
-		this.clear_error = clear_error;
+		this.get_title = get_title;
+		this.set_status = set_status;
+		this.get_status = get_status;
+		this.addAction = addAction;
+		this.removeAction = removeAction;
+		this.beginInit = beginInit;
+		this.endInit = endInit;
 
 		/////////////
 		// private //
 		/////////////
 
-		drive_code = drive_code_to_index(drive_code);
-		if (isNaN(drive_code)) {
-			throw new Error('Некорректный код дисковода');
+		var self = this;
+		var init = false;
+		var title = '';
+		var status = DriveBoxStatus.empty;
+		var actions = [];
+
+		var $box = $("<?=drive-box?>").appendTo(container);
+
+		var $letter = $box.find('.letter');
+		var $title = $box.find('.title');
+		var $status = $box.find('.status');
+		var $actionsButton = $box.find('.action-button');
+		var $actions = $box.find('.action-list');
+
+		function set_title(value) {
+			title = value;
+			bindData();
 		}
 
-		var temp_div = document.createElement('div');
-		temp_div.innerHTML = "<?=drive-box?>";
-		var div = temp_div.children[0];
-		container.appendChild(div);
-
-		var $letter = $(div).find('.letter');
-		var $title = $(div).find('.title');
-		var $status = $(div).find('.status');
-		var $actions_btn = $(div).find('.action-button');
-		var $actions = $(div).find('.action-list');
-
-		$letter.text(String.fromCharCode( 0x41 + drive_code ) + ':');
-		$title.text(title || '');
-
-		function set_title( text ) {
-			$title.text(text);
+		function get_title() {
+			return title;
 		}
 
-		function load_start() {
-			$status.addClass('process');
+		function set_status(value) {
+			status = value;
+			bindData();
 		}
 
-		function load_end() {
-			$status.removeClass('process');
+		function get_status(value) {
+			return status;
 		}
 
-		function error() {
-			$status.addClass('error');
+		function addAction(command, title) {
+			actions.push({ command: command, title: title });
+			bindData();
 		}
 
-		function clear_error() {
-			$status.removeClass('error');
-		}
-
-		// Если в качестве аргумента передана буква диска (A - D), то преобразует ее в индекс.
-		// Если же передан индекс (0 - 3), то он возвращается как результат.
-		function drive_code_to_index( drive_code ) {
-			if ( typeof drive_code == 'string' ) {
-				switch ( drive_code.toUpperCase() ) {
-					case 'A': return 0;
-					case 'B': return 1;
-					case 'C': return 2;
-					case 'D': return 3;
-					case '0': return 0;
-					case '1': return 1;
-					case '2': return 2;
-					case '3': return 3;
-					default: return NaN;
+		function removeAction(command) {
+			for (var i = 0; i < actions.length; i++ ) {
+				if (actions[i].command == command) {
+					actions.splice(i, 1);
+					break;
 				}
 			}
-
-			if ( typeof drive_code == 'number' && drive_code >= 0 && drive_code <= 3 ) {
-				return drive_code;
-			}
-
-			return NaN;
+			bindData();
 		}
 
-		$actions_btn.on('click', function(e) {
-			if ($actions.is(':visible')) {
-				$actions.hide();
-				$(document.body).off('click', do_action);
+		function beginInit() {
+			init = true;	
+		}
+
+		function endInit() {
+			init = false;
+			bindData();
+		}
+
+		function bindData() {
+			if (init)
+				return;
+
+			$letter.text(String.fromCharCode(0x41 + driveIndex));
+			if (status == DriveBoxStatus.empty) {
+				$title.text('<пусто>');
 			}
 			else {
-				$actions.show();
-				$(document.body).on('click', do_action);
+				$title.text(title);
 			}
-			e.stopPropagation();
+			$status.removeClass('loading error');
+			switch (status) {
+				case DriveBoxStatus.loading: $status.addClass('loading'); break;
+				case DriveBoxStatus.error: $status.addClass('error'); break;
+			}
+			$actions.empty();
+			for ( var i = 0; i < actions.length; i++ ) {
+				var $action = $('<li></li>');
+				var $actionLink = $('<a></a>')
+					.attr('data-command', actions[i].command)
+					.text(actions[i].title)
+					.appendTo($action);
+				$actions.append($action);
+			}
+		}
+
+		$actionsButton.on('click', function(e) {
+			if (!$actions.is(':visible')) {
+				$actions.show();
+
+				setTimeout(function() {
+					$(document.body).on('click', onClick);
+					$(document.body).on('keydown', onKeyDown)
+				}, 0);				
+			}
 		});
 
-		
-
-		function do_action( e ) {
+		function onClick(e) {
 			$actions.hide();
-			$(document.body).off('click', do_action);
+			$(document.body).off('click', onClick);
+			$(document.body).off('keydown', onKeyDown);
 
-			var action = $(e.target).attr('data-action');
-			if (action) {
-				on_action({
-					name: action,
-					value: {
-						drive_code: drive_code
-					}
-				})
+			var command = $(e.target).attr('data-command');
+			if (!command || typeof onCommand !== 'function')
+				return;
+			
+			onCommand(command, driveIndex, self);
+		}
+
+		function onKeyDown(e) {
+			if (e.keyCode == 27) {
+				$actions.hide();
+				$(document.body).off('click', onClick);
+				$(document.body).off('keydown', onKeyDown);
+				return false;
 			}
 		}
 	}

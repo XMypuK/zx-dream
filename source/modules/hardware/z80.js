@@ -1,6 +1,8 @@
-function Z80 (bus) {
+function ZX_Z80 () {
     'use strict';
     
+    var _bus;
+
     // счетчик тактов
     var ts_cnt = 0;
 
@@ -84,6 +86,7 @@ function Z80 (bus) {
     var nmi_request = false;
     var int_request = false;
     var int_request_data = 0xff;
+    var int_request_force = false;
 
     /////////////////////////////////////
     // фуикции чтения/записи регистров //
@@ -129,104 +132,75 @@ function Z80 (bus) {
     // фуикции чтения/записи спец. флагов //
     ////////////////////////////////////////
 
-    function flag_iff1(value) {
-        if (value !== undefined) {
-            if (value) {
-                iff |= 0x02;
-            }
-            else {
-                iff &= 0xfd;
-            }
-        }
-        else {
-            return !!(iff & 0x02);
-        }
-    }
+	function get_iff1() {
+		return !!(iff & 0x02);
+	}
 
-    function flag_iff2(value) {
-        if (value !== undefined) {
-            if (value) {
-                iff |= 0x01;
-            }
-            else {
-                iff &= 0xfe;
-            }
-        }
-        else {
-            return !!(iff & 0x01);
-        }
-    }
+	function set_iff1(value) {
+		if (value) {
+			iff |= 0x02;
+		}
+		else {
+			iff &= 0xfd;
+		}
+	}
 
-    function flag_imfa(value) {
-        if (value !== undefined) {
-            if (value) {
-                imf |= 0x02;
-            }
-            else {
-                imf &= 0xfd;
-            }
-        }
-        else {
-            return !!(imf & 0x02);
-        }
-    }
+	function get_iff2() {
+		return !!(iff & 0x01);
+	}
 
-    function flag_imfb(value) {
-        if (value !== undefined) {
-            if (value) {
-                imf |= 0x01;
-            }
-            else {
-                imf &= 0xfe;
-            }
-        }
-        else {
-            return !!(imf & 0x01);
-        }
-    }
+	function set_iff2(value) {
+		if (value) {
+			iff |= 0x01;
+		}
+		else {
+			iff &= 0xfe;
+		}
+	}
+	
+	function get_imfa() {
+		return !!(imf & 0x02);
+	}
 
+	function set_imfa(value) {
+		if (value) {
+			imf |= 0x02;
+		}
+		else {
+			imf &= 0xfd;
+		}
+	}
+
+	function get_imfb() {
+		return !!(imf & 0x01);
+	}
+
+	function set_imfb(value) {
+		if (value) {
+			imf |= 0x01;
+		}
+		else {
+			imf &= 0xfe;
+		}
+	}
 
     ///////////////////////////////////////////////////////////
     // функции обращения к памяти и устройствам ввода/вывода //
     ///////////////////////////////////////////////////////////
 
     function read_opcode() {
-        var state = {
-            mreq: true,
-            iorq: false,
-            m1: true,
-            read: true,
-            write: false,
-            address: pc,
-            data: 0,
-            size: 1
-        }
-
-        bus.request(state);
+        var v8 = _bus.instruction_read(pc);
         pc = ( pc + 1 ) & 0xffff;
         r = ( r & 0x80 ) | (( r + 1 ) & 0x7f );
         ts_cnt += 4;
-
-        return state.data;
+        return v8;
     }
 
     function read_operand_byte() {
-        var state = {
-            mreq: true,
-            iorq: false,
-            m1: true,
-            read: true,
-            write: false,
-            address: pc,
-            data: 0,
-            size: 1
-        }
-
-        bus.request(state);
+        var v8 = _bus.instruction_read(pc);
         pc = ( pc + 1 ) & 0xffff;
         ts_cnt += 3;
-
-        return state.data;
+        return v8;
     }
 
     function read_operand_word() {
@@ -235,94 +209,41 @@ function Z80 (bus) {
         return low_byte | ( high_byte << 8 );
     }
 
-    function mem_byte(address, value) {
-        var state = {
-            mreq: true,
-            iorq: false,
-            m1: false,
-            read: false,
-            write: false,
-            address: address,
-            data: 0,
-            size: 1
-        };
-
-        var res;
-
-        if (value !== undefined) {
-            state.write = true;
-            state.data = value;
-            bus.request(state);
-        }
-        else {
-            state.read = true;
-            bus.request(state);
-            res = state.data;
-        }
-
+    function read_mem_byte(address) {
+        var v8 = _bus.mem_read(address);
         ts_cnt += 3;
-
-        return res;
+        return v8;
     }
 
-    function mem_word(address, value) {
-        if ( value !== undefined ) {
-            mem_byte( address, value & 0xff )
-            mem_byte(( address + 1 ) & 0xffff, value >> 8 );
-            return;
-        }
-        else {
-            var low_byte = mem_byte(address);
-            var high_byte = mem_byte(( address + 1 ) & 0xffff );
-            return low_byte | ( high_byte << 8 );
-        }
+    function write_mem_byte(address, value) {
+        _bus.mem_write(address, value);
+        ts_cnt += 3;
     }
 
-    function io_byte(port, value) {
-        var state = {
-            mreq: false,
-            iorq: true,
-            m1: false,
-            read: false,
-            write: false,
-            address: port,
-            data: 0,
-            size: 1
-        };
+    function read_mem_word(address) {
+        var low_byte = read_mem_byte(address);
+        var high_byte = read_mem_byte(( address + 1 ) & 0xffff);
+        return low_byte | ( high_byte << 8 );
+    }
+    
+    function write_mem_word(address, value) {
+        write_mem_byte(address, value & 0xff);
+        write_mem_byte(( address + 1 ) & 0xffff, value >> 8);
+    }
 
-        var res;
-
-        if (value !== undefined) {
-            state.write = true;
-            state.data = value;
-            bus.request(state);
-        }
-        else {
-            state.read = true;
-            bus.request(state);
-            res = state.data;
-        }
-
+    function read_io_byte(port) {
+        var v8 = _bus.io_read(port);
         ts_cnt += 4;
+        return v8;
+    }
 
-        return res;
+    function write_io_byte(port, value) {
+        _bus.io_write(port, value);
+        ts_cnt += 4;
     }
 
     function is_halt() {
-        var state = {
-            mreq: true,
-            iorq: false,
-            m1: true,
-            read: true,
-            write: false,
-            address: pc,
-            data: 0,
-            size: 1
-        }
-
-        bus.request(state);
-
-        return state.data == 0x76;
+        return _bus.instruction_read(pc) == 0x76;
     }
 
     ///////////////////////////////////////////
@@ -330,102 +251,19 @@ function Z80 (bus) {
     ///////////////////////////////////////////
 
     function process() {
-        // обработка прерываний:
         // если выполняется команда с данными префиксами,
-        // то ждем завершения
+        // то не обрабатываем поступившие прерывания, 
+        // а ждем завершения чтения и выполнения команды
         if (!prefix_bit && !prefix_ext) {
-
             // проверка на запрос немаскируемого прерывания
-            if (nmi_request) {
-                nmi_request = false;
-
-                // total: + 11 t-states
-                flag_iff1(false);
-
-                r = ( r & 0x80 ) | (( r + 1 ) & 0x7f );
-
-                if ( is_halt() ) {
-                    pc = ( pc + 1 ) & 0xffff;
-                }                
-                else if ( prefix_iy || prefix_ix ) {
-                    // если включен какой-то из индексных префиксов,
-                    // то после прерывания надо заного его включить,
-                    // поэтому адрес возврата делаем на единицу меньше
-                    pc = ( pc - 1 ) & 0xffff;
-                }
-
-                prefix_iy = false;
-                prefix_ix = false;
-
-                sp = ( sp - 2 ) & 0xffff;
-                mem_word(sp, pc);
-                pc = 0x0066;
-
-                ts_cnt += 5;
-
+            if (nmi_request && process_nmi_request())
                 return;
-            }
-
             // проверка на запрос маскируемого прерывания
-            if (int_request) {
-                int_request = false;
-
-                // если маскируемые прерывания включены
-                if (flag_iff1()) {
-                    flag_iff1(false);
-                    flag_iff2(false);
-                
-                    r = ( r & 0x80 ) | (( r + 1 ) & 0x7f );
-
-                    if ( is_halt() ) {
-                        pc = ( pc + 1 ) & 0xffff;
-                    }   
-                    else if ( prefix_iy || prefix_ix ) {
-                        // если включен какой-то из индексных префиксов,
-                        // то после прерывания надо заного его включить,
-                        // поэтому адрес возврата делаем на единицу меньше
-                        pc = ( pc - 1 ) & 0xffff;
-                    }
-
-                    prefix_iy = false;
-                    prefix_ix = false;
-
-                    ts_cnt += 2 + 4;
-
-                    switch (imf) {
-                        case 0x00:
-                        case 0x01:
-                            // IM 0
-                            // total: + 13 t-states
-                            do_operation(int_request_data);
-                            break;
-
-                        case 0x02:
-                            // IM 1
-                            // total: + 13 t-states
-                            do_operation(0xff); // RST #38
-                            break;
-
-                        case 0x03:
-                            // IM 2
-                            // total: + 19 t-states
-                            var ref_addr = ( i << 8 ) | int_request_data;
-                            var hnd_addr = mem_word(ref_addr);
-
-                            sp = ( sp - 2 ) & 0xffff;
-                            mem_word(sp, pc);
-                            pc = hnd_addr;
-
-                            ts_cnt += 1;
-
-                            break;
-                    }
-
-                    return;
-                }
-            }
+            if (int_request && process_int_request()) 
+                return;
         }
 
+        // считываем очередной код
         var opcode = read_opcode();
 
         // проверка на префиксы
@@ -475,6 +313,122 @@ function Z80 (bus) {
         prefix_bit = false;
     }
 
+    function process_nmi_request() {
+        nmi_request = false;
+
+        // total: + 11 t-states
+        set_iff1(false);
+
+        r = ( r & 0x80 ) | (( r + 1 ) & 0x7f );
+
+        if ( is_halt() ) {
+            pc = ( pc + 1 ) & 0xffff;
+        }                
+        else if ( prefix_iy || prefix_ix ) {
+            // если включен какой-то из индексных префиксов,
+            // то после прерывания надо заново его включить,
+            // поэтому адрес возврата делаем на единицу меньше
+            pc = ( pc - 1 ) & 0xffff;
+        }
+
+        prefix_iy = false;
+        prefix_ix = false;
+
+        sp = ( sp - 2 ) & 0xffff;
+        write_mem_word(sp, pc);
+        pc = 0x0066;
+
+        ts_cnt += 5;
+
+        return true;
+    }
+
+    function process_int_request() {
+        int_request = false;
+
+        // если маскируемые прерывания выключены
+        // прерывание не обрабатывается
+        if (!get_iff1() && !int_request_force)
+            return false;
+
+        int_request_force = false;
+        set_iff1(false);
+        set_iff2(false);
+
+        /*
+            Команды LD A, I и LD A, R по спецификации должны копировать флаг
+            прерываний iff2 во флаг четности. Однако в реальном Z80 существует
+            баг, что если в этот момент поступит сигнал прерывания, то во флаг
+            четности запишется значение уже сброшенного флага.
+
+            Мы уже сбросили флаги выше. Проверяем, что следующая команда - одна
+            из перечисленных и, если так, даем ей выполниться со сброшенным флагом
+            iff2. После выполнения команды прерывание будет выполнено по условиям 
+            int_request и int_request_force.
+        */
+
+        var emulate_iff2_copy_bug = false;
+        var next_opcode = _bus.instruction_read(pc);
+        if ( next_opcode == 0xed ) {
+            next_opcode = _bus.instruction_read((pc + 1) & 0xffff);
+            emulate_iff2_copy_bug = ( next_opcode & 0xf7 ) == 0x57;
+        }
+
+        if (emulate_iff2_copy_bug) {
+            int_request = true;
+            int_request_force = true;
+            return false;
+        }
+
+        // выполняем прерывание
+        r = ( r & 0x80 ) | (( r + 1 ) & 0x7f );
+
+        if ( is_halt() ) {
+            pc = ( pc + 1 ) & 0xffff;
+        }   
+        else if ( prefix_iy || prefix_ix ) {
+            // если включен какой-то из индексных префиксов,
+            // то после прерывания надо заново его включить,
+            // поэтому адрес возврата делаем на единицу меньше
+            pc = ( pc - 1 ) & 0xffff;
+        }
+
+        prefix_iy = false;
+        prefix_ix = false;
+
+        ts_cnt += 2 + 4;
+
+        switch (imf) {
+            case 0x00:
+            case 0x01:
+                // IM 0
+                // total: + 13 t-states
+                do_operation(int_request_data);
+                break;
+
+            case 0x02:
+                // IM 1
+                // total: + 13 t-states
+                do_operation(0xff); // RST #38
+                break;
+
+            case 0x03:
+                // IM 2
+                // total: + 19 t-states
+                var ref_addr = ( i << 8 ) | int_request_data;
+                var hnd_addr = read_mem_word(ref_addr);
+
+                sp = ( sp - 2 ) & 0xffff;
+                write_mem_word(sp, pc);
+                pc = hnd_addr;
+
+                ts_cnt += 1;
+
+                break;
+        }
+        return true;
+    }
+
     function do_operation(opcode) {
         if (prefix_ext) {
 
@@ -489,18 +443,6 @@ function Z80 (bus) {
                     case 0x00: i = a; break;
                     case 0x01: r = a; break;
 
-                    /*
-                        Команды LD A, I и LD A, R по спецификации должны копировать флаг
-                        прерываний iff2 во флаг четности. Однако в реальном Z80 существует
-                        баг, что если в этот момент поступит сигнал прерывания, то во флаг
-                        четности запишется 0.
-
-                        Представленный тут алгоритм также реализует подобное поведение,
-                        однако нет уверенности, что оно совпадает с оригинальным на 100%.
-                        (Имеется ввиду соответствие интервалов времени и режима прерываний,
-                        на основе которых принимается решение о значении флага.)
-                    */
-
                     case 0x02: 
                         a = i;
                         f.s = a & 0x80;
@@ -508,7 +450,7 @@ function Z80 (bus) {
                         f.y = a & 0x20;
                         f.h = 0;
                         f.x = a & 0x08;
-                        f.p = ( flag_iff1() && int_request ) ? 0 : flag_iff2();
+                        f.p = get_iff2();
                         f.n = 0;
                         break;
 
@@ -519,7 +461,7 @@ function Z80 (bus) {
                         f.y = a & 0x20;
                         f.h = 0;
                         f.x = a & 0x08;
-                        f.p = ( flag_iff1() && int_request ) ? 0 : flag_iff2();
+                        f.p = get_iff2();
                         f.n = 0;
                         break;
                 }
@@ -540,7 +482,7 @@ function Z80 (bus) {
                 var dd = (opcode >> 4) & 0x03;
 
                 if (to_reg) {
-                    var value = mem_word(addr);
+                    var value = read_mem_word(addr);
                     switch (dd) {
                         case 0x00: set_bc(value); break;
                         case 0x01: set_de(value); break;
@@ -556,7 +498,7 @@ function Z80 (bus) {
                         case 0x02: value = get_hl(); break;
                         case 0x03: value = sp; break;
                     }
-                    mem_word(addr, value);
+                    write_mem_word(addr, value);
                 }
 
                 return;
@@ -576,8 +518,8 @@ function Z80 (bus) {
                 var cur_de = get_de();
                 var cur_bc = get_bc();
 
-                var data = mem_byte(cur_hl);
-                mem_byte(cur_de, data);
+                var data = read_mem_byte(cur_hl);
+                write_mem_byte(cur_de, data);
 
                 if (increment) {
                     cur_hl = (cur_hl + 1) & 0xffff;
@@ -624,7 +566,7 @@ function Z80 (bus) {
                 var cur_hl = get_hl();
                 var cur_bc = get_bc();
 
-                var data = mem_byte(cur_hl);
+                var data = read_mem_byte(cur_hl);
                 var cmp_res = (a - data) & 0xff;
                 var cmp_half = ((a & 0x0f) - (data & 0x0f)) < 0;
 
@@ -686,8 +628,8 @@ function Z80 (bus) {
                 // IM 2
                 // * включая все недокументированные варианты опкодов
 
-                flag_imfa(!!(opcode & 0x10));
-                flag_imfb(!!(opcode & 0x08));
+                set_imfa(!!(opcode & 0x10));
+                set_imfb(!!(opcode & 0x08));
 
                 return;
             }
@@ -757,7 +699,7 @@ function Z80 (bus) {
                 // RRD          ( 4 + 4 + 3 + 3 ) + 4
 
                 var left = !!(opcode & 0x08);
-                var cur_mem = mem_byte(get_hl());
+                var cur_mem = read_mem_byte(get_hl());
 
                 if (left) {
                     var temp = cur_mem >> 4;
@@ -770,7 +712,7 @@ function Z80 (bus) {
                     a = ( a & 0xf0 ) | temp;
                 }
 
-                mem_byte(get_hl(), cur_mem);
+                write_mem_byte(get_hl(), cur_mem);
                 f.s = a & 0x80;
                 f.z = !a;
                 f.y = a & 0x20;
@@ -790,9 +732,9 @@ function Z80 (bus) {
                 // RETN         ( 4 + 4 + 3 + 3 )
                 // * включая все недокументированные варианты опкодов
 
-                pc = mem_word(sp);
+                pc = read_mem_word(sp);
                 sp = ( sp + 2 ) & 0xffff;
-                flag_iff1(flag_iff2());
+                set_iff1(get_iff2());
 
                 return;
             }
@@ -809,7 +751,7 @@ function Z80 (bus) {
 
                 if (cmd_in) {
                     // IN
-                    var value = io_byte(get_bc());
+                    var value = read_io_byte(get_bc());
                     switch (r1) {
                         case 0x00: regs.b = value; break;
                         case 0x01: regs.c = value; break;
@@ -841,7 +783,7 @@ function Z80 (bus) {
                         case 0x07: value = a; break;
                     }
 
-                    io_byte(get_bc(), value);
+                    write_io_byte(get_bc(), value);
                 }
 
                 return;
@@ -869,12 +811,12 @@ function Z80 (bus) {
 
                 var data;
                 if (cmd_in) {
-                    data = io_byte(( new_b << 8 ) | regs.c ); // именно new_b
-                    mem_byte(cur_hl, data);
+                    data = read_io_byte(( new_b << 8 ) | regs.c ); // именно new_b
+                    write_mem_byte(cur_hl, data);
                 }
                 else {
-                    data = mem_byte(cur_hl);
-                    io_byte(( regs.b << 8 ) | regs.c, data);
+                    data = read_mem_byte(cur_hl);
+                    write_io_byte(( regs.b << 8 ) | regs.c, data);
                 }
 
                 regs.b = new_b;
@@ -972,10 +914,10 @@ function Z80 (bus) {
 
                 var current;
                 if (prefix_ix) {
-                    current = mem_byte(( ix + index_offset_cache ) & 0xffff);
+                    current = read_mem_byte(( ix + index_offset_cache ) & 0xffff);
                 }
                 else if (prefix_iy) {
-                    current = mem_byte(( iy + index_offset_cache ) & 0xffff);
+                    current = read_mem_byte(( iy + index_offset_cache ) & 0xffff);
                 }
                 else {
                     switch (r1) {
@@ -985,7 +927,7 @@ function Z80 (bus) {
                         case 0x03: current = regs.e; break;
                         case 0x04: current = regs.h; break;
                         case 0x05: current = regs.l; break;
-                        case 0x06: current = mem_byte(get_hl()); break;
+                        case 0x06: current = read_mem_byte(get_hl()); break;
                         case 0x07: current = a; break;
                     }
                 }
@@ -1041,12 +983,12 @@ function Z80 (bus) {
                 }
 
                 if (prefix_ix) {
-                    mem_byte((ix + index_offset_cache) & 0xffff, result);
+                    write_mem_byte((ix + index_offset_cache) & 0xffff, result);
 
                     ts_cnt += 6;
                 }
                 else if (prefix_iy) {
-                    mem_byte((iy + index_offset_cache) & 0xffff, result);   
+                    write_mem_byte((iy + index_offset_cache) & 0xffff, result);   
 
                     ts_cnt += 6;
                 }
@@ -1060,7 +1002,7 @@ function Z80 (bus) {
                     case 0x05: regs.l = result; break;
                     case 0x06:
                         if (!prefix_ix && !prefix_iy) {
-                            mem_byte(get_hl(), result);
+                            write_mem_byte(get_hl(), result);
 
                             ts_cnt += 1;
                         }
@@ -1094,13 +1036,13 @@ function Z80 (bus) {
                 var index_address;
                 if (prefix_ix) {
                     index_address = ( ix + index_offset_cache ) & 0xffff;
-                    value = mem_byte(index_address);
+                    value = read_mem_byte(index_address);
 
                     ts_cnt += 6;
                 }
                 else if (prefix_iy) {
                     index_address = ( iy + index_offset_cache ) & 0xffff;
-                    value = mem_byte(index_address);
+                    value = read_mem_byte(index_address);
 
                     ts_cnt += 6;
                 }
@@ -1113,7 +1055,7 @@ function Z80 (bus) {
                         case 0x04: value = regs.h; break;
                         case 0x05: value = regs.l; break;
                         case 0x06: 
-                            value = mem_byte(get_hl()); 
+                            value = read_mem_byte(get_hl()); 
                             ts_cnt += 1;
                             break;
 
@@ -1156,10 +1098,10 @@ function Z80 (bus) {
 
                 var value;
                 if (prefix_ix) {
-                    value = mem_byte(( ix + index_offset_cache ) & 0xffff);
+                    value = read_mem_byte(( ix + index_offset_cache ) & 0xffff);
                 }
                 else if (prefix_iy) {
-                    value = mem_byte(( iy + index_offset_cache ) & 0xffff);
+                    value = read_mem_byte(( iy + index_offset_cache ) & 0xffff);
                 }
                 else {
                     switch (r_dst) {
@@ -1169,7 +1111,7 @@ function Z80 (bus) {
                         case 0x03: value = regs.e; break;
                         case 0x04: value = regs.h; break;
                         case 0x05: value = regs.l; break;
-                        case 0x06: value = mem_byte(get_hl()); break;
+                        case 0x06: value = read_mem_byte(get_hl()); break;
                         case 0x07: value = a; break;
                     }
                 }
@@ -1185,12 +1127,12 @@ function Z80 (bus) {
                 }
 
                 if (prefix_ix) {
-                    mem_byte(( ix + index_offset_cache ) & 0xffff, value);
+                    write_mem_byte(( ix + index_offset_cache ) & 0xffff, value);
 
                     ts_cnt += 6;
                 }
                 else if (prefix_iy) {
-                    mem_byte(( iy + index_offset_cache ) & 0xffff, value);
+                    write_mem_byte(( iy + index_offset_cache ) & 0xffff, value);
 
                     ts_cnt += 6;
                 }
@@ -1204,7 +1146,7 @@ function Z80 (bus) {
                     case 0x05: regs.l = value; break;
                     case 0x06:
                         if (!prefix_ix && !prefix_iy) {
-                            mem_byte(get_hl(), value);
+                            write_mem_byte(get_hl(), value);
 
                             ts_cnt += 1;
                         }
@@ -1297,7 +1239,7 @@ function Z80 (bus) {
                     else {
                         addr = get_hl();
                     }
-                    value = mem_byte(addr); 
+                    value = read_mem_byte(addr); 
                     break;
 
                 case 0x07: value = a; break;
@@ -1349,7 +1291,7 @@ function Z80 (bus) {
                     else {
                         addr = get_hl();
                     }
-                    mem_byte(addr, value);
+                    write_mem_byte(addr, value);
                     break;
 
                 case 0x07: a = value; break;
@@ -1414,7 +1356,7 @@ function Z80 (bus) {
                     else {
                         addr = get_hl();
                     }                    
-                    mem_byte(addr, read_operand_byte()); 
+                    write_mem_byte(addr, read_operand_byte()); 
                     break;
 
                 case 0x07: a = read_operand_byte(); break;
@@ -1446,18 +1388,18 @@ function Z80 (bus) {
                 switch (r_code) {
                     case 0x00: 
                         // A, (BC)
-                        a = mem_byte(get_bc());
+                        a = read_mem_byte(get_bc());
                         break;
 
                     case 0x01:
                         // A, (DE)
-                        a = mem_byte(get_de());
+                        a = read_mem_byte(get_de());
                         break;
 
                     case 0x02:
                         // HL, (nn)
                         var addr = read_operand_word();
-                        var value = mem_word(addr);
+                        var value = read_mem_word(addr);
                         if (prefix_ix) {
                             ix = value;
                         }
@@ -1472,7 +1414,7 @@ function Z80 (bus) {
                     case 0x03:
                         // A, (nn)
                         var addr = read_operand_word();
-                        a = mem_byte(addr);
+                        a = read_mem_byte(addr);
                         break;
                 }
             }
@@ -1480,12 +1422,12 @@ function Z80 (bus) {
                 switch (r_code) {
                     case 0x00:
                         // (BC), A
-                        mem_byte(get_bc(), a);
+                        write_mem_byte(get_bc(), a);
                         break;
 
                     case 0x01:
                         // (DE), A
-                        mem_byte(get_de(), a);
+                        write_mem_byte(get_de(), a);
                         break;
 
                     case 0x02:
@@ -1502,13 +1444,13 @@ function Z80 (bus) {
                         }
 
                         var addr = read_operand_word();
-                        mem_word(addr, value);
+                        write_mem_word(addr, value);
                         break;
 
                     case 0x03:
                         // (nn), A
                         var addr = read_operand_word();
-                        mem_byte(addr, a);
+                        write_mem_byte(addr, a);
                         break;
                 }
             }
@@ -1560,7 +1502,7 @@ function Z80 (bus) {
 
 
             if (to_reg) {
-                var value = mem_word(sp);
+                var value = read_mem_word(sp);
                 sp = ( sp + 2 ) & 0xffff;
 
                 switch (qq) {
@@ -1604,7 +1546,7 @@ function Z80 (bus) {
                 }
 
                 sp = ( sp - 2 ) & 0xffff;
-                mem_word(sp, value);
+                write_mem_word(sp, value);
 
                 ts_cnt += 1;
             }
@@ -1666,17 +1608,17 @@ function Z80 (bus) {
             // EX (SP), IX      ( 4 + 4 + 3 + 3 + 3 + 3 ) + 3
             // EX (SP), IY      ( 4 + 4 + 3 + 3 + 3 + 3 ) + 3
 
-            var value = mem_word(sp);
+            var value = read_mem_word(sp);
             if (prefix_ix) {
-                mem_word(sp, ix);
+                write_mem_word(sp, ix);
                 ix = value;
             }
             else if (prefix_iy) {
-                mem_word(sp, iy);
+                write_mem_word(sp, iy);
                 iy = value;
             }
             else {
-                mem_word(sp, get_hl());
+                write_mem_word(sp, get_hl());
                 set_hl(value);
             }
 
@@ -1769,18 +1711,18 @@ function Z80 (bus) {
                     case 0x06:
                         if (prefix_ix) {
                             var offset = byte_to_svalue(read_operand_byte()); // (IX + d)
-                            operand = mem_byte((ix + offset) & 0xffff);
+                            operand = read_mem_byte((ix + offset) & 0xffff);
 
                             ts_cnt += 5;
                         }
                         else if (prefix_iy) {
                             var offset = byte_to_svalue(read_operand_byte()); // (IY + d)
-                            operand = mem_byte((iy + offset) & 0xffff);
+                            operand = read_mem_byte((iy + offset) & 0xffff);
 
                             ts_cnt += 5;
                         }
                         else {
-                            operand = mem_byte(get_hl()); // (HL)
+                            operand = read_mem_byte(get_hl()); // (HL)
                         }
                         break;
 
@@ -2001,9 +1943,9 @@ function Z80 (bus) {
                             ts_cnt += 1;
                         }
 
-                        operand = mem_byte(addr);
+                        operand = read_mem_byte(addr);
                         result = (operand + 1) & 0xff;
-                        mem_byte(addr, result);
+                        write_mem_byte(addr, result);
                         break;
 
                     case 0x07:
@@ -2117,9 +2059,9 @@ function Z80 (bus) {
                             ts_cnt += 1;
                         }      
                         
-                        operand = mem_byte(addr);
+                        operand = read_mem_byte(addr);
                         result = (operand - 1) & 0xff;
-                        mem_byte(addr, result);                                      
+                        write_mem_byte(addr, result);                                      
                         break;
 
                     case 0x07:
@@ -2148,8 +2090,8 @@ function Z80 (bus) {
             // EI           ( 4 )
 
             var allow_int = !!(opcode & 0x08);
-            flag_iff1(allow_int);
-            flag_iff2(allow_int);
+            set_iff1(allow_int);
+            set_iff2(allow_int);
             return;
         }
 
@@ -2498,7 +2440,7 @@ function Z80 (bus) {
             var addr = read_operand_word();
 
             sp = ( sp - 2 ) & 0xffff;
-            mem_word(sp, pc);
+            write_mem_word(sp, pc);
             pc = addr;
 
             ts_cnt += 1;
@@ -2528,7 +2470,7 @@ function Z80 (bus) {
 
             if ( condition ) {
                 sp = ( sp - 2 ) & 0xffff;
-                mem_word(sp, pc);
+                write_mem_word(sp, pc);
                 pc = addr;
 
                 ts_cnt += 1;
@@ -2541,7 +2483,7 @@ function Z80 (bus) {
         if ( opcode == 0xc9 ) {
             // RET          ( 4 + 3 + 3 )
 
-            pc = mem_word(sp);
+            pc = read_mem_word(sp);
             sp = ( sp + 2 ) & 0xffff;
             return;
         }
@@ -2565,7 +2507,7 @@ function Z80 (bus) {
             }
 
             if ( condition ) {
-                pc = mem_word(sp);
+                pc = read_mem_word(sp);
                 sp = ( sp + 2 ) & 0xffff;
             }
 
@@ -2582,7 +2524,7 @@ function Z80 (bus) {
             var addr = rst_code << 3; // code * 8
 
             sp = ( sp - 2 ) & 0xffff;
-            mem_word(sp, pc);
+            write_mem_word(sp, pc);
             pc = addr;
 
             ts_cnt += 1;
@@ -2602,11 +2544,11 @@ function Z80 (bus) {
             var cmd_in = !!(opcode & 0x08);
             if (cmd_in) {
                 // IN
-                a = io_byte(port);
+                a = read_io_byte(port);
             }
             else {
                 // OUT
-                io_byte(port, a);
+                write_io_byte(port, a);
             }
 
             return;
@@ -2698,22 +2640,44 @@ function Z80 (bus) {
     // функции запроса прерываний //
     ////////////////////////////////
 
+    // Ставит запрос на немаскируемое прерывание, 
+    // который будет обработан при следующем (или
+    // после следующем) вызове метода process()
     function nmirq() {
         nmi_request = true;
     }  
 
+    // intrq(data = 0xff);
+    // Ставит запрос на маскируемое прерывание.
+    // При следующем (или после следующем) вызо-
+    // ве метода process(), запрос будет либо
+    // удовлетворен, либо отклонен (если маскиру-
+    // емые прерывания запрещены в данный момент).
+    // Агрумент data - восьмибитное число на шине
+    // данных в момент прерывания. Оно использу-
+    // ется в режимах прерывания 0 и 2.    
     function intrq(data) {
+        if ( data === undefined ) {
+            data = 0xff;
+        }
         int_request = true;
-        int_request_data = (data !== undefined) ? (data & 0xff) : 0xff;
+        int_request_data = data & 0xff;
     }
 
     ////////////////////
     // функция сброса //
     ////////////////////
 
+    // reset();
+    // Заново инициализирует процессор. После
+    // сброса устанавливается режим прерываний 0,
+    // запрещаются маскируемые прерывания, ре-
+    // гистры AF и SP устанавливаются в 0xFFFF,
+    // регистры IR и PC устанавливаются в 0x0000.
+    // Значение остальных регистров не определено.
     function reset() {
-        flag_iff1(false);
-        flag_iff2(false);
+        set_iff1(false);
+        set_iff2(false);
         int_request = false;
         nmi_request = false;
         pc = 0x0000;
@@ -2809,32 +2773,6 @@ function Z80 (bus) {
     // внешний интерфейс //
     ///////////////////////
 
-    // nmirq();
-    // Ставит запрос на немаскируемое прерывание, 
-    // который будет обработан при следующем (или
-    // после следующем) вызове метода process()
-    this.nmirq = nmirq;
-
-    // intrq(data = 0xff);
-    // Ставит запрос на маскируемое прерывание.
-    // При следующем (или после следующем) вызо-
-    // ве метода process(), запрос будет либо
-    // удовлетворен, либо отклонен (если маскиру-
-    // емые прерывания запрещены в данный момент).
-    // Агрумент data - восьмибитное число на шине
-    // данных в момент прерывания. Оно использу-
-    // ется в режимах прерывания 0 и 2.
-    this.intrq = intrq;
-
-    // reset();
-    // Заного инициализирует процессор. После
-    // сброса устанавливается режим прерываний 0,
-    // запрещаются маскируемые прерывания, ре-
-    // гистры AF и SP устанавливаются в 0xFFFF,
-    // регистры IR и PC устанавливаются в 0x0000.
-    // Значение остальных регистров не определено.
-    this.reset = reset;
-
     // process();
     // Считывает очередную инструкцию из памяти и
     // либо выполняет команду, либо устанавливает
@@ -2883,6 +2821,13 @@ function Z80 (bus) {
     // }
     this.set_state = set_state;
 
-    this.get_ts_cnt = function() { return ts_cnt; }
-    this.set_ts_cnt = function( value ) { ts_cnt = value; }
+    this.get_tstates = function() { return ts_cnt; }
+    this.set_tstates = function( value ) { ts_cnt = value; }
+
+    this.connect = function (bus) {
+        _bus = bus;
+        _bus.on_reset(reset);
+        _bus.on_var_write(nmirq, 'nmirq');
+        _bus.on_var_write(intrq, 'intrq');
+    }
 }

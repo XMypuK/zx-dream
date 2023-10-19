@@ -1,3 +1,7 @@
+<style>
+.ui-dialog .local-open-snapshot-dlg { border-radius: 0 0 10px 10px; -moz-border-radius: 0 0 10px 10px; -webkit-border-radius: 0 0 10px 10px; padding: 1em 0.5em; }
+</style>
+
 <template id="local-open-snapshot-dlg">
 	<div class="local-open-snapshot-dlg">
 		<input type="file" name="snapshot" />
@@ -5,30 +9,52 @@
 </template>
 
 <script type="text/javascript">
-	function LocalOpenSnapshotDialog( on_file_selected ) {
+	function LocalOpenSnapshotDialog() {
 		'use strict';
 
 		var $dlg = $("<?=local-open-snapshot-dlg?>");
-		$dlg
+		var openResult$ = null;
+
+		this.open = open;
+
+		function open() {
+			if (!openResult$) {
+				openResult$ = $.Deferred();
+				init();
+			}
+			return openResult$;
+		}
+
+		function init() {
+			$dlg
 			.dialog({
 				autoOpen: true,
 				title: 'Выберите снимок SNA',
 				modal: true,
 				width: 400,
-				height: 150
+				height: 120,
+				close: function (e) {
+					$(this).dialog('destroy'); 
+					$(this).remove(); 
+
+					if (openResult$) {
+						openResult$.reject();
+						openResult$ = null;
+					}
+				}
 			})
 			.on('keydown', function (e) { e.stopPropagation(); })
 			.on('keyup', function (e) { e.stopPropagation(); });
 
-		var $snapshot = $dlg.find('input[name=snapshot]');
-		$snapshot.on('change', function (e) {
-			on_file_selected(e.target);
-			
-			$dlg
-				.dialog('close')
-				.dialog('destroy');
-
-			$dlg = null;
-		});
+			var $snapshot = $dlg.find('input[name=snapshot]');
+			$snapshot.on('change', function (e) {
+				if (openResult$) {
+					openResult$.resolve(e.target);
+					openResult$ = null;
+				}
+				$dlg.dialog('close')
+				$dlg = null;
+			});
+		}
 	}
 </script>

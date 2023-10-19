@@ -20,76 +20,33 @@ function ZX_BetaDisk() {
 		{ image: null, track: 0 }
 	];
 
-	function insert( drive_code, image ) {
-		drive_code = drive_code_to_index(drive_code);
-
-		if (!isNaN(drive_code)) {
-			// сначала извлекаем текущий диск, если он есть
-			if ( drives[ drive_code ] ) {
-				eject(drive_code);
-			}
-
-			// вставляем новый
-			drives[ drive_code ].image = image;
-
-			// генерируем событие, если необходимо
-			on_drive_ready(drive_code);
+	function insert( drive_index, image ) {
+		// сначала извлекаем текущий диск, если он есть
+		if ( drives[ drive_index ] ) {
+			eject(drive_index);
 		}
+
+		// вставляем новый
+		drives[ drive_index ].image = image;
+
+		// генерируем событие, если необходимо
+		on_drive_ready(drive_index);
 	}
 
-	function eject( drive_code ) {
-		drive_code = drive_code_to_index(drive_code);
-
-		if (!isNaN(drive_code)) {
-			drives[ drive_code ].image = null;
-			on_drive_unready(drive_code);
-		}
+	function eject( drive_index ) {
+		drives[ drive_index ].image = null;
+		on_drive_unready(drive_index);
 	}
 
-	function ready( drive_code ) {
-		if ( drive_code === undefined ) {
-			drive_code = drive;
+	function ready( drive_index ) {
+		if ( typeof drive_index === 'undefined' ) {
+			drive_index = drive;
 		}
-
-		drive_code = drive_code_to_index(drive_code);
-
-		if (!isNaN(drive_code)) {
-			return !!drives[ drive_code ].image;
-		}
-		else {
-			return false;
-		}
+		return !!drives[drive_index].image;
 	}
 
-	function get_image( drive_code ) {
-		drive_code = drive_code_to_index(drive_code);
-		if (!isNaN(drive_code)) {
-			return drives[ drive_code ].image;
-		}
-		else {
-			return null;
-		}
-	}
-
-	function drive_code_to_index( drive_code ) {
-		if ( typeof drive_code == 'string' ) {
-			switch ( drive_code.toUpperCase() ) {
-				case 'A': return 0;
-				case 'B': return 1;
-				case 'C': return 2;
-				case 'D': return 3;
-				case '0': return 0;
-				case '1': return 1;
-				case '2': return 2;
-				case '3': return 3;
-			}
-		}
-
-		if ( typeof drive_code == 'number' && drive_code >= 0 && drive_code <= 3 ) {
-			return drive_code;
-		}
-
-		return NaN;
+	function get_image( drive_index ) {
+		return drives[drive_index].image;
 	}
 
 	// Ввод/вывод в контроллер возможен только
@@ -102,13 +59,15 @@ function ZX_BetaDisk() {
 	var mfm = 0; // 0 - MFM, 1 - FM ( UNDONE: not sure )
 
 	// интервал появления индексного отверстия (ms)
+	// (скорость вращения диска 5.25 - 360 об/минуту; интервал = 167мс)
+	// (скорость вращения диска 3.5 - 200 об/минуту; интервал = 200мс)
 	var index_pointer_interval = 200;
 
 	// длина индексного отверстия (ms)
 	var index_pointer_length = 10;
 
 	// таймаут чтения или записи дорожки, после которого происходит прерывание операции
-	var track_rw_timeout = index_pointer_interval * 2;//000000;
+	var track_rw_timeout = index_pointer_interval * 2//000000;
 
 	// Таймаут чтения или записи одного байта (ms).
 	// В чистом виде не используется, т.к. слишком
@@ -122,7 +81,7 @@ function ZX_BetaDisk() {
 	var hld_extratime = index_pointer_interval * 15;
 
 	function index_pointer() {
-		return (( new Date().getTime() - last_index_pointer_time ) < index_pointer_length );
+		return (( Date.now() - last_index_pointer_time ) < index_pointer_length );
 	}
 
 
@@ -139,7 +98,7 @@ function ZX_BetaDisk() {
 	var busy = 0;
 	var hld = 0;
 
-	var idle_since = new Date().getTime();
+	var idle_since = Date.now();
 
 	function is_busy() {
 		return to_bool(busy);
@@ -152,7 +111,7 @@ function ZX_BetaDisk() {
 			hld = get_hld();
 		}
 		else {
-			idle_since = new Date().getTime();
+			idle_since = Date.now();
 		}
 	}
 
@@ -161,7 +120,7 @@ function ZX_BetaDisk() {
 			return hld;
 		}
 		else {
-			if ( hld && ( new Date().getTime() - idle_since ) < hld_extratime ) {
+			if ( hld && ( Date.now() - idle_since ) < hld_extratime ) {
 				return 1;
 			}
 			else {
@@ -216,7 +175,7 @@ function ZX_BetaDisk() {
 	}
 
 	function on_index_pointer() {
-		last_index_pointer_time = new Date().getTime();
+		last_index_pointer_time = Date.now();
 		if ( int_on_index_pointer ) {
 			intrq = 1;
 		}
@@ -280,7 +239,7 @@ function ZX_BetaDisk() {
 	function process_command( cmd ) {
 		r_command = cmd;
 
-		// проверка не команду прерывания
+		// проверка на команду прерывания
 		if (( r_command & 0xf0 ) == 0xd0 ) {
 			// прерывание команды
 
@@ -1327,21 +1286,11 @@ function ZX_BetaDisk() {
 		}
 	}
 
-	function read_sysreg( data ) {
-		if ( intrq ) {
-			data |= 0x80;
-		}
-		else {
-			data &= 0x7f;
-		}
-
-		if ( drq ) {
-			data |= 0x40;
-		}
-		else {
-			data &= 0xbf;
-		}
-
+	function read_sysreg() {
+		var data = 
+			(intrq ? 0x80 : 0x00) 
+			| (drq ? 0x40 : 0x00) 
+			| 0x3f;
 		// console.log('read', 0xff, data)
 		return data;
 	}
@@ -1370,44 +1319,41 @@ function ZX_BetaDisk() {
 		process_command(0x03);
 	}
 
-	var dev = new ZX_Device({
-		id: 'betadisk',
-		iorq: function ( state, bus ) {
-			if ( rom_trdos ) {
-				if ( state.write && ( state.address & 0x9f ) == 0x1f ) {
-					vg93_write(( state.address >> 5 ) & 0x03, state.data);
-					return;
-				}
+	function io_read(address) {
+		if (!rom_trdos)
+			return;
+		if (( address & 0x9f ) == 0x1f )
+			return vg93_read(( address >> 5 ) & 0x03);
+		if (( address & 0xff) == 0xff )
+			return read_sysreg();
+	}
 
-				if ( state.read && ( state.address & 0x9f ) == 0x1f ) {
-					state.data = vg93_read(( state.address >> 5 ) & 0x03 );
-					return;
-				}
-
-				if ( state.write && ( state.address & 0xff ) == 0xff ) {
-					write_sysreg(state.data);
-					return;
-				}
-
-				if ( state.read && ( state.address & 0xff ) == 0xff ) {
-					state.data = read_sysreg(state.data);
-					return;
-				}			
-			}
-		},
-		event: function ( name, options, bus ) {
-			if ( name == 'var_changed' && options.name == 'rom_trdos' ) {
-				rom_trdos = options.value;
-			}
+	function io_write(address, data) {
+		if (!rom_trdos)
+			return;
+		if (( address & 0x9f ) == 0x1f ) {
+			vg93_write(( address >> 5 ) & 0x03, data);
 		}
-	});
+		if (( address & 0xff) == 0xff ) {
+			write_sysreg(data);
+		}
+	}
 
-	dev.insert = insert;
-	dev.eject = eject;
-	dev.ready = ready;
-	dev.get_image = get_image;
+	function var_write_rom_trdos(name, value) {
+		rom_trdos = value;
+	}
 
-	return dev;
+	function connect(bus) {
+		bus.on_io_read(io_read);
+		bus.on_io_write(io_write);
+		bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
+	}
+
+	this.insert = insert;
+	this.eject = eject;
+	this.ready = ready;
+	this.get_image = get_image;
+	this.connect = connect;
 
 	function CRC() {
 		// CRC16 CCITT

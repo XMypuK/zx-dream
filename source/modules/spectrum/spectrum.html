@@ -1,615 +1,68 @@
 <include includeType="embed" source="common.js" />
 <include includeType="embed" source="settings.js" />
-<include includeType="embed" source="workloop.js" />
 <include includeType="embed" source="diskimage.js" />
 <include includeType="embed" source="snapshot.js" />
 
 <include includeType="embed" source="../hardware/hardware.html" />
 <include includeType="embed" source="../debug/debug.html" />
-<include includeType="embed" source="../ui/ui.html" />
-
-<style type="text/css">
-	body {
-		width: 100%;
-		margin: 8px 0;
-	}
-
-	.clear {
-		clear: both;
-	}
-
-	#main_container {
-		margin: 0 auto;
-	}
-
-	#left_field,
-	#right_field {
-		min-width: 250px;
-	}
-
-	#left_field,
-	#right_field,
-	#center_field {
-		float: left;
-	}
-
-	#commands {
-		margin: 200px 10px 10px 10px;
-	}
-	#commands a {
-		margin: 0;
-	}
-	#display {
-		position: relative;
-		border: 1px solid #a0a0a0;
-		border-radius: 5px;
-		box-shadow: 1px 1px #a0a0a0;
-		width: 576px;
-		height: 448px;
-		margin: 0 auto;
-	}
-
-	#display .error-message {
-		text-align: center;
-		color: #ff0000;
-		padding: 2em;
-	}
-
-	#vkeyb {
-		margin: 5px auto;
-		text-align: center;
-	}
-	#vmouse {
-		margin: 200px 10px 10px 10px;
-		text-align: center;
-	}
-
-	#debug {
-		display: none;
-		width: 700px;
-	}
-</style>
-
-<template id="spectrum">
-	<div id="main_container">
-		<div id="left_field">
-			<div id="commands">
-				<a data-command="reset" title="Сброс"><img src="img/reset.png" alt="Сброс" /></a>
-				<a data-command="settings" title="Настройки"><img src="img/properties.png" alt="Настройки"/></a>
-				<a data-command="snapshot-open" title="Загрузить снимок"><img src="img/open.png" alt="Загрузить снимок" /></a>
-				<a data-command="snapshot-save" title="Сохранить снимок"><img src="img/save.png" alt="Сохранить снимок" /></a>
-				<a data-command="about" title="Об эмуляторе"><img src="img/info.png" alt="Об эмуляторе"/></a>
-			</div>
-			<div id="drives"></div>	
-		</div>
-		<div id="center_field">
-			<div id="display"></div>
-			<div id="vkeyb"></div>		
-		</div>	
-		<div id="right_field">
-			<div id="vmouse"></div>
-		</div>
-		<div class="clear"></div>
-		<div id="debug_container">
-			<div id="debug"></div>
-		</div>
-	</div>
-</template>
+<include includeType="embed" source="../ui/workspace.html" />
 
 <script type="text/javascript">
 
 $(window).load(function() {
-	$("<?=spectrum?>").appendTo(document.body);
-
-	var bus = new ZX_Bus();
-	var port_fe = new ZX_PortFE();
-	var port_7ffd = new ZX_Port7FFD();
-	var rom = new ZX_ROM();
-	var ram = new ZX_RAM();
-	var display = new ZX_Display($('#display')[0]);
-	var keyboard = new ZX_Keyboard();
-	var betadisk = new ZX_BetaDisk();
-	var mouse = new ZX_Mouse();
-
-	bus.connect(port_fe);
-	bus.connect(port_7ffd);
-	bus.connect(rom);
-	bus.connect(ram);
-	bus.connect(display);
-	bus.connect(keyboard);
-	bus.connect(betadisk);
-	bus.connect(mouse);
-
-	var drives = {
-		0: new DriveBox($('#drives')[0], on_drive_action, 0, ''),
-		1: new DriveBox($('#drives')[0], on_drive_action, 1, ''),
-		2: new DriveBox($('#drives')[0], on_drive_action, 2, ''),
-		3: new DriveBox($('#drives')[0], on_drive_action, 3, '')
+	window.ZXContext = {
+		settings: new ZX_Settings(),
+		hw: {},
+		ui: {}
 	};
 
-	var z80 = new Z80(bus);
-
-	var useDefaultSettings = /(\?|&)default=?(&|$)/.test(window.location.search);
-	var settings = 
-		useDefaultSettings ? 
-		ZX_Settings.get_default_settings() :
-		ZX_Settings.get_local_settings();
-
-	var workloop = new ZX_WorkLoop(settings, z80, display);
-
-	apply_settings( true );
-
-
-	$('#commands>a').button({ text: false });
-	$('#commands>a').click(function (e) {
-		var command = $(e.target).closest('a').attr('data-command');
-		switch ( command ) {
-			case 'reset': reset(); break;
-			case 'settings': open_settings(); break;
-			case 'snapshot-open': snapshot_open(); break;
-			case 'snapshot-save': snapshot_save(); break;
-			case 'about': about(); break;
-		}
-	});
-
-	function on_drive_action( state ) {
-		switch ( state.name ) {
-			case 'image-open': image_open(state.value.drive_code); break;
-			case 'image-open-local': image_open_local(state.value.drive_code); break;
-			case 'image-save-local': image_save_local(state.value.drive_code); break;
-			case 'image-create': image_create(state.value.drive_code); break;
-			case 'image-eject': image_eject(state.value.drive_code); break;				
-		}
-	}
-
-	function reset() {
-		z80.reset();
-		bus.reset();
-	}
-
-	function open_settings() {
-		var dlg = new SettingsDialog(settings, settings_updated);
-
-		function settings_updated() {
-			apply_settings( false );
-			ZX_Settings.store_local_settings(settings);
-		}
-	}
-
-	function apply_settings( load_images ) {
-		ram.mode( settings.extended_memory );
-		display.semicolors( settings.use_bright_bit );
-		display.rendererType( settings.renderer_type );
-		display.scaleType( settings.scale_type );
-
-		if ( load_images ) {
-			if ( settings.drive_a ) load_image(0, settings.drive_a);
-			if ( settings.drive_b ) load_image(1, settings.drive_b);
-			if ( settings.drive_c ) load_image(2, settings.drive_c);
-			if ( settings.drive_d ) load_image(3, settings.drive_d);
-		}
-
-		if ( workloop.is_started() ) {
-			workloop.stop();
-			workloop.apply_settings(settings);
-			workloop.start();
-		}
-		else {
-			workloop.apply_settings(settings);
-		}
-	}
-
-	function load_image ( drive_code, filename_or_fileinput ) {
-		var local = typeof filename_or_fileinput != 'string';
-		var filename;
-		if ( local ) {
-			filename = filename_or_fileinput.value;
-			var index_of_slash = filename.lastIndexOf('/');
-			if ( index_of_slash == -1 ) {
-				index_of_slash = filename.lastIndexOf('\\');
-			}
-			if ( index_of_slash != -1 ) {
-				filename = filename.substr(index_of_slash + 1);
-			}
-		} 
-		else {
-			filename = filename_or_fileinput;
-		}
-
-		var match = (/^[^\\\/]*\.(trd|fdi|scl)$/i).exec(filename);
-		if ( !match ) {
-			alert('Неподдерживаемый формат файла.');
-		}
-		var format = match[1].toLowerCase();
-
-		if ( local ) {
-			if ( window.File && window.FileReader ) {
-				// загрузка с диска напрямую
-				var reader = new FileReader();
-				reader.onload = function(e) { on_load(string_to_bytes(e.target.result)); }
-				reader.onerror = function(e) { on_error('Ошибка при открытии файла.'); }
-				reader.readAsBinaryString(filename_or_fileinput.files[0]);
-			}
-			else {
-				// загрузка с диска через сервер
-				var $iframe =
-					$('<iframe>')
-						.prop({
-							id: 'image_load_frame',
-							name: 'image_load_frame'
-						})
-						.css('display', 'none')
-						.appendTo(document.body);
-
-				var action_url = 'get_base64.php?input=' + encodeURIComponent(filename_or_fileinput.name);
-				var $form = 
-					$('<form>')
-						.prop({
-							action: action_url,
-							method: 'post',
-							enctype: 'multipart/form-data',
-							target: 'image_load_frame'
-						})
-						.append(filename_or_fileinput)
-						.appendTo(document.body);
-
-				$iframe.on('load', function(e) {
-					var base64_data = $iframe.contents().text().trim();
-					on_load(base64_decode(base64_data));
-
-					$iframe.remove();
-					$form.remove();
-				});
-
-				$iframe.on('error', function(e) {
-					on_error('Ошибка при открытии файла');
-				});
-
-				$form.submit();
-			}
-		}
-		else {
-			// загрузка с сервера
-			$.ajax({
-				url: 'get_base64.php?type=' + encodeURIComponent(format) + '&name=' + encodeURIComponent(filename),
-				dataType: 'text',
-				success: function ( base64_data ) {
-					on_load(base64_decode(base64_data));
-				},
-				error: function ( xhr, textStatus, error ) {
-					on_error(textStatus);
-				}
-			});
-		}
-		drives[drive_code].clear_error();
-		drives[drive_code].load_start();
-
-		function on_load( data ) {
-			try {
-				switch ( format ) {
-					case 'trd': betadisk.insert(drive_code, DiskImage.createFromTRD(data)); break;
-					case 'fdi': betadisk.insert(drive_code, DiskImage.createFromFDI(data)); break;
-					case 'scl': betadisk.insert(drive_code, DiskImage.createFromSCL(data)); break;
-					default: alert('Неподдерживаемый формат файла.'); return;
-				}
-			}
-			catch ( error ) {
-				on_error(error.message);
-				return;
-			}
-
-			drives[drive_code].load_end();
-			drives[drive_code].set_title(filename);
-
-			switch ( drive_code ) {
-				case 0: settings.drive_a = filename; break;
-				case 1: settings.drive_b = filename; break;
-				case 2: settings.drive_c = filename; break;
-				case 3: settings.drive_d = filename; break;
-			}
-			ZX_Settings.store_local_settings( settings );
-		}
-
-		function on_error( message ) {
-			alert(message);
-			drives[drive_code].load_end();
-			drives[drive_code].error();
-		}
-	}
-
-	function image_open( drive_code ) {
-		var browser = new ServerBrowser(function ( filename, format ) {
-			load_image(drive_code, filename);
-		});
-	}
-
-	function image_open_local( drive_code ) {
-		var browser = new LocalBrowser(function ( fileinput ) {
-			load_image(drive_code, fileinput);
-		});
-	}
-
-	function image_save_local( drive_code ) {
-		var image = betadisk.get_image(drive_code);
-		if (!image) {
-			alert('Нет диска.');
-			return;
-		}
-
-		var formats = DiskImage.getCompatibleFormats(image);
-		var dlg = new SaveImageDialog(on_format_selected, formats);
-
-		function on_format_selected( params ) {
-			var format = params.format;
-			var data = null;
-
-			switch ( format ) {
-				case 'trd': data = DiskImage.saveToTRD(image); break;
-				case 'fdi': data = DiskImage.saveToFDI(image); break;
-				case 'scl': data = DiskImage.saveToSCL(image); break;
-				default: alert('Неподдерживаемый формат файла.'); return;
-			}
-
-			var action_url = 'get_bin.php?input=data&name=custom_image.' + format;
-			var $form = $('<form action="' + action_url + '" method="post" target="_blank" style="display: none;" />').appendTo(document.body);
-			var $i_data = $('<input type="hidden" name="data" />').appendTo($form);
-
-			$i_data.val(base64_encode(data));
-
-			$form.submit();
-			//$form.remove();
-		}
-	}
-
-	function image_create( drive_code ) {
-		var dlg = new CreateImageDialog(on_apply);
-
-		function on_apply( params ) {
-			var cyl_count = params.cyl_count;
-			var head_count = params.head_count;
-			var trdos_format = params.trdos_format;
-
-			betadisk.insert(drive_code, DiskImage.createCustomImage(cyl_count, head_count, trdos_format));
-			drives[drive_code].set_title('custom_image');
-
-			switch ( drive_code ) {
-				case 0: settings.drive_a = ''; break;
-				case 1: settings.drive_b = ''; break;
-				case 2: settings.drive_c = ''; break;
-				case 3: settings.drive_d = ''; break;
-			}
-			ZX_Settings.store_local_settings( settings );
-		}
-	}
-
-	function image_eject( drive_code ) {
-		betadisk.eject(drive_code);
-		drives[drive_code].set_title('');
-
-		switch ( drive_code ) {
-			case 0: settings.drive_a = ''; break;
-			case 1: settings.drive_b = ''; break;
-			case 2: settings.drive_c = ''; break;
-			case 3: settings.drive_d = ''; break;
-		}
-		ZX_Settings.store_local_settings( settings );		
-	}
-
-	function snapshot_open() {
-		var dlg = new LocalOpenSnapshotDialog(on_file_selected);
-
-		function on_file_selected( fileinput ) {
-			var filename = fileinput.value;
-			var match = (/\.sna$/i).exec(filename);
-			if ( !match ) {
-				alert('Неподдерживаемый формат файла.');
-				return;
-			}
-
-			if ( window.File && window.FileReader ) {
-				// загрузка с диска напрямую
-				var reader = new FileReader();
-				reader.onload = function(e) { on_load(string_to_bytes(e.target.result)); }
-				reader.onerror = function(e) { on_error('Ошибка при открытии файла.'); }
-				reader.readAsBinaryString(fileinput.files[0]);
-			}
-			else {
-				// загрузка с диска через сервер
-				var $iframe =
-					$('<iframe>')
-						.prop({
-							id: 'snapshot_load_frame',
-							name: 'snapshot_load_frame'
-						})
-						.css('display', 'none')
-						.appendTo(document.body);
-
-				var action_url = 'get_base64.php?input=' + encodeURIComponent(fileinput.name);
-				var $form = 
-					$('<form>')
-						.prop({
-							action: action_url,
-							method: 'post',
-							enctype: 'multipart/form-data',
-							target: 'snapshot_load_frame'
-						})
-						.append(fileinput)
-						.appendTo(document.body);
-
-				$iframe.on('load', function(e) {
-					var base64_data = $iframe.contents().text().trim();
-					on_load(base64_decode(base64_data));
-
-					$iframe.remove();
-					$form.remove();
-				});
-
-				$iframe.on('error', function(e) {
-					on_error('Ошибка при открытии файла');
-				});
-
-				$form.submit();
-			}			
-		}
-
-		function on_load( data ) {
-			try {
-				var snapshot = ZX_Snapshot.createFromSNA( data );
-				if ( snapshot == null ) {
-					throw new Error('Ошибка формата файла.');
-				}
-
-				var state = $.extend({}, snapshot.z80_state, {
-					prefix_dd: false,
-					prefix_fd: false,
-					prefix_ed: false,
-					prefix_cb: false
-				});
-
-				bus.reset();
-				for ( var page = 0; page < 8; page++ ) {
-					if ( snapshot.memory[page] ) {
-						bus.set_var('port_7ffd_value', page);
-
-						for ( var i = 0x0000; i < 0x4000; i++ ) {
-							bus.request({
-								mreq: 1,
-								write: 1,
-								address: 0xc000 | i,
-								data: snapshot.memory[page][i]
-							});
-						}
-					}
-				}
-				bus.set_var('port_7ffd_value', snapshot.port_7ffd);
-				bus.set_var('rom_trdos', snapshot.trdos);
-
-				bus.request({
-					iorq: 1,
-					write: 1,
-					address: 0xfe,
-					data: snapshot.border & 0x07
-				});
-
-				z80.reset();
-				z80.set_state(state);
-			}
-			catch ( error ) {
-				on_error(error.message);
-				return;
-			}
-		}
-
-		function on_error( message ) {
-			alert(message);
-		}		
-	}
-
-	function snapshot_save() {
-		var current_fe_value = bus.get_var('port_fe_value');
-		var current_7ffd_value = bus.get_var('port_7ffd_value');
-		var current_rom_trdos = bus.get_var('rom_trdos');
-
-		var snapshot = new ZX_Snapshot();
-
-		var state = z80.get_state();
-		if ( state.prefix_dd || state.prefix_fd || state.prefix_ed || state.prefix_cb ) {
-			state.pc = ( state.pc - 1 ) & 0xffff;
-			state.r = ( state.r & 0x80 ) | (( state.r - 1 ) & 0x7f );
-		}
-
-		$.extend(snapshot.z80_state, state);
-
-		for ( var page = 0; page < 8; page++ ) {
-			bus.set_var('port_7ffd_value', ( current_7ffd_value & 0xf8 ) | page );
-
-			var memory_page = [];
-			for ( var i = 0x0000; i < 0x4000; i++ ) {
-				var state = {
-					mreq: 1,
-					read: 1,
-					address: 0xc000 | i,
-					data: 0
-				}
-				bus.request(state);
-				memory_page[i] = state.data;
-			}
-
-			snapshot.memory[page] = memory_page;
-		}
-		
-		snapshot.border = current_fe_value & 0x07;
-		snapshot.port_7ffd = current_7ffd_value & 0x3f;
-		snapshot.trdos = current_rom_trdos;
-
-		bus.set_var('port_7ffd_value', current_7ffd_value);
-
-		var data = ZX_Snapshot.saveToSNA(snapshot);
-
-		var action_url = 'get_bin.php?input=data&name=snapshot.sna';
-		var $form = $('<form action="' + action_url + '" method="post" target="_blank" style="display: none;" />').appendTo(document.body);
-		var $i_data = $('<input type="hidden" name="data" />').appendTo($form);
-
-		$i_data.val(base64_encode(data));
-
-		$form.submit();
-		//$form.remove();
-	}
-
-	function about() {
-		var dlg = new AboutDialog();
-	}
-
-	// подключение виртуальной клавиатуры
-	var vkeyb = new VirtualKeyboard($('#vkeyb')[0], function ( key, pressed ) {
-		keyboard.switchKeys([key], pressed);
-	});
-	keyboard.monitorKeyState(function ( keys, pressed ) {
-		for ( var i = 0; i < keys.length; i++ ) {
-			vkeyb.keyStateChanged(keys[i], pressed);
-		}
-	});
-
-	// подключение виртуальной мыши
-	var vmouse = new VirtualMouse($('#vmouse')[0], mouse);
-
-	// ждем загрузки ПЗУ и диска
-	wait_loadings(start);
+	ZXContext.ui.workspace = new ZX_Workspace();
 	
-	function wait_loadings(handler) {
-		if ( !rom.ready() /* || !betadisk.ready('a') */ ) {
-			setTimeout(function() { wait_loadings(handler); }, 10);
-			return;
-		}
+	ZXContext.hw.bus = new ZX_Bus();
+	ZXContext.hw.clock = new ZX_Clock();
+	ZXContext.hw.cpu = new ZX_Z80();
+	ZXContext.hw.rom = new ZX_ROM();
+	ZXContext.hw.ram = new ZX_RAM();
+	ZXContext.hw.display = new ZX_Display(ZXContext.ui.workspace.get_display());
+	ZXContext.hw.port_fe = new ZX_PortFE();
+	ZXContext.hw.port_7ffd = new ZX_Port7FFD();
+	ZXContext.hw.keyboard = new ZX_Keyboard();
+	ZXContext.hw.mouse = new ZX_Mouse();
+	ZXContext.hw.betadisk = new ZX_BetaDisk();
 
-		handler();
-	}
+	ZXContext.hw.cpu.connect(ZXContext.hw.bus);
+	ZXContext.hw.clock.connect(ZXContext.hw.bus, ZXContext.hw.cpu);
+	ZXContext.hw.rom.connect(ZXContext.hw.bus);
+	ZXContext.hw.ram.connect(ZXContext.hw.bus);
+	ZXContext.hw.display.connect(ZXContext.hw.bus);
+	ZXContext.hw.port_fe.connect(ZXContext.hw.bus);
+	ZXContext.hw.port_7ffd.connect(ZXContext.hw.bus);
+	ZXContext.hw.keyboard.connect(ZXContext.hw.bus);
+	ZXContext.hw.mouse.connect(ZXContext.hw.bus);
+	ZXContext.hw.betadisk.connect(ZXContext.hw.bus);
 
-	var debug_mode = (/(\&|\?)debug=?/).test(window.location.search);
+	ZXContext.ui.workspace.init();
+	
+	// ждем загрузки ПЗУ и диска
+	ZXContext.hw.rom.get_ready$().then(function () {
+		start();
+	}).fail(function (error) {
+		alert('Не удалось загрузить ПЗУ: ' + error);
+	});
+
+	var debugMode = (/(\&|\?)debug=?/).test(window.location.search);
 
 	function start() {
-		if ( debug_mode ) {
-			$('#debug').show();
-			zxdebug.debug($('#debug')[0], z80, bus, display, settings);
-			adjustLayout();
+		if ( debugMode ) {
+			$debug.show();
+			zxdebug.debug($debug[0], ZXContext.hw.cpu, ZXContext.hw.bus, ZXContext.ui.workspace.get_display(), ZXContext.settings);
+			ZXContext.ui.workspace.adjustWorkspaceLayout();
 		}
 		else {
-			workloop.start();
-			adjustLayout();
+			ZXContext.hw.clock.run();
+			ZXContext.ui.workspace.adjustWorkspaceLayout();
 		}
 	}
-	
-	$(window).resize(adjustLayout);
-
-	function adjustLayout() {
-		var $main_container = $('#main_container');
-		var $l = $('#left_field');
-		var $c = $('#center_field');
-		var $r = $('#right_field');
-
-		$main_container
-			.css('width', Math.ceil($l.outerWidth() + $c.outerWidth() + $r.outerWidth()) + 'px');
-	}	
 });
 
 </script>

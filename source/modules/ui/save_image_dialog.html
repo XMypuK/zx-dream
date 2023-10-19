@@ -1,4 +1,6 @@
-
+<style>
+.ui-dialog .save-image-dialog { padding: 0.5em; }
+</style>
 
 <template id="save-image-dialog">
 	<div class="save-image-dialog">
@@ -6,9 +8,9 @@
 			<tr>
 				<td class="title">Формат:</td>
 				<td class="data">
-					<label><input type="radio" name="format" value="trd" />&nbsp;TRD</label>
-					<label><input type="radio" name="format" value="scl" />&nbsp;SCL</label>
-					<label><input type="radio" name="format" value="fdi" />&nbsp;FDI</label>
+					<label><input type="radio" name="format" value="TRD" />&nbsp;TRD</label>
+					<label><input type="radio" name="format" value="SCL" />&nbsp;SCL</label>
+					<label><input type="radio" name="format" value="FDI" />&nbsp;FDI</label>
 				</td>
 			</tr>
 		</table>
@@ -16,11 +18,23 @@
 </template>
 
 <script type="text/javascript">
-	function SaveImageDialog ( on_format_selected, compatible_formats ) {
+	function SaveImageDialog () {
 		'use strict';
 		
 		var $dlg = null;
-		init();
+		var openResult$ = null;
+		var formats = null;
+
+		this.open = open;
+
+		function open(compatible_formats) {
+			if (!openResult$) {
+				openResult$ = $.Deferred();
+				formats = compatible_formats;
+				init();
+			}
+			return openResult$;
+		}
 
 		function init() {
 			var temp_div = document.createElement('div');
@@ -29,32 +43,34 @@
 			$dlg = $(temp_div).children('.save-image-dialog');
 			$dlg.dialog({
 				autoOpen: true,
-				title: 'Select image format',
+				title: 'Выберите целевой формат образа',
 				modal: true,
 				width: 400,
-				height: 200,
+				height: 120,
 				buttons: [
-					{ text: 'Save', click: save },
-					{ text: 'Cancel', click: cancel }
-				]
+					{ text: 'Сохранить', click: save },
+					{ text: 'Отмена', click: cancel }
+				],
+				close: function (e) { 
+					$(this).dialog('destroy');
+					$(this).remove(); 
+					if (openResult$) {
+						openResult$.reject();
+						openResult$ = null;
+					}
+				}
 			});
 			$dlg.on('keydown', function(e) { e.stopPropagation(); });
 			$dlg.on('keyup', function(e) { e.stopPropagation(); });
 
 			$dlg.find('[name=format][value=trd]')
-				.prop('disabled', !$.grep(compatible_formats, function(e, i) { return (e == 'trd') }).length);
+				.prop('disabled', !$.grep(formats, function(e, i) { return (e == 'TRD') }).length);
 
 			$dlg.find('[name=format][value=fdi]')
-				.prop('disabled', !$.grep(compatible_formats, function(e, i) { return (e == 'fdi') }).length);
+				.prop('disabled', !$.grep(formats, function(e, i) { return (e == 'FDI') }).length);
 
 			$dlg.find('[name=format][value=scl]')
-				.prop('disabled', !$.grep(compatible_formats, function(e, i) { return (e == 'scl') }).length);
-		}
-
-		function destroy() {
-			$dlg.dialog('close');
-			$dlg.dialog('destroy');
-			$dlg = null;
+				.prop('disabled', !$.grep(formats, function(e, i) { return (e == 'SCL') }).length);
 		}
 
 		function save() {
@@ -64,15 +80,21 @@
 				return;
 			}
 
-			on_format_selected({
-				format: $format.val()
-			});
-
-			destroy();
+			if (openResult$) {
+				openResult$.resolve($format.val());
+				openResult$ = null;
+			}
+			$dlg.dialog('close');
+			$dlg = null;
 		}
 
 		function cancel() {
-			destroy();
+			if (openResult$) {
+				openResult$.reject();
+				openResult$ = null;
+			}			
+			$dlg.dialog('close');
+			$dlg = null;
 		}
 	}
 </script>

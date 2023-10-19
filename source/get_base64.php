@@ -17,7 +17,7 @@
 		}
 	}
 	else if ( isset($_GET['type']) && isset($_GET['name']) ) {
-		$type = $_GET['type'];
+		$type = strtolower($_GET['type']);
 		$name = $_GET['name'];
 
 		if ( !preg_match("/(^|[\/\\\\])\\.{2}/", $name) ) {

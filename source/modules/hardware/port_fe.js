@@ -1,24 +1,31 @@
 function ZX_PortFE() {
 	'use strict';
 
+	var _bus;
 	var port_value = 0x00;
 
-	var dev = new ZX_Device({
-		id: 'port_fe',
-		reset: function( bus ) {
-			bus.set_var('port_fe_value', 0x00);
-		},
-		iorq: function( state, bus ) {
-			if ( state.write && ( state.address & 0xff ) == 0xfe ) {
-				bus.set_var('port_fe_value', state.data);
-			}
-		},
-		event: function ( name, options, bus ) {
-			if ( name == 'var_changed' && options.name == 'port_fe_value' ) {
-				port_value = options.value;
-			}
+	function io_write(address, data) {
+		if (( address & 0xff ) == 0xfe) {
+			_bus.var_write('port_fe_value', data);
 		}
-	});
+	}
+	function var_write_port_fe_value(name, value) {
+		port_value = value;
+	}
 
-	return dev;
+	function var_read_port_fe_value(name) {
+		return port_value;
+	}
+
+	function reset() {
+		_bus.var_write('port_fe_value', 0x00);
+	}
+
+	this.connect = function (bus) {
+		_bus = bus;
+		bus.on_io_write(io_write);
+		bus.on_var_write(var_write_port_fe_value, 'port_fe_value');
+		bus.on_var_read(var_read_port_fe_value, 'port_fe_value');
+		bus.on_reset(reset);
+	}
 }

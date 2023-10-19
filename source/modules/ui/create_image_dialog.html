@@ -1,7 +1,6 @@
 <style>
-	.create-image-dialog .title {
-		text-align: right;
-	}
+	.ui-dialog .create-image-dialog { padding: 0.5em; }
+	.create-image-dialog .title { text-align: right; }
 </style>
 
 <template id="create-image-dialog">
@@ -29,11 +28,21 @@
 </template>
 
 <script type="text/javascript">
-	function CreateImageDialog ( on_apply ) {
+	function CreateImageDialog () {
 		'use strict';
 		
 		var $dlg = null;
-		init();
+		var openResult$ = null;
+
+		this.open = open;
+
+		function open() {
+			if (!openResult$) {
+				openResult$ = $.Deferred();
+				init();
+			}
+			return openResult$;
+		}
 
 		function init() {
 			var temp_div = document.createElement('div');
@@ -49,16 +58,18 @@
 				buttons: [
 					{ text: 'Создать', click: create },
 					{ text: 'Отмена', click: cancel }
-				]
+				],
+				close: function (e) { 
+					$(this).dialog('destroy'); 
+					$(this).remove(); 
+					if (openResult$) {
+						openResult$.reject();
+						openResult$ = null;
+					}
+				}
 			});
 			$dlg.on('keydown', function(e) { e.stopPropagation(); });
 			$dlg.on('keyup', function(e) { e.stopPropagation(); });
-		}
-
-		function destroy() {
-			$dlg.dialog('close');
-			$dlg.dialog('destroy');
-			$dlg = null;				
 		}
 
 		function create() {
@@ -76,17 +87,26 @@
 				return;
 			}
 
-			on_apply({
-				cyl_count: cyl_count,
-				head_count: head_count,
-				trdos_format: trdos_format
-			});
+			if (openResult$) {
+				openResult$.resolve({
+					cyl_count: cyl_count,
+					head_count: head_count,
+					trdos_format: trdos_format
+				});
+				openResult$ = null;
+			}
 
-			destroy();
+			$dlg.dialog('close');
+			$dlg = null;
 		}
 
 		function cancel() {
-			destroy();
+			if (openResult$) {
+				openResult$.reject();
+				openResult$ = null;
+			}			
+			$dlg.dialog('close');
+			$dlg = null;
 		}		
 	}
 </script>

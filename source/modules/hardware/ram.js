@@ -1,23 +1,65 @@
 function ZX_RAM() {
 	'use strict';
 	
-	var MODE_OFF = 0;
-	var MODE_PENTRAGON = 1;
+	var _bus;
+	var PAGE_SIZE = 0x4000;
+	var PAGE_COUNT = 32;
 
-	var mode = MODE_OFF;
-
+	var extendedMemory = VAL_EXTENDED_MEMORY_OFF;
 	var port_7ffd_value = 0x00;
+	var useTypedArrays = isTypedArraysSupported();
 
 	// инициализация памяти 512 кб
-	var memory = [];
-	for ( var page = 0; page < 32; page++ ) {
-		var memory_page = [];
+	var ordinaryPages = null;
+	var typedPages = null;
+	var memory = null;
+	
+	if (useTypedArrays) {
+		initTypedPages();
+		memory = typedPages;
+	}
+	else {
+		initOrdinaryPages();
+		memory = ordinaryPages;
+	}
 
-		for ( var address = 0x0000; address < 0x4000; address++ ) {
-			memory_page[address] = 0x00;
+	function initOrdinaryPages() {
+		ordinaryPages = [];
+		for ( var page = 0; page < PAGE_COUNT; page++ ) {
+			var pageData = [];
+			for ( var address = 0x0000; address < PAGE_SIZE; address++ ) {
+				pageData[address] = 0x00;
+			}
+			ordinaryPages[page] = pageData;
 		}
+	}
 
-		memory[page] = memory_page;
+	function initTypedPages() {
+		typedPages = [];
+		var buffer = new ArrayBuffer(PAGE_SIZE * PAGE_COUNT);
+		for ( var page = 0; page < PAGE_COUNT; page++ ) {
+			typedPages[page] = new Uint8Array(buffer, page * PAGE_SIZE, PAGE_SIZE);
+		}
+	}
+
+	function switchToOrdinaryPages() {
+		if (!ordinaryPages) {
+			initOrdinaryPages();
+		}
+		for ( var page = 0; page < PAGE_COUNT; page++ ) {
+			ordinaryPages[page] = Array.prototype.slice.call(typedPages[page]);
+		}
+		memory = ordinaryPages;
+	}
+
+	function switchToTypedPages() {
+		if (!typedPages) {
+			initTypedPages();
+		}
+		for ( var page = 0; page < PAGE_COUNT; page++ ) {
+			typedPages[page].set(ordinaryPages[page]);
+		}
+		memory = typedPages;
 	}
 
 	function get_page( address ) {
@@ -33,65 +75,57 @@ function ZX_RAM() {
 			return 2;
 		}
 
-		switch ( mode ) {
-			case MODE_OFF: return ( port_7ffd_value & 0x07 );
-			case MODE_PENTRAGON: return (( port_7ffd_value & 0xc0 ) >> 3 ) | ( port_7ffd_value & 0x07 );
+		switch ( extendedMemory ) {
+			case VAL_EXTENDED_MEMORY_OFF: return ( port_7ffd_value & 0x07 );
+			case VAL_EXTENDED_MEMORY_PENTAGON: return (( port_7ffd_value & 0xc0 ) >> 3 ) | ( port_7ffd_value & 0x07 );
 		}
 
 		return NaN;
 	}
 
-	var device = new ZX_Device({
-		id: 'ram',
-		reset: function ( bus ) {
-
-		},
-		dreq: function ( state, bus ) {
-			if ( state.dreq == 'ram_read' ) {
-				state.data = memory[state.page][state.address];
-			}
-		},
-		mreq: function ( state, bus ) {
-			var page = get_page(state.address);
-			var address = state.address & 0x3fff;
-
-			if ( isNaN(page) ) {
-				return;
-			}
-
-			if ( state.write ) {
-				memory[page][address] = state.data;
-
-				if ( address < 0x1b00 ) {
-					switch ( page ) {
-						case 5: bus.raise('wr_scr_5', { address: address, data: state.data }); break;
-						case 7: bus.raise('wr_scr_7', { address: address, data: state.data }); break;
-					}
-				}
-
-				return;
-			}
-
-			if ( state.read ) {
-				state.data = memory[page][address];
-				return;
-			}		
-		},
-		event: function ( name, options, bus ) {
-			if ( name == 'var_changed' && options.name == 'port_7ffd_value' ) {
-				port_7ffd_value = options.value;
-			}
-		}
-	});
-
-	device.mode = function(value) {
-		if ( value !== undefined ) {
-			mode = value;
-		}
-		else {
-			return mode;
+	function read( address ) {
+		var page = get_page(address);
+		if ( !isNaN(page) ) {
+			return memory[page][address & 0x3fff];
 		}
 	}
 
-	return device;
+	function write( address, data ) {
+		var page = get_page(address);
+		if ( !isNaN(page) ) {
+			memory[page][address & 0x3fff] = data;
+		}
+	}
+
+	function var_write_port_7ffd_value(name, value) {
+		port_7ffd_value = value;
+	}
+
+	function opt_extendedMemory(name, value) {
+		if (extendedMemory !== value) {
+			extendedMemory = value;
+		}
+	}
+
+	function opt_useTypedArrays(name, value) {
+		if (useTypedArrays != value) {
+			useTypedArrays = value;
+			if (useTypedArrays) {
+				switchToTypedPages();
+			}
+			else {
+				switchToOrdinaryPages();
+			}
+		}
+	}
+
+	this.connect = function(bus) {
+		_bus = bus;
+		bus.on_instruction_read(read);
+		bus.on_mem_read(read);
+		bus.on_mem_write(write);
+		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
+		bus.on_opt(opt_extendedMemory, OPT_EXTENDED_MEMORY);
+		bus.on_opt(opt_useTypedArrays, OPT_USE_TYPED_ARRAYS);
+	}
 }

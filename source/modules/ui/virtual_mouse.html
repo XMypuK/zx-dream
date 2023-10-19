@@ -1,0 +1,351 @@
+<style>
+	.virtual-mouse {
+		border: 1px solid #a0a0a0;
+		border-top-left-radius: 15px;
+		border-top-right-radius: 15px;
+		border-bottom-left-radius: 45px;
+		border-bottom-right-radius: 45px;
+
+		display: inline-block;
+		width: 140px;
+		text-align: center;
+		padding: 5px;
+	}
+
+	.virtual-mouse .button {
+		display: inline-block;
+		width: 40px;
+		height: 50px;
+
+		cursor: pointer;
+		background-color: #e0e0e0;
+
+		border: 1px solid #a0a0a0;
+		border-bottom-left-radius: 10px;
+		border-bottom-right-radius: 10px;
+		border-top-left-radius: 10px;
+		border-top-right-radius: 10px;
+		
+	}
+
+	.virtual-mouse .pressed {
+		background-color: #3c85ff;
+		box-shadow: inset 1px 1px #a0a0a0;
+	}
+
+	.virtual-mouse .move-area {
+		display: inline-block;
+		cursor: move;
+		background-repeat: no-repeat;
+		background-position: center center;
+		width: 130px;
+		height: 130px;
+		position: relative;
+	}
+
+	.virtual-mouse .move-area canvas {
+		position: absolute;
+		top: 25px;
+		left: 25px;
+	}
+
+	.virtual-mouse .moving {
+		/* background-image: url('../img/mouse_arrows.png') */
+	}
+</style>
+
+<template id="virtual-mouse">
+	<div class="virtual-mouse">
+		<div class="buttons">
+			<a class="button" data-num="1"></a>
+			<a class="button" data-num="3"></a>
+			<a class="button" data-num="2"></a>
+		</div>
+		<a class="move-area">
+			<canvas class="ball" width="80" height="80"></canvas>
+		</a>
+	</div>
+</template>
+
+<script type="text/javascript">
+	function VirtualMouse ( container, mouse ) {
+
+		$vmouse = $("<?=virtual-mouse?>");
+		$(container).append($vmouse);
+
+		$buttons = $vmouse.find('.button');
+		$buttons.on('mousedown', function ( e ) {
+			var num = parseInt($(this).attr('data-num'));
+			if ( num ) {
+				mouse.switchButton( num, true );
+				return false;
+			}
+		});
+		$buttons.on('mouseup', function ( e ) {
+			var num = parseInt($(this).attr('data-num'));
+			if ( num ) {
+				mouse.switchButton( num, false );
+			}
+			
+		});
+
+		mouse.subscribe(function ( state ) {
+			if ( state.type == 'key' ) {
+				if ( state.pressed ) {
+					$buttons
+						.filter('[data-num=' + state.num + ']')
+						.addClass('pressed');
+				}
+				else {
+					$buttons
+						.filter('[data-num=' + state.num + ']')
+						.removeClass('pressed');
+				}
+			}
+		});
+
+		$move_area = $vmouse.find('.move-area');
+
+		var 
+			ball_canvas = $move_area.find('.ball')[0],
+			ball_context = ball_canvas.getContext('2d'),
+			ball_radius = 39,
+			ball_center_x = 40,
+			ball_center_y = 40,
+			ball = new Sphere(ball_radius);
+		
+		ball.draw(ball_context, ball_center_x, ball_center_y);
+
+		var x, y, draged, start_time;
+		$move_area.on('mousedown', drag_start);
+	
+		function drag_start ( e ) {
+			x = e.pageX;
+			y = e.pageY;
+			start_time = Date.now();
+			draged = false;
+
+			$(document)
+				.on('mousemove', drag_process)
+				.on('mouseup', drag_stop);
+
+			$move_area.addClass('moving');
+
+			return false;
+		}
+		function drag_process ( e ) {
+			var shiftX = e.pageX - x;
+			var shiftY = e.pageY - y;
+
+			if (shiftX) {
+				mouse.moveX(shiftX);
+			}
+			if (shiftY) {
+				mouse.moveY(-shiftY);
+			}
+			if ( shiftX != 0 ) {	
+				ball.rotate_over_z( -Math.PI * shiftX / ( 2 * ball_radius ));
+				ball_context.clearRect(0, 0, ball_context.canvas.width, ball_context.canvas.height);
+				ball.draw(ball_context, ball_center_x, ball_center_y);
+			}
+			if (shiftY != 0 ) {
+				ball.rotate_over_x( -Math.PI * shiftY / ( 2 * ball_radius ));
+				ball_context.clearRect(0, 0, ball_context.canvas.width, ball_context.canvas.height);
+				ball.draw(ball_context, ball_center_x, ball_center_y);
+			}
+
+			x = e.pageX;
+			y = e.pageY;
+			draged = true;
+
+			return false;
+		}
+		function drag_stop ( e ) {
+			$(document)
+				.off('mousemove', drag_process)
+				.off('mouseup', drag_stop);
+
+			$move_area.removeClass('moving');
+
+			if ( !draged ) {
+				// если был простой щелчек меньше 500ms, то посылаем команду
+				// нажатия и отпускания соответствующей клавиши мыши
+				var press_time = Date.now() - start_time;
+				if ( press_time < 500 ) {
+					var num;
+					switch (e.which) {
+						case 1: num = 1; break;
+						case 2: num = 3; break;
+						case 3: num = 2; break;
+					}
+					if ( num !== undefined ) {
+						mouse.switchButton( num, true );
+						setTimeout(function() {
+							mouse.switchButton( num, false );
+						}, press_time);
+					}
+				}
+			}
+
+			return false;
+		}
+
+		function Sphere ( radius ) {
+			this.draw = draw;
+			this.rotate_over_x = rotate_over_x;
+			this.rotate_over_y = rotate_over_y;
+			this.rotate_over_z = rotate_over_z;
+
+			var foregroundColor = [ 0xA8, 0xA8, 0xA8, 0xFF ];
+			var backgroundColor = [ 0xC0, 0xC0, 0xC0, 0xFF ];
+
+			var curves = [];
+
+		    for ( var i = -3; i <= 3; i++ ) { put_latitude(i * Math.PI / 8); }
+		    for ( var i = 0; i < 16; i++ ) { put_longitude(i * Math.PI / 8); }			
+
+		    function draw( context, cx, cy ) {
+		    	context.save();
+			    context.strokeStyle = 'rgba(' + foregroundColor.join(',') + ')';
+			    context.fillStyle = 'rgba(' + backgroundColor.join(',') + ')';
+
+		        context.beginPath();
+		        var center = translatePoint({ x: 0, y: 0 }, cx, cy);
+		        context.arc(center.x, center.y, radius, 0, 2 * Math.PI);
+		        context.closePath();
+		        context.fill();
+		        context.stroke();
+
+	            context.beginPath();
+
+		        for ( var i = 0; i < curves.length; i++ ) {
+		            var curvePoints = curves[i];
+		            for ( var pointIndex = 0; pointIndex < curvePoints.length - 1; pointIndex++ ) {
+		                var point1 = getPlainPoint(curvePoints[pointIndex]);
+		                var point2 = getPlainPoint(curvePoints[pointIndex + 1]);
+		                
+		                if ( point1 && point2 ) {
+		                	point1 = translatePoint(point1, cx, cy);
+		                	point2 = translatePoint(point2, cx, cy);
+
+		                    context.moveTo(point1.x, point1.y);
+		                    context.lineTo(point2.x, point2.y);
+		                }
+		            }
+		        }
+
+	            context.closePath();
+	            context.stroke();
+
+		        context.restore();
+		    }
+		    
+		    function put_latitude ( latitude ) {
+		        var 
+		            z = radius * Math.sin(latitude),
+		            lat_radius = radius * Math.cos(latitude),
+		            chunks = 36,
+		            step = 2 * Math.PI / chunks,
+		            curvePoints = [];
+		        
+		        for ( var chunk = 0; chunk < chunks; chunk++ ) {
+		            var angle = step * chunk;
+		            curvePoints.push({
+		                x: lat_radius * Math.cos(angle),
+		                y: lat_radius * Math.sin(angle),
+		                z: z
+		            });
+		        }
+		        
+		        curvePoints.push({
+		            x: curvePoints[0].x,
+		            y: curvePoints[0].y,
+		            z: curvePoints[0].z
+		        })
+		        
+		        curves.push(curvePoints);
+		    }
+		    
+		    function put_longitude ( longitude ) {
+		        rotate_over_z(longitude);
+		        
+		        var 
+		            chunks = 18,
+		            step = Math.PI / chunks,
+		            curvePoints = [];
+		        
+		        for ( var chunk = 0; chunk <= chunks; chunk++ ) {
+		            var angle = step * chunk;
+		            curvePoints.push({
+		                x: 0,
+		                y: radius * Math.sin(angle),
+		                z: radius * Math.cos(angle)
+		            });
+		        }
+		        
+		        curves.push(curvePoints);
+		        
+		        rotate_over_z(-longitude);
+		    }
+		    
+		    function rotate_over_z( angle ) {
+		        for ( var i = 0; i < curves.length; i++ ) {
+		            var curvePoints = curves[i];
+		            for ( var pointIndex = 0; pointIndex < curvePoints.length; pointIndex++ ) {
+		                var point = curvePoints[pointIndex];
+		                curvePoints[pointIndex] = {
+		                    x: point.x * Math.cos(angle) - point.y * Math.sin(angle),
+		                    y: point.x * Math.sin(angle) + point.y * Math.cos(angle),
+		                    z: point.z
+		                }
+		            }
+		        }
+		    }
+		    
+		    function rotate_over_x( angle ) {
+		        for ( var i = 0; i < curves.length; i++ ) {
+		            var curvePoints = curves[i];
+		            for ( var pointIndex = 0; pointIndex < curvePoints.length; pointIndex++ ) {
+		                var point = curvePoints[pointIndex];
+		                curvePoints[pointIndex] = {
+		                    x: point.x,
+		                    y: point.y * Math.cos(angle) - point.z * Math.sin(angle),
+		                    z: point.y * Math.sin(angle) + point.z * Math.cos(angle)
+		                };
+		            }
+		        }
+		    }
+		    
+		    function rotate_over_y( angle ) {
+		        for ( var i = 0; i < curves.length; i++ ) {
+		            var curvePoints = curves[i];
+		            for ( var pointIndex = 0; pointIndex < curvePoints.length; pointIndex++ ) {
+		                var point = curvePoints[pointIndex];
+		                curvePoints[pointIndex] = {
+		                    x: point.x * Math.cos(angle) + point.z * Math.sin(angle),
+		                    y: point.y,
+		                    z: -point.z * Math.sin(angle) + point.z * Math.cos(angle)
+		                }
+		            }
+		        }
+		    }  
+		    
+		    function getPlainPoint( spacePoint ) {
+		        if ( spacePoint.y < 0 ) {
+		            return null;
+		        }
+		        return {
+		            x: spacePoint.x,
+		            y: spacePoint.z
+		        }				
+		    }
+
+		    function translatePoint( plainPoint, cx, cy ) {
+		    	return {
+		    		x: cx + plainPoint.x,
+		    		y: cy - plainPoint.y
+		    	};
+		    }
+		}
+	}
+</script>

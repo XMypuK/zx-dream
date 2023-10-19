@@ -1,177 +1,178 @@
 function ZX_Bus() {
 	'use strict';
 
-	var self = this;
-	var devs = [];
-	var vars = {};
+	var instruction_read_handlers = [];
+	var mem_read_handlers = [];
+	var mem_write_handlers = [];
+	var io_read_handlers = [];
+	var io_write_handlers = [];
+	var var_read_handlers = [];
+	var var_write_handlers = [];
+	var specific_var_read_handlers = {};
+	var specific_var_write_handlers = {};
+	var reset_handlers = [];
+	var opt_handlers = [];
+	var specific_opt_handlers = [];
+
+	function register_handler(collection, fn) {
+		if (typeof fn === 'function') {
+			collection.push(fn);
+		}
+	}
+
+	function on_instruction_read(fn) {
+		register_handler(instruction_read_handlers, fn);
+	}
+
+	function on_mem_read(fn) {
+		register_handler(mem_read_handlers, fn);
+	}
+
+	function on_mem_write(fn) {
+		register_handler(mem_write_handlers, fn);
+	}
+
+	function on_io_read(fn) {
+		register_handler(io_read_handlers, fn);
+	}
+
+	function on_io_write(fn) {
+		register_handler(io_write_handlers, fn);
+	}
+
+	function on_var_read(fn, name) {
+		var handlers = var_read_handlers;
+		if (!!name) {
+			handlers = specific_var_read_handlers[name] || (specific_var_read_handlers[name] = []);
+		}
+		register_handler(handlers, fn);
+	}
+
+	function on_var_write(fn, name) {
+		var handlers = var_write_handlers;
+		if (!!name) {
+			handlers = specific_var_write_handlers[name] || (specific_var_write_handlers[name] = []);
+		}
+		register_handler(handlers, fn);
+	}
+
+	function on_reset(fn) {
+		register_handler(reset_handlers, fn);
+	}
+
+	function on_opt(fn, name) {
+		var handlers = opt_handlers;
+		if (!!name) {
+			handlers = specific_opt_handlers[name] || (specific_opt_handlers[name] = []);
+		}
+		register_handler(handlers, fn);
+	}
+
+	function instruction_read(address) {
+		var result;
+		for ( var i = 0; i < instruction_read_handlers.length; i++ ) {
+			var subresult = instruction_read_handlers[i](address);
+			if (subresult !== undefined) {
+				result = subresult;
+			}
+		}
+		return result;
+	}
+
+	function mem_read(address) {
+		var result = 0xff;
+		for ( var i = 0; i < mem_read_handlers.length; i++ ) {
+			var subresult = mem_read_handlers[i](address);
+			if (subresult !== undefined) {
+				result = subresult;
+			}
+		}
+		return result;
+	}
+
+	function mem_write(address, data) {
+		for ( var i = 0; i < mem_write_handlers.length; i++ ) {
+			mem_write_handlers[i](address, data);
+		}
+	}
+
+	function io_read(address) {
+		var result = 0xff;
+		for ( var i = 0; i < io_read_handlers.length; i++ ) {
+			var subresult = io_read_handlers[i](address);
+			if (subresult !== undefined) {
+				result = subresult;
+			}
+		}
+		return result;
+	}
+
+	function io_write(address, data) {
+		for ( var i = 0; i < io_write_handlers.length; i++ ) {
+			io_write_handlers[i](address, data);
+		}
+	}
+
+	function var_read(name) {
+		var result;
+		var specific_handlers = specific_var_read_handlers[name] || [];
+		for ( var i = 0; i < specific_handlers.length; i++ ) {
+			var subresult = specific_handlers[i](name);
+			if (subresult !== undefined) {
+				result = subresult;
+			}
+		}
+		for ( var i = 0; i < var_read_handlers.length; i++ ) {
+			var subresult = var_read_handlers[i](name);
+			if (subresult !== undefined) {
+				result = subresult;
+			}
+		}
+		return result;
+	}
+
+	function var_write(name, value) {
+		var specific_handlers = specific_var_write_handlers[name] || [];
+		for ( var i = 0; i < specific_handlers.length; i++ ) {
+			specific_handlers[i](name, value);
+		}
+		for ( var i = 0; i < var_write_handlers.length; i++ ) {
+			var_write_handlers[i](name, value);
+		}
+	}
 
 	function reset() {
-		for (var i = 0; i < devs.length; i++) {
-			devs[i].reset(self);
+		for ( var i = 0; i < reset_handlers.length; i++ ) {
+			reset_handlers[i]();
 		}
 	}
 
-	function request( state ) {
-		if ( state.mreq ) {
-			for (var i = 0; i < devs.length; i++) {
-				devs[i].mreq(state, self);
-			}
+	function opt(name, value) {
+		var specific_handlers = specific_opt_handlers[name] || [];
+		for ( var i = 0; i < specific_handlers.length; i++ ) {
+			specific_handlers[i](name, value);
 		}
-		else if ( state.dreq ) {
-			for (var i = 0; i < devs.length; i++) {
-				devs[i].dreq(state, self);
-			}
-		}
-		else if ( state.iorq ) {
-			if ( state.read ) {
-				state.data = 0xff;
-			}
-
-			for (var i = 0; i < devs.length; i++) {
-				devs[i].iorq(state, self);
-			}
+		for ( var i = 0; i < opt_handlers.length; i++ ) {
+			opt_handlers[i](name, value);
 		}
 	}
 
-	function set_var( name, value ) {
-		vars[ name ] = value;
-		raise('var_changed', { name: name, value: value });
-	}
-
-	function get_var( name ) {
-		return vars[ name ];
-	}
-
-	function raise( name, options ) {
-		for (var i = 0; i < devs.length; i++) {
-			devs[i].event(name, options, self);
-		}
-	}
-
-	function connect(dev) {
-		if (dev_by_id(dev.id()) == null) {
-			for (var i = 0; i < dev.depend_ids().length; i++) {
-				var dep_id = dev.depend_ids()[i];
-				var dep_dev = exclude_dev_for_embeding(dep_id);
-				if (dep_dev == null) {
-					throw new Error("Depend device depend device \"" + dep_id + "\" not found");
-				}
-
-				dev.embed(dep_dev);
-			}
-			devs.push(dev);
-		}
-		else {
-			throw new Error("The device already is present in the list");
-		}
-	}
-
-	function dev_by_id(dev_id) {
-		for (var i = 0; i < devs.length; i++) {
-			if (devs[i].contains_id(dev_id)) {
-				return devs[i];
-			}
-		}
-
-		return null;
-	}
-
-	function exclude_dev_for_embeding(dev_id) {
-		for (var i = 0; i < devs.length; i++) {
-			if (devs[i].contains_id(dev_id)) {
-				var dev = devs[i];
-				devs.splice(i, 1);
-				return dev;
-			}
-		}
-
-		return null;
-	}
-
-	this.connect = connect;
+	this.on_instruction_read = on_instruction_read;
+	this.on_mem_read = on_mem_read;
+	this.on_mem_write = on_mem_write;
+	this.on_io_read = on_io_read;
+	this.on_io_write = on_io_write;
+	this.on_var_read = on_var_read;
+	this.on_var_write = on_var_write;
+	this.on_reset = on_reset;
+	this.on_opt = on_opt;
+	this.instruction_read = instruction_read;
+	this.mem_read = mem_read;
+	this.mem_write = mem_write;
+	this.var_read = var_read;
+	this.var_write = var_write;
+	this.io_read = io_read;
+	this.io_write = io_write;
 	this.reset = reset;
-	this.request = request;
-	this.set_var = set_var;
-	this.get_var = get_var;
-	this.raise = raise;
-}
-
-// При создании переменная options должна содержать
-// следующий члены:
-// id - строковый идентификатор
-// depend_ids - идентификатор устройства, от которого зависит работа данного устройства, либо массив таких идентификаторов (или null).
-// request - function(state), реализация функции обработки запроса
-function ZX_Device(options) {
-	'use strict';
-	
-	options = options || {};
-
-	var id = options.id || '';
-
-	var depend_ids = [];
-	if (options.depend_ids) {
-		if (typeof options.depend_ids == 'string') {
-			depend_ids.push(options.depend_ids);
-		}
-		else if (typeof options.depend_ids == 'object') {
-			depend_ids = options.depend_ids.slice(0);
-		}
-	}
-
-	var embeds = [];
-
-	function contains_id(dev_id) {
-		if (id == dev_id) {
-			return true;
-		}
-
-		for (var i = 0; i < embeds.length; i++) {
-			if (embeds[i].contains_id(dev_id)) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	function embed(dev) {
-		embeds.push(dev);
-	}
-
-	function get_embed_by_id(dev_id) {
-		for (var i = 0; i < embeds.length; i++) {
-			if (embeds[i].contains_id(dev_id)) {
-				return embeds[i];
-			}
-		}
-
-		return null;
-	}
-
-	// id();
-	// возвращает id модуля
-	this.id = function() { return id; }
-
-	// depend_ids();
-	// возвращает список идентификаторов устройств, от которых зависит данное устройство
-	this.depend_ids = function() { return depend_ids; }
-
-	// get_embed_by_id(dev_id);
-	// возвращает зависимый устройство, в иерархии зависимости которого
-	// есть устройство с данным dev_id
-	this.get_embed_by_id = get_embed_by_id;
-
-	// contains_id(dev_id);
-	// проверяет есть ли в иерархии зависимости устройство с данным dev_id
-	this.contains_id = contains_id;
-
-	// embed(dev);
-	// встраивает модуль, от которого зависит данный.
-	this.embed = embed;
-
-	this.reset = options.reset || (function(){});
-	this.iorq = options.iorq || (function(){});
-	this.mreq = options.mreq || (function(){});
-	this.dreq = options.dreq || (function(){});
-	this.event = options.event || (function(){});
+	this.opt = opt;
 }

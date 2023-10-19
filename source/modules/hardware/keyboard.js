@@ -161,26 +161,24 @@ function ZX_Keyboard() {
 		}
 	}
 
-	var device = new ZX_Device({
-		id: 'keyboard',
-		iorq: function ( state, bus ) {
-			if ( state.read && 
-				 ( state.address & 0xff) == 0xfe ) {
-
-				var port_high = state.address >> 8;
-
-				state.data = 0xff;
-				for (var index = 0; index < 8; index++) {
-					if ( !(port_high & (0x01 << index)) ) {
-						state.data &= key_states[index];
-					}
+	function io_read(address) {
+		if ((address & 0xff) == 0xfe) {
+			var port_hi = address >> 8;
+			var data = 0xff;
+			for (var index = 0; index < 8; index++) {
+				if ( !(port_hi & (0x01 << index)) ) {
+					data &= key_states[index];
 				}
-			}			
+			}
+			return data;
 		}
-	});
+	}
+	
+	function connect(bus) {
+		bus.on_io_read(io_read);
+	}
 
-	device.monitorKeyState = monitorKeyState;
-	device.switchKeys = switch_keys;
-
-	return device;
+	this.monitorKeyState = monitorKeyState;
+	this.switchKeys = switch_keys;
+	this.connect = connect;
 }

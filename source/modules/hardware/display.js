@@ -1,15 +1,3 @@
-var ScreenConstants = {
-	SCALE_TYPE_UNDEFINED: 0,
-	SCALE_TYPE_PRE: 1, // scaling samples
-	SCALE_TYPE_RENDER: 2, 
-	SCALE_TYPE_POST: 3, // scaling by CSS
-
-	RENDERER_TYPE_UNDEFINED: 0,
-	RENDERER_TYPE_PUT_IMAGE_DATA: 1,
-	RENDERER_TYPE_DRAW_IMAGE: 2,
-	RENDERER_TYPE_WEB_GL: 3
-}
-
 // экран 256 x 192
 // 6144 (0x1800) байт под пикселы
 // 768 (0x300) байт под цвета знакомест
@@ -155,25 +143,23 @@ function ZX_Display ( container ) {
 	
 	var borderWidth = 16;
 	var scale = 2;
-	var scaleType = ScreenConstants.SCALE_TYPE_RENDER;
-	var rendererType = ScreenConstants.RENDERER_TYPE_DRAW_IMAGE;	
+	var scaleType = VAL_SCALE_METHOD_RENDER;
+	var rendererType = VAL_RENDERER_DRAW_IMAGE;	
 	var semicolors = false;
-	var flashInvertion = false;
+	var flashInversion = false;
 	var flashInterval = 512;
+	var renderOnAnimationFrame = false;
 
 	var inited = false;
 	var port_7ffd_value = 0x00;
 	var port_fe_value = 0x00;
 	var borderChanged = false;
 	var _bus = null;
+	var extendedMemory = VAL_EXTENDED_MEMORY_OFF;
 
-	var renderer = null;
-
-	var screen5 = new ScreenPage();
-	screen5.layer = 0;
-
-	var screen7 = new ScreenPage();
-	screen7.layer = 1;
+	var renderer = new NullRenderer();
+	var screen5 = new ScreenPage(0);
+	var screen7 = new ScreenPage(1);
 
 	function init() {
 		setTimeout(flashLoop, flashInterval);
@@ -182,21 +168,15 @@ function ZX_Display ( container ) {
 	}
 
 	function recreateRenderer() {
-		if ( renderer ) {
-			screen5.unbindRenderer();
-			screen7.unbindRenderer();
-			renderer.destroyCanvas();
-			renderer = null;
-		}
-
+		renderer.destroyCanvas();
 		switch ( rendererType ) {
-			case ScreenConstants.RENDERER_TYPE_PUT_IMAGE_DATA: renderer = new PutImageDataRenderer(); break;
-			case ScreenConstants.RENDERER_TYPE_DRAW_IMAGE: renderer = new DrawImageRenderer(); break;
-			case ScreenConstants.RENDERER_TYPE_WEB_GL: renderer = new WebGLRenderer(); break;
+			case VAL_RENDERER_PUT_IMAGE_DATA: renderer = new PutImageDataRenderer(); break;
+			case VAL_RENDERER_DRAW_IMAGE: renderer = new DrawImageRenderer(); break;
+			case VAL_RENDERER_WEB_GL: renderer = new WebGLRenderer(); break;
+			default: renderer = new NullRenderer(); break;
 		}
-		screen5.bindRenderer(renderer);
-		screen7.bindRenderer(renderer);
-
+		screen5.set_renderer(renderer);
+		screen7.set_renderer(renderer);
 		recreateCanvas();
 	}
 
@@ -231,9 +211,9 @@ function ZX_Display ( container ) {
 	}
 
 	function flashLoop() {
-		flashInvertion = !flashInvertion;
-		screen5.flashInvertion = flashInvertion;
-		screen7.flashInvertion = flashInvertion;
+		flashInversion = !flashInversion;
+		screen5.set_flashInversion(flashInversion);
+		screen7.set_flashInversion(flashInversion);
 		setTimeout(flashLoop, flashInterval);
 	}
 
@@ -244,70 +224,85 @@ function ZX_Display ( container ) {
 
 		screen5.flush();
 		screen7.flush();
-		renderer.processQueue();
 
-		if ( borderChanged ) {
-			var 
-				attrs = port_fe_value & 0x07,
-				borderColor = ScreenUtils.getColor( !semicolors, attrs & 0x02, attrs & 0x04, attrs & 0x01 );
-
-			renderer.drawBorder(borderColor);
-			borderChanged = false;
-		}
-
-		renderer.setVisibleLayer( (port_7ffd_value & 0x08) ? 1 : 0 );
-	}
-
-
-	var device = new ZX_Device({
-		id: 'display',
-		reset: function( bus ) {
-			_bus = bus;
-		},
-		event: function( name, options, bus ) {
-			_bus = bus;
-
-			if (!inited) {
-				init();
-			}
-
-			if ( name == 'var_changed' ) {
-				switch ( options.name ) {
-					case 'port_7ffd_value': port_7ffd_value = options.value; break;
-					case 'port_fe_value':
-						borderChanged = borderChanged || (( port_fe_value ^ options.value ) & 0x07 );
-						port_fe_value = options.value;
-						break;
-				}
-			}
-			else if ( name == 'wr_scr_5' ) {
-				screen5.write(options.address, options.data);
-			}
-			else if ( name == 'wr_scr_7' ) {
-				screen7.write(options.address, options.data);
-			}
-		}
-	});
-
-	device.semicolors = function( value ) {
-		if ( value !== undefined ) {
-			semicolors = value;
-			borderChanged = true;
-
-			screen5.semicolors = semicolors;
-			screen5.invalidate();
-
-			screen7.semicolors = semicolors;
-			screen7.invalidate();
+		if (renderOnAnimationFrame) {
+			requestAnimationFrame(function () { render(); });
 		}
 		else {
-			return value;
+			render();
 		}
 	}
 
-	device.redraw = redraw;
+	function render() {
+		renderer.processQueue();
+		renderer.setVisibleLayer( (port_7ffd_value & 0x08) ? 1 : 0 );
 
-	device.set_border_text = function( text ) {
+		if ( !borderChanged )
+			return;
+
+		borderChanged = false;
+		var 
+			attrs = port_fe_value & 0x07,
+			borderColor = ScreenUtils.getColor( !semicolors, attrs & 0x02, attrs & 0x04, attrs & 0x01 );
+
+		renderer.drawBorder(borderColor);
+	}
+
+	function get_page( address ) {
+		if ( address < 0x4000 ) {
+			return NaN;
+		}
+
+		if ( address < 0x8000 ) {
+			return 5;
+		}
+
+		if ( address < 0xc000 ) {
+			return 2;
+		}
+
+		switch ( extendedMemory ) {
+			case VAL_EXTENDED_MEMORY_OFF: return ( port_7ffd_value & 0x07 );
+			case VAL_EXTENDED_MEMORY_PENTAGON: return (( port_7ffd_value & 0xc0 ) >> 3 ) | ( port_7ffd_value & 0x07 );
+		}
+
+		return NaN;
+	}
+
+	function write(address, data) {
+		var page = get_page(address);
+		address = address & 0x3fff;
+		if ( address < 0x1b00 ) {
+			switch (page) {
+				case 5: 
+					if ( !inited ) {
+						init();
+					}
+					screen5.write(address, data); 
+					break;
+
+				case 7:
+					if ( !inited ) {
+						init();
+					}
+					screen7.write(address, data); 
+					break;
+			}
+		}
+	}
+
+	function var_write_port_7ffd_value(name, value) {
+		port_7ffd_value = value;
+	}
+
+	function var_write_port_fe_value(name, value) {
+		borderChanged = borderChanged || (( port_fe_value ^ value ) & 0x07 );
+		port_fe_value = value;
+	}
+
+	this.force_redraw = redraw;
+
+	this.set_border_text = function(text) {
 		var
 			attrs = port_fe_value & 0x07,
 			textColor = ScreenUtils.getColor( !semicolors, !(attrs & 0x02), !(attrs & 0x04), !(attrs & 0x01) );
@@ -315,37 +310,83 @@ function ZX_Display ( container ) {
 		renderer.drawBorderText(text, textColor);
 	}
 
-	device.rendererType = function ( type ) {
-		if ( type !== undefined ) {
-			if ( rendererType != type ) {
-				rendererType = type;
-
-				if ( inited ) {
-					recreateRenderer();
-				}
-			}
-		}
-		else {
-			return rendererType;
+	function opt_extendedMemory(name, value) {
+		if ( extendedMemory !== value ) {
+			extendedMemory = value;
 		}
 	}
 
-	device.scaleType = function ( type ) {
-		if ( type !== undefined ) {
-			if ( scaleType != type ) {
-				scaleType = type;
+	function opt_scale(name, value) {
+		if ( scale !== value ) {
+			scale = value;
 
-				if ( inited ) {
-					recreateCanvas();
-				}
+			if ( inited ) {
+				recreateCanvas();
 			}
-		}
-		else {
-			return scaleType;
 		}
 	}
 
-	return device;
+	function opt_scale_method(name, value) {
+		if ( scaleType !== value ) {
+			scaleType = value;
+
+			if ( inited ) {
+				recreateCanvas();
+			}
+		}
+	}
+
+	function opt_renderer(name, value) {
+		if ( rendererType !== value ) {
+			rendererType = value;
+
+			if ( inited ) {
+				recreateRenderer();
+			}			
+		}
+	}
+
+	function opt_renderOnAnimationFrame(name, value) {
+		if (renderOnAnimationFrame != value) {
+			renderOnAnimationFrame = value;
+		}
+	}
+
+	function opt_semicolors(name, value) {
+		if (semicolors != value) {
+			semicolors = value;
+			borderChanged = true;
+
+			screen5.set_semicolors(semicolors);
+			screen5.invalidate();
+
+			screen7.set_semicolors(semicolors);
+			screen7.invalidate();
+		}
+	}
+
+	function opt_useTypedArrays(name, value) {
+		screen5.set_useTypedArrays(value);
+		screen7.set_useTypedArrays(value);
+	}
+	
+	this.connect = function (bus) {
+		_bus = bus;
+		bus.on_mem_write(write);
+		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
+		bus.on_var_write(var_write_port_fe_value, 'port_fe_value');
+		bus.on_var_write(redraw, 'intrq');
+		bus.on_var_write(function (name, value) {
+			this.set_border_text('~ ' + value.frequency .toFixed(2) + ' MHz  ' + Math.round(value.fps) + ' FPS');
+		}.bind(this), 'performance');
+		bus.on_opt(opt_extendedMemory, OPT_EXTENDED_MEMORY);
+		bus.on_opt(opt_scale, OPT_SCALE);
+		bus.on_opt(opt_scale_method, OPT_SCALE_METHOD);
+		bus.on_opt(opt_renderer, OPT_RENDERER);
+		bus.on_opt(opt_renderOnAnimationFrame, OPT_RENDER_ON_ANIMATION_FRAME);
+		bus.on_opt(opt_semicolors, OPT_SEMICOLORS);
+		bus.on_opt(opt_useTypedArrays, OPT_USE_TYPED_ARRAYS);
+	}
 }
 
 /*
@@ -353,15 +394,12 @@ function ZX_Display ( container ) {
 
 	properties:
 		layer: 0 or 1. Represents screen5 and screen7 respectively.
-		flashInvertion: bool. Points whether flash regions must be inverted in current moment.
+		flashInversion: bool. Points whether flash regions must be inverted in current moment.
 		semicolors: bool. Points whether semicolors is used.
+		renderer: A renderer that will be user for displaying screen data
+		useTypedArray: A value indicating, which kind of arrays to use for storing screen data.
 
 	methods:
-		void bindRenderer( renderer )
-			Assigns the renderer that will be user for displaying screen data.
-
-		void unbindRenderer()
-
 		void write( ushort address, byte data )
 			Writes byte in the video memory if it's differs from the current value. Queues corresponding area to be redrawed.
 
@@ -372,115 +410,256 @@ function ZX_Display ( container ) {
 			Flushes invalidated areas to the renderer.
 
 */
-function ScreenPage() {
-	this._buffer = [];
-	this._dirty = [];
-	this._renderer = null;
-	this._lastFlashInvertion = false;
+function ScreenPage(layer) {
+	var _buffer = []; for ( var i = 0; i < 0x1b00; i++ ) { _buffer[i] = 0; }
+	var _dirty = []; for ( var i = 0; i < 0x1800; i++ ) { _dirty[i] = false; }
+	var _renderer = new NullRenderer();
+	var _lastFlashInversion = false;
 
-	this.layer = 0;
-	this.flashInvertion = false;
-	this.semicolors = false;
+	var _layer = layer;
+	var _flashInversion = false;
+	var _semicolors = false;
+	var _useTypedArrays = false;
 
-	for ( var address = 0; address < 0x1b00; address++ ) {
-		this._buffer[address] = 0;
+	this.get_layer = function () {
+		return _layer;
 	}
 
-	for ( var address = 0; address < 0x1800; address++ ) {
-		this._dirty[address] = false;
+	this.get_flashInversion = function () {
+		return _flashInversion;
 	}
 
-	this.bindRenderer = function ( renderer ) {
-		this._renderer = renderer;
+	this.set_flashInversion = function (value) {
+		_flashInversion = value;
 	}
 
-	this.unbindRenderer = function () {
-		this._renderer = null;
+	this.get_semicolors = function () {
+		return _semicolors;
 	}
 
-	this.write = function ( address, data ) {
-		if ( this._buffer[address] != data ) {
-			this._buffer[address] = data;
+	this.set_semicolors = function (value) {
+		_semicolors = value;
+	}
 
-			if ( address < 0x1800 ) {
-				this._dirty[address] = true;
+	this.get_useTypedArrays = function () {
+		return _useTypedArrays;
+	}
+	
+	this.set_useTypedArrays = function (value) {
+		if (_useTypedArrays != value) {
+			_useTypedArrays = value;
+			if (value) {
+				switchToTypedArrays();
 			}
 			else {
-				var region = ScreenUtils.getRegionCoordsByAddress(address);
-				var addresses = ScreenUtils.getAddressesByRegionCoords(region);
-
-				for ( var i = 0; i < 8; i++ ) {
-					this._dirty[addresses[i]] = true;
-				}
+				switchToOrdinaryArrays();
 			}
 		}
 	}
 
-	this.invalidate = function () {
-		for ( var address = 0; address < 0x1800; address++ ) {
-			this._dirty[address] = true;
+	this.set_renderer = function (value) {
+		_renderer = value || new NullRenderer();
+	}
+
+	this.get_renderer = function () {
+		return _renderer;
+	}
+
+	function switchToTypedArrays() {
+		_buffer = new Uint8Array(_buffer);
+		_dirty = new Int8Array(_dirty.map(function (value) { return value ? 1 : 0; }));
+		this.invalidate = invalidateTyped;
+		this.write = writeTyped;
+		this.flush = flushTyped;
+	}
+
+	function switchToOrdinaryArrays() {
+		_buffer = Array.prototype.slice.call(_buffer);
+		_dirty =  Array.prototype.slice.call(_dirty).map(function (value) { return !!value; });
+		this.invalidate = invalidate;
+		this.write = write;
+		this.flush = flush;
+	}
+
+	function getActualAttrs(attrs) {
+		if ( !_semicolors ) {
+			attrs |= 0x40;
+		}
+		if ((attrs & 0x80)) {
+			attrs = _flashInversion 
+				? (attrs & 0x40) | ((attrs << 3) & 0x38) | ((attrs >> 3) & 0x07)
+				: (attrs & 0x7f);
+		}
+		return attrs;
+	}
+
+	function invalidate() {
+		for ( var i = 0; i < 0x1800; i++ ) {
+			_dirty[i] = true;
 		}
 	}
 
-	this.flush = function () {
-		if ( !this._renderer ) {
+	function write(address, data) {
+		if (_buffer[address] == data)
+			return;
+
+		_buffer[address] = data;
+		if ( address < 0x1800 ) {
+			_dirty[address] = true;
 			return;
 		}
 
-		this._checkForInvertion();
+		var first_row_address = ((address << 3) & 0x1800) | (address & 0x00ff);
+		_dirty[first_row_address + 0x0000] = true;
+		_dirty[first_row_address + 0x0100] = true;
+		_dirty[first_row_address + 0x0200] = true;
+		_dirty[first_row_address + 0x0300] = true;
+		_dirty[first_row_address + 0x0400] = true;
+		_dirty[first_row_address + 0x0500] = true;
+		_dirty[first_row_address + 0x0600] = true;
+		_dirty[first_row_address + 0x0700] = true;
+	}
+
+	function processInversion() {
+		if ( _lastFlashInversion == _flashInversion ) 
+			return;
+
+		_lastFlashInversion = _flashInversion;
+		for ( var address = 0x1800; address < 0x1b00; address++ ) {
+			if ( _buffer[address] & 0x80 ) {
+				var first_row_address = ((address << 3) & 0x1800) | (address & 0x00ff);
+				_dirty[first_row_address + 0x0000] = true;
+				_dirty[first_row_address + 0x0100] = true;
+				_dirty[first_row_address + 0x0200] = true;
+				_dirty[first_row_address + 0x0300] = true;
+				_dirty[first_row_address + 0x0400] = true;
+				_dirty[first_row_address + 0x0500] = true;
+				_dirty[first_row_address + 0x0600] = true;
+				_dirty[first_row_address + 0x0700] = true;
+			}
+		}
+	}
+
+	function flush() {
+		processInversion();
 
 		for ( var address = 0; address < 0x1800; address++ ) {
-			if ( this._dirty[address] ) {
-				var point = ScreenUtils.getPointCoordsByAddress(address);
-				var region = ScreenUtils.getRegionCoordsByPointCoords(point);
-				var regionAddress = ScreenUtils.getAddressByRegionCoords(region);
+			if ( _dirty[address] ) {
+				_renderer.queueDrawing(
+					(address << 3) & 0xf8, // ( 0..31 ) * 8
+					((address >> 5) & 0xc0) | ((address >> 2) & 0x38) | ((address >> 8) & 0x07), // 0..191
+					_layer, // 0..1
+					_buffer[address], // 8 bits
+					getActualAttrs(_buffer[0x1800 | ((address >> 3) & 0x0300) | (address & 0xff)])); // 7 bits
 
-				this._renderer.queueDrawing(
-					point.x, // ( 0..31 ) * 8
-					point.y, // 0..191
-					this.layer, // 0..1
-					this._buffer[address], // 8 bits
-					this._correctAttrs(this._buffer[regionAddress])); // 7 bits
-
-				this._dirty[address] = false;
+				_dirty[address] = false;
 			}
 		}
 	}
 
-	this._checkForInvertion = function () {
-		if ( this._lastFlashInvertion != this.flashInvertion ) {
-			for ( var address = 0x1800; address < 0x1b00; address++ ) {
-				if ( this._buffer[address] & 0x80 ) {
-					var region = ScreenUtils.getRegionCoordsByAddress(address);
-					var addresses = ScreenUtils.getAddressesByRegionCoords(region);
+	function invalidateTyped() {
+		_dirty.fill(1);
+	}
 
-					for ( var i = 0; i < 8; i++ ) {
-						this._dirty[addresses[i]] = true;
-					}
-				}
+	function writeTyped(address, data) {
+		if (_buffer[address] == data)
+			return;
+
+		_buffer[address] = data;
+		if ( address < 0x1800 ) {
+			_dirty[address] = 1;
+			return;
+		}
+
+		/* OPTIMIZED CODE BEGIN */
+		var first_row_address = ((address << 3) & 0x1800) | (address & 0x00ff);
+		_dirty[first_row_address + 0x0000] = 1;
+		_dirty[first_row_address + 0x0100] = 1;
+		_dirty[first_row_address + 0x0200] = 1;
+		_dirty[first_row_address + 0x0300] = 1;
+		_dirty[first_row_address + 0x0400] = 1;
+		_dirty[first_row_address + 0x0500] = 1;
+		_dirty[first_row_address + 0x0600] = 1;
+		_dirty[first_row_address + 0x0700] = 1;
+		/* OPTIMIZED CODE END */
+
+		/* ORIGINAL CODE BEGIN */
+		// var region = ScreenUtils.getRegionCoordsByAddress(address);
+		// var addresses = ScreenUtils.getAddressesByRegionCoords(region);
+		// for ( var i = 0; i < 8; i++ ) {
+		// 	_dirty[addresses[i]] = 1;
+		// }
+		/* ORIGINAL CODE END */
+
+	}
+
+	function processInversionTyped() {
+		if ( _lastFlashInversion == _flashInversion ) 
+			return;
+
+		_lastFlashInversion = _flashInversion;
+		for ( var address = 0x1800; address < 0x1b00; address++ ) {
+			if ( _buffer[address] & 0x80 ) {
+				/* OPTIMIZED CODE BEGIN */
+				var first_row_address = ((address << 3) & 0x1800) | (address & 0x00ff);
+				_dirty[first_row_address + 0x0000] = 1;
+				_dirty[first_row_address + 0x0100] = 1;
+				_dirty[first_row_address + 0x0200] = 1;
+				_dirty[first_row_address + 0x0300] = 1;
+				_dirty[first_row_address + 0x0400] = 1;
+				_dirty[first_row_address + 0x0500] = 1;
+				_dirty[first_row_address + 0x0600] = 1;
+				_dirty[first_row_address + 0x0700] = 1;
+				/* OPTIMIZED CODE END */
+
+				/* ORIGINAL CODE BEGIN */
+				// the followed algorithm is optimized below
+				// var region = ScreenUtils.getRegionCoordsByAddress(address);
+				// var addresses = ScreenUtils.getAddressesByRegionCoords(region);
+				// for ( var i = 0; i < 8; i++ ) {
+				// 	_dirty[addresses[i]] = 0;
+				// }
+				/* ORIGINAL CODE END */
 			}
-
-			this._lastFlashInvertion = this.flashInvertion;
 		}
 	}
 
-	this._correctAttrs = function ( attrs ) {
-		if ( attrs & 0x80 ) {
-			attrs =
-				this.flashInvertion ?
-				(( attrs & 0x07 ) << 3 ) | (( attrs & 0x38 ) >> 3 ) | ( attrs & 0x40 ) :
-				( attrs & 0x7f );
+	function flushTyped() {
+		processInversionTyped();
 
+		for ( var address = 0; address < 0x1800; address++ ) {
+			if ( _dirty[address] ) {
+				/* OPTIMIZED CODE BEGIN */
+				_renderer.queueDrawing(
+					(address << 3) & 0xf8, // ( 0..31 ) * 8
+					((address >> 5) & 0xc0) | ((address >> 2) & 0x38) | ((address >> 8) & 0x07), // 0..191
+					_layer, // 0..1
+					_buffer[address], // 8 bits
+					getActualAttrs(_buffer[0x1800 | ((address >> 3) & 0x0300) | (address & 0xff)])); // 7 bits
+				/* OPTIMIZED CODE END */
+
+				/* ORIGINAL CODE BEGIN */
+				// var point = ScreenUtils.getPointCoordsByAddress(address);
+				// var region = ScreenUtils.getRegionCoordsByPointCoords(point);
+				// var regionAddress = ScreenUtils.getAddressByRegionCoords(region);
+
+				// _renderer.queueDrawing(
+				// 	point.x, // ( 0..31 ) * 8
+				// 	point.y, // 0..191
+				// 	_layer, // 0..1
+				// 	_buffer[address], // 8 bits
+				// 	this._correctAttrs(_buffer[regionAddress])); // 7 bits
+				/* ORIGINAL CODE END */
+
+				_dirty[address] = 0;
+			}
 		}
-
-		if ( !this.semicolors ) {
-			attrs |= 0x40;
-		}
-
-		return attrs;
-	}	
+	}
+	
+	this.invalidate = invalidate;
+	this.write = write;
+	this.flush = flush;
 }
-
 
 /*
 	Renderer interface:
@@ -511,14 +690,27 @@ function ScreenPage() {
 			Draws the text on the top border area with the specific color.
 */
 
+function NullRenderer() {
+	var _layer = 0;
+	this.createCanvas = function (container, borderWidth, scale, scaleType) { }
+	this.destroyCanvas = function () { }
+	this.setVisibleLayer = function (layer) { _layer = layer; }
+	this.getVisibleLayer = function () { return _layer; }
+	this.queueDrawing = function (x, y, layer, bits, attrs) { }
+	this.processQueue = function () { }
+	this.drawBorder = function (color) { }
+	this.drawBorderText = function (text, color) { }
+}
+
 function PutImageDataRenderer() {
 	this._samples = [];
 	this._scale = 1;
-	this._scaleType = ScreenConstants.SCALE_TYPE_UNDEFINED;
+	this._scaleType = VAL_SCALE_METHOD_UNDEFINED;
 	this._borderWidth = 16;
 	this._lastBorderColor = [ 0, 0, 0, 255 ];
 	this._lastBorderTextWidth = 0;
 
+	this._wrapper = null;
 	this._border = null;
 	this._layer0 = null;
 	this._layer1 = null;
@@ -536,7 +728,7 @@ function PutImageDataRenderer() {
 
 		var sampleCanvas = document.createElement('canvas');
 		var sampleContext = sampleCanvas.getContext('2d');
-		var scale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE ) ?	this._scale : 1;
+		var scale = ( this._scaleType == VAL_SCALE_METHOD_PRE ) ?	this._scale : 1;
 		var 
 			sampleWidth = 8 * scale,
 			sampleHeight = 1 * scale;
@@ -586,11 +778,17 @@ function PutImageDataRenderer() {
 		canvasContext.putImageData(imageData, 0, 0);
 	}
 
+	this._removeChildNodes = function ( parent ) {
+		while ( parent.firstChild ) {
+			this._removeChildNodes(parent.firstChild);
+			parent.removeChild(parent.firstChild);
+		}
+	}
 
 	this.createCanvas = function ( container, borderWidth, scale, scaleType ) {
 		// с методом putImageData масштабирование при отрисовке невозможно
-		if ( scaleType == ScreenConstants.SCALE_TYPE_RENDER ) {
-			scaleType = ScreenConstants.SCALE_TYPE_PRE;
+		if ( scaleType == VAL_SCALE_METHOD_RENDER ) {
+			scaleType = VAL_SCALE_METHOD_PRE;
 		}
 
 		if (( scale != this._scale ) || ( scaleType != this._scaleType )) {
@@ -601,51 +799,49 @@ function PutImageDataRenderer() {
 
 		this._borderWidth = borderWidth;
 
-		var pixelScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE ) ? this._scale : 1;
-		var cssScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_POST ) ? this._scale : 1;
+		var pixelScale = ( this._scaleType == VAL_SCALE_METHOD_PRE ) ? this._scale : 1;
+		var cssScale = ( this._scaleType == VAL_SCALE_METHOD_POST ) ? this._scale : 1;
+
+		this._wrapper = document.createElement('div');
+		this._wrapper.style.width = ( borderWidth + 256 + borderWidth ) * scale + 'px';
+		this._wrapper.style.height = ( borderWidth + 192 + borderWidth ) * scale + 'px';
+		this._wrapper.style.padding = '0 0 0 0';
+		this._wrapper.style.margin = '0 0 0 0';
+		this._wrapper.style.position = 'relative';
+		container.appendChild(this._wrapper);
 
 		this._border = this._createCanvas(0, 0, borderWidth + 256 + borderWidth, borderWidth + 192 + borderWidth, scale, 1);
 		this._ctxBorder = this._border.getContext('2d');
 		this._initImageData( this._ctxBorder, this._border.width, this._border.height );
-		container.appendChild(this._border);
+		this._wrapper.appendChild(this._border);
 
 		this._layer0 = this._createCanvas(borderWidth, borderWidth, 256, 192, pixelScale, cssScale);
 		this._ctxLayer0 = this._layer0.getContext('2d');
 		this._initImageData( this._ctxLayer0, this._layer0.width, this._layer0.height );
-		container.appendChild(this._layer0);
+		this._wrapper.appendChild(this._layer0);
 
 		this._layer1 = this._createCanvas(borderWidth, borderWidth, 256, 192, pixelScale, cssScale);
 		this._ctxLayer1 = this._layer1.getContext('2d');
 		this._initImageData( this._ctxLayer1, this._layer1.width, this._layer1.height );
-		container.appendChild(this._layer1);
+		this._wrapper.appendChild(this._layer1);
 
 		this.setVisibleLayer(this._visibleLayer);
 	}
 
 	this.destroyCanvas = function() {
-		if ( this._border ) {
-			if ( this._border.parentNode ) {
-				this._border.parentNode.removeChild(this._border);
+		if ( this._wrapper ) {
+			if ( this._wrapper.parentNode ) {
+				this._removeChildNodes(this._wrapper);
+				this._wrapper.parentNode.removeChild(this._wrapper);
 			}
-			this._border = null;
-			this._ctxBorder = null;
 		}
 
-		if ( this._layer0 ) {
-			if ( this._layer0.parentNode ) {
-				this._layer0.parentNode.removeChild(this._layer0);
-			}
-			this._layer0 = null;
-			this._ctxLayer0 = null;
-		}
-
-		if ( this._layer1 ) {
-			if ( this._layer1.parentNode ) {
-				this._layer1.parentNode.removeChild(this._layer1);
-			}
-			this._layer1 = null;
-			this._ctxLayer1 = null;
-		}
+		this._border = null;
+		this._ctxBorder = null;
+		this._layer0 = null;
+		this._ctxLayer0 = null;
+		this._layer1 = null;
+		this._ctxLayer1 = null;
 	}
 
 	this.setVisibleLayer = function ( layer ) {
@@ -664,7 +860,7 @@ function PutImageDataRenderer() {
 	}
 
 	this.processQueue = function () {
-		var sampleScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE ) ? this._scale : 1;
+		var sampleScale = ( this._scaleType == VAL_SCALE_METHOD_PRE ) ? this._scale : 1;
 		var queueLength = this._queue.length;
 		for ( var i = 0; i < queueLength; ) {
 			var 
@@ -744,7 +940,7 @@ function PutImageDataRenderer() {
 
 function DrawImageRenderer() {
 	this._scale = 1;
-	this._scaleType = ScreenConstants.SCALE_TYPE_UNDEFINED;
+	this._scaleType = VAL_SCALE_METHOD_UNDEFINED;
 	this._borderWidth = 16;
 	this._lastBorderColor = [ 0, 0, 0, 255 ];
 	this._lastBorderTextWidth = 0;
@@ -757,6 +953,7 @@ function DrawImageRenderer() {
 		stepY: 3
 	};
 
+	this._wrapper = null;
 	this._border = null;
 	this._layer0 = null;
 	this._layer1 = null;
@@ -786,7 +983,7 @@ function DrawImageRenderer() {
 		y4	.................................
 
 		*/
-		var sampleScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE ) ? this._scale : 1;
+		var sampleScale = ( this._scaleType == VAL_SCALE_METHOD_PRE ) ? this._scale : 1;
 		var sampleParams = {
 			width: 8 * sampleScale,
 			height: 1 * sampleScale,
@@ -871,6 +1068,12 @@ function DrawImageRenderer() {
 		canvasContext.putImageData(imageData, 0, 0);
 	}
 
+	this._removeChildNodes = function ( parent ) {
+		while ( parent.firstChild ) {
+			this._removeChildNodes(parent.firstChild);
+			parent.removeChild(parent.firstChild);
+		}
+	}
 
 	this.createCanvas = function ( container, borderWidth, scale, scaleType ) {
 		if (( this._scale != scale ) || ( this._scaleType != scaleType )) {
@@ -881,51 +1084,49 @@ function DrawImageRenderer() {
 		
 		this._borderWidth = borderWidth;
 
-		var pixelScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE || this._scaleType == ScreenConstants.SCALE_TYPE_RENDER ) ? this._scale : 1;
-		var cssScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_POST ) ? this._scale : 1;
+		var pixelScale = ( this._scaleType == VAL_SCALE_METHOD_PRE || this._scaleType == VAL_SCALE_METHOD_RENDER ) ? this._scale : 1;
+		var cssScale = ( this._scaleType == VAL_SCALE_METHOD_POST ) ? this._scale : 1;
+
+		this._wrapper = document.createElement('div');
+		this._wrapper.style.width = ( borderWidth + 256 + borderWidth ) * scale + 'px';
+		this._wrapper.style.height = ( borderWidth + 192 + borderWidth ) * scale + 'px';
+		this._wrapper.style.padding = '0 0 0 0';
+		this._wrapper.style.margin = '0 0 0 0';
+		this._wrapper.style.position = 'relative';
+		container.appendChild(this._wrapper);
 
 		this._border = this._createCanvas(0, 0, borderWidth + 256 + borderWidth, borderWidth + 192 + borderWidth, scale, 1);
 		this._ctxBorder = this._border.getContext('2d');
 		this._initImageData( this._ctxBorder, this._border.width, this._border.height );
-		container.appendChild(this._border);
+		this._wrapper.appendChild(this._border);
 
 		this._layer0 = this._createCanvas(borderWidth, borderWidth, 256, 192, pixelScale, cssScale);
 		this._ctxLayer0 = this._layer0.getContext('2d');
 		this._initImageData( this._ctxLayer0, this._layer0.width, this._layer0.height );
-		container.appendChild(this._layer0);
+		this._wrapper.appendChild(this._layer0);
 
 		this._layer1 = this._createCanvas(borderWidth, borderWidth, 256, 192, pixelScale, cssScale);
 		this._ctxLayer1 = this._layer1.getContext('2d');
 		this._initImageData( this._ctxLayer1, this._layer1.width, this._layer1.height );
-		container.appendChild(this._layer1);
+		this._wrapper.appendChild(this._layer1);
 
 		this.setVisibleLayer(this._visibleLayer);
 	}
 
 	this.destroyCanvas = function() {
-		if ( this._border ) {
-			if ( this._border.parentNode ) {
-				this._border.parentNode.removeChild(this._border);
+		if ( this._wrapper ) {
+			if ( this._wrapper.parentNode ) {
+				this._removeChildNodes(this._wrapper);
+				this._wrapper.parentNode.removeChild(this._wrapper);
 			}
-			this._border = null;
-			this._ctxBorder = null;
 		}
 
-		if ( this._layer0 ) {
-			if ( this._layer0.parentNode ) {
-				this._layer0.parentNode.removeChild(this._layer0);
-			}
-			this._layer0 = null;
-			this._ctxLayer0 = null;
-		}
-
-		if ( this._layer1 ) {
-			if ( this._layer1.parentNode ) {
-				this._layer1.parentNode.removeChild(this._layer1);
-			}
-			this._layer1 = null;
-			this._ctxLayer1 = null;
-		}
+		this._border = null;
+		this._ctxBorder = null;
+		this._layer0 = null;
+		this._ctxLayer0 = null;
+		this._layer1 = null;
+		this._ctxLayer1 = null;
 	}
 
 	this.setVisibleLayer = function ( layer ) {
@@ -945,7 +1146,7 @@ function DrawImageRenderer() {
 
 	this.processQueue = function () {
 		var 
-			renderScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE || this._scaleType == ScreenConstants.SCALE_TYPE_RENDER ) ? this._scale : 1,
+			renderScale = ( this._scaleType == VAL_SCALE_METHOD_PRE || this._scaleType == VAL_SCALE_METHOD_RENDER ) ? this._scale : 1,
 			queueLength = this._queue.length,
 			sampleParams = this._sampleParams,
 			w = 8 * renderScale,
@@ -1030,7 +1231,7 @@ function DrawImageRenderer() {
 
 function WebGLRenderer() {
 	this._scale = 1;
-	this._scaleType = ScreenConstants.SCALE_TYPE_UNDEFINED;
+	this._scaleType = VAL_SCALE_METHOD_UNDEFINED;
 	this._borderWidth = 16;
 	this._lastBorderColor = [ 0, 0, 0, 255 ];
 	this._lastBorderTextWidth = 0;
@@ -1041,6 +1242,7 @@ function WebGLRenderer() {
 		height: 1
 	};
 
+	this._wrapper = null;
 	this._border = null;
 	this._layer0 = null;
 	this._layer1 = null;
@@ -1063,7 +1265,7 @@ function WebGLRenderer() {
 		y2	...........................
 
 		*/
-		var sampleScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE ) ? this._scale : 1;
+		var sampleScale = ( this._scaleType == VAL_SCALE_METHOD_PRE ) ? this._scale : 1;
 		var sampleParams = {
 			width: 8 * sampleScale,
 			height: 1 * sampleScale
@@ -1181,6 +1383,13 @@ function WebGLRenderer() {
 	    glContext.texImage2D(glContext.TEXTURE_2D, 0, glContext.RGBA, glContext.RGBA, glContext.UNSIGNED_BYTE, this._samples);
 	}
 
+	this._removeChildNodes = function ( parent ) {
+		while ( parent.firstChild ) {
+			this._removeChildNodes(parent.firstChild);
+			parent.removeChild(parent.firstChild);
+		}
+	}	
+
 	this.createCanvas = function ( container, borderWidth, scale, scaleType ) {
 		if (( this._scale != scale ) || ( this._scaleType != scaleType )) {
 			this._scale = scale;
@@ -1190,13 +1399,21 @@ function WebGLRenderer() {
 		
 		this._borderWidth = borderWidth;
 
-		var pixelScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE || this._scaleType == ScreenConstants.SCALE_TYPE_RENDER ) ? this._scale : 1;
-		var cssScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_POST ) ? this._scale : 1;
+		var pixelScale = ( this._scaleType == VAL_SCALE_METHOD_PRE || this._scaleType == VAL_SCALE_METHOD_RENDER ) ? this._scale : 1;
+		var cssScale = ( this._scaleType == VAL_SCALE_METHOD_POST ) ? this._scale : 1;
+
+		this._wrapper = document.createElement('div');
+		this._wrapper.style.width = ( borderWidth + 256 + borderWidth ) * scale + 'px';
+		this._wrapper.style.height = ( borderWidth + 192 + borderWidth ) * scale + 'px';
+		this._wrapper.style.padding = '0 0 0 0';
+		this._wrapper.style.margin = '0 0 0 0';
+		this._wrapper.style.position = 'relative';
+		container.appendChild(this._wrapper);
 
 		this._border = this._createCanvas(0, 0, borderWidth + 256 + borderWidth, borderWidth + 192 + borderWidth, scale, 1);
 		this._ctxBorder = this._border.getContext('2d');
 		this._initImageData( this._ctxBorder, this._border.width, this._border.height );
-		container.appendChild(this._border);
+		this._wrapper.appendChild(this._border);
 
 		// extra points to width for correct for with FF
 		var 
@@ -1216,36 +1433,26 @@ function WebGLRenderer() {
 		this._initWebGLContext(this._ctxLayer0);
 		this._initWebGLContext(this._ctxLayer1);
 
-		container.appendChild(this._layer0);
-		container.appendChild(this._layer1);
+		this._wrapper.appendChild(this._layer0);
+		this._wrapper.appendChild(this._layer1);
 
 		this.setVisibleLayer(this._visibleLayer);
 	}
 
 	this.destroyCanvas = function() {
-		if ( this._border ) {
-			if ( this._border.parentNode ) {
-				this._border.parentNode.removeChild(this._border);
+		if ( this._wrapper ) {
+			if ( this._wrapper.parentNode ) {
+				this._removeChildNodes(this._wrapper);
+				this._wrapper.parentNode.removeChild(this._wrapper);
 			}
-			this._border = null;
-			this._ctxBorder = null;
 		}
 
-		if ( this._layer0 ) {
-			if ( this._layer0.parentNode ) {
-				this._layer0.parentNode.removeChild(this._layer0);
-			}
-			this._layer0 = null;
-			this._ctxLayer0 = null;
-		}
-
-		if ( this._layer1 ) {
-			if ( this._layer1.parentNode ) {
-				this._layer1.parentNode.removeChild(this._layer1);
-			}
-			this._layer1 = null;
-			this._ctxLayer1 = null;
-		}
+		this._border = null;
+		this._ctxBorder = null;
+		this._layer0 = null;
+		this._ctxLayer0 = null;
+		this._layer1 = null;
+		this._ctxLayer1 = null;
 	}
 
 	this.setVisibleLayer = function ( layer ) {
@@ -1265,8 +1472,8 @@ function WebGLRenderer() {
 
 	this.processQueue = function () {
 		var 
-			//sampleScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE ) ? this._scale : 1,
-			renderScale = ( this._scaleType == ScreenConstants.SCALE_TYPE_PRE || this._scaleType == ScreenConstants.SCALE_TYPE_RENDER ) ? this._scale : 1,
+			//sampleScale = ( this._scaleType == VAL_SCALE_METHOD_PRE ) ? this._scale : 1,
+			renderScale = ( this._scaleType == VAL_SCALE_METHOD_PRE || this._scaleType == VAL_SCALE_METHOD_RENDER ) ? this._scale : 1,
 			queueLength = this._queue.length,
 			sampleParams = this._sampleParams,
 			dw = 8 * renderScale,

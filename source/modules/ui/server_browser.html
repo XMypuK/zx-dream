@@ -39,6 +39,13 @@
 		background-color: #0088ff;
 		color: #ffffff;
 	}
+
+	.ui-dialog .server-browser {
+		border-radius: 0 0 10px 10px;
+		-moz-border-radius: 0 0 10px 10px;
+		-webkit-border-radius: 0 0 10px 10px;
+		padding: 0.5em;
+	}
 </style>
 
 <template id="server-browser">
@@ -54,38 +61,60 @@
 </template>
 
 <script type="text/javascript">
-	function ServerBrowser( on_file_selected ) {
+	function ServerBrowser() {
 		'use strict';
 		
 		var $dlg = $("<?=server-browser?>");
-		$dlg.dialog({
-			autoOpen: true,
-			title: 'Выберите образ TRD, FDI или SCL',
-			modal: true,
-			width: 600,
-			height: 400
-		});
-		$dlg.on('keydown', function(e) { e.stopPropagation(); });
-		$dlg.on('keyup', function(e) { e.stopPropagation(); });
+		var openResult$ = null;
+		var files = [];
+
+		this.open = open;
+
+		function open() {
+			if (!openResult$) {
+				openResult$ = $.Deferred();
+				init();
+			}
+			return openResult$;
+		}
+
+		function init() {
+			$dlg.dialog({
+				autoOpen: true,
+				title: 'Выберите образ TRD, FDI или SCL',
+				modal: true,
+				width: 600,
+				height: 400,
+				close: function (e) { 
+					$(this).dialog('destroy'); 
+					$(this).remove(); 
+
+					if (openResult$) {
+						openResult$.reject();
+						openResult$ = null;
+					}
+				}
+			});
+			$dlg.on('keydown', function(e) { e.stopPropagation(); });
+			$dlg.on('keyup', function(e) { e.stopPropagation(); });
+
+			// загрузка каталога с сервера
+			$.get('get_catalog.php', [], function(data) {
+				if ( data && data.length !== undefined ) {
+					files = data;
+					refresh_tags();
+					refresh_files();
+				}
+				else {
+					alert('Неожиданный ответ от сервера.');
+				}
+			}, 'json');
+		}
+
 		
 		var $file_list = $dlg.find('ul.files');
 		var $filter_text = $dlg.find('input.filter-text');
 		var $tag_list = $dlg.find('ul.tags');
-
-		var files = [];
-
-		// загрузка каталога с сервера
-		$.get('get_catalog.php', [], function(data) {
-			if ( data && data.length !== undefined ) {
-				files = data;
-				refresh_tags();
-				refresh_files();
-			}
-			else {
-				alert('Неожиданный ответ от сервера.');
-			}
-		}, 'json');
-
 		// обработка клика на файле
 		$file_list.on('click', function (e) {
 			var filename = $(e.target).attr('data-filename');
@@ -94,11 +123,13 @@
 				return;
 			}
 
-			on_file_selected(filename, format);
+			if (openResult$) {
+				openResult$.resolve(filename);
+				openResult$ = null;
+			}
 
 			$dlg.dialog('close');
-			$dlg.dialog('destroy');
-			$dlg = null;			
+			$dlg = null;
 		});
 
 		$filter_text

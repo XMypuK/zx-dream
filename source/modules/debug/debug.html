@@ -1,15 +1,13 @@
 <style>
-	.zxdebug-toolbar {
-		font-size: 14px;
-		border-top: 1px solid #444444;
-		border-left: 1px solid #444444;
-		border-right: 1px solid #444444;
+	.debug-toolbar {
+		background-color: #cccccc;
+		border: 1px solid #444444;
+		border-bottom: none;
 	}
 
 	.zxdebug-registers {
 		font-family: Courier New, monospace; 
 		font-size: 14px;
-		margin-bottom: 10px;
 	}
 
 	.zxdebug-registers td, .zxdebug-registers th {
@@ -21,13 +19,24 @@
 	}
 
 	.zxdebug-trace {
+		display: inline-block;
+		padding: 0px 0px;
+		width: 33%;
+		vertical-align: top;
+
 		font-family: Courier New, monospace; 
 		font-size: 14px;
+
 		border: 1px solid #444444;
-		padding: 0px 0px;
-		display: inline-block;
-		width: 49%;
-		float: left;
+		border-top: none;
+		box-sizing: border-box;
+		-moz-box-sizing: border-box;
+		-webkit-box-sizing: border-box;
+	}
+
+	.zxdebug-trace .debug-toolbar {
+		border: none;
+		border-bottom: 1px solid #444444;
 	}
 
 	.zxdebug-trace .dasm-line {
@@ -51,39 +60,65 @@
 	}
 
 	.zxdebug-memory {
+		display: inline-block;
+		padding: 0px 0px;
+		width: 34%;
+		vertical-align: top;
+
 		font-family: Courier New, monospace; 
 		font-size: 14px;
+
 		border: 1px solid #444444;
-		padding: 0px 0px;
-		display: inline-block;
-		width: 49%;
-		float: right;
+		border-left: none;
+		border-top: none;
+		box-sizing: border-box;
+		-moz-box-sizing: border-box;
+		-webkit-box-sizing: border-box;
+
+		overflow-x: auto;
+	}
+
+	.zxdebug-memory .debug-toolbar {
+		border: none;
+		border-bottom: 1px solid #444444;
 	}
 
 	.zxdebug-memory .mem-line {
 		padding: 0px 5px;
+		white-space: nowrap;
 	}
 
 	.zxdebug-memory .addr {
 		width: 50px;
 		display: inline-block;
 	}
+
+	.zxdebug-watch {
+		display: inline-block;
+		padding: 0px 0px;
+		width: 33%;
+		vertical-align: top;
+		font-family: Courier New, monospace; 
+		font-size: 14px;
+
+		border: 1px solid #444444;
+		border-left: none;
+		border-top: none;
+		box-sizing: border-box;
+		-moz-box-sizing: border-box;
+		-webkit-box-sizing: border-box;
+	}
+
+	.zxdebug-watch .debug-toolbar {
+		border: none;
+		border-bottom: 1px solid #444444;
+	}
 </style>
 
 <template id="toolbar">
-	<div class="zxdebug-toolbar">
-		<input type="checkbox" id="zxdebug_cb_hex" checked /><label for="zxdebug_cb_hex">hex</label>
-		<input type="button" id="zxdebug_btn_step_in" value="step in (I)" />
-		<input type="button" id="zxdebug_btn_step_out" value="step out (O)" />
-		<input type="button" id="zxdebug_btn_step_to" value="step to (T)" />
-		<input type="button" id="zxdebug_btn_mem_addr" value="mem address (M)" />
-		<input type="button" id="zxdebug_btn_mem_add_08h" value="+8" />
-		<input type="button" id="zxdebug_btn_mem_sub_08h" value="-8" />
-		<input type="button" id="zxdebug_btn_mem_add_80h" value="+80h" />
-		<input type="button" id="zxdebug_btn_mem_sub_80h" value="-80h" />
-		<input type="checkbox" id="zxdebug_cb_words" /><label for="zxdebug_cb_words">words</label>
-		<input type="button" id="zxdebug_btn_toggle_bp" value="toggle BP (B)" />
-		<input type="button" id="zxdebug_btn_run_break" value="run / break (R)" />
+	<div class="debug-toolbar">
+		<input id="zxdebug_cb_hex" type="checkbox" class="debug-command" data-command="toggle-hex" checked /><label for="zxdebug_cb_hex">hex</label>
+		<input id="zxdebug_cb_enable_hotkeys" type="checkbox" class="debug-command" data-command="enable-hotkeys" /><label for="zxdebug_cb_enable_hotkeys">enable hotkeys</label>
 	</div>
 </template>
 
@@ -173,18 +208,170 @@
 </template>
 
 <template id="trace-block">
-	<div id="zxdebug_dasm" class="zxdebug-trace"></div>
+	<div class="zxdebug-trace">
+		<div class="debug-toolbar">
+			<button class="debug-command" data-command="step-in">Si</button>
+			<button class="debug-command" data-command="step-out">So</button>
+			<button class="debug-command" data-command="step-to">St</button>
+			<button class="debug-command" data-command="toggle-bp">BP</button>
+			<button class="debug-command" data-command="run">Run</button>
+		</div>
+		<div id="zxdebug_dasm"></div>
+	</div>
 </template>
 
 <template id="memory-block">
-	<div id="zxdebug_memory" class="zxdebug-memory"></div>
+	<div class="zxdebug-memory">
+		<div class="debug-toolbar">
+			<button class="debug-command" data-command="mem-go-to">G</button>
+			<button class="debug-command" data-command="mem-add-8h">+8</button>
+			<button class="debug-command" data-command="mem-sub-8h">-8</button>
+			<button class="debug-command" data-command="mem-add-80h">+80h</button>
+			<button class="debug-command" data-command="mem-sub-80h">-80h</button>
+			<input type="checkbox" id="zxdebug_cb_words" class="debug-command" data-command="toggle-words" /><label for="zxdebug_cb_words">words</label>		
+		</div>
+		<div id="zxdebug_memory"></div>
+	</div>
+</template>
+
+<template id="watch-block">
+	<div class="zxdebug-watch">
+		<div class="debug-toolbar">
+			<button class="debug-command" data-command="add-watch">Add</button>
+			<button class="debug-command" data-command="remove-watches">Remove</button>
+		</div>
+		<div id="zxdebug_watch"></div>
+	</div>
+</template>
+
+<template id="watch-item-block">
+	<div class="zxdebug-watch-item">
+		<label>
+			<input type="checkbox" class="watch-item-selected" />
+			<span class="watch-item-address"></span>
+			<span class="watch-item-name"></span>
+			<span class="watch-item-value"></span>
+		<label>
+	</div>
+</template>
+
+<template id="watch-add-dialog">
+	<div class="zxdebug-watch-add-dialog">
+		<table>
+			<tbody>
+				<tr>
+					<td>Name:</td>
+					<td><input type="text" class="watch-name"</td>
+				</tr>
+				<tr>
+					<td>Address:</td>
+					<td><input type="text" class="watch-address"></td>
+				</tr>
+				<tr>
+					<td>Length:</td>
+					<td>
+						<select class="watch-length">
+							<option value="byte">byte</option>
+							<option value="word">word</option>
+						</select>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
 </template>
 
 <script type="text/javascript">
+	var debugCommandManager = new (function() {
+		var self = this;
+
+		var availableCommands = []; // [ "commandName1", "commandName2", ... ]
+		var hotKeyCommands = {}; // { keyCode: "commandName", ... }
+		var commandHandlers = {}; // { "command": [ function(){}, function(){}, ... ], ... }
+		var enableHotkeys = false;
+
+		$(document).on('keydown', function ( event ) {
+			if ( enableHotkeys && hotKeyCommands[event.which] !== undefined ) {
+				self.doCommand(hotKeyCommands[event.which]);
+			}
+		});
+
+		$(document).on('click', function ( event ) {
+			$target = $(event.target);
+			if ( $target.hasClass('debug-command') ) {
+				var command = $target.attr('data-command');
+				if ( command ) {
+					self.doCommand(command);
+				}
+			}
+		});
+
+		this.enableHotkeys = function (value) {
+			if ( value !== undefined ) {
+				enableHotkeys = !!value;
+			}
+			else {
+				return enableHotkeys;
+			}
+		};
+
+		this.onCommand = function ( command, handler ) {
+			commandHandlers[command] = commandHandlers[command] || [];
+			commandHandlers[command].push(handler);
+		}
+
+		this.doCommand = function ( command ) {
+			if ( $.grep(availableCommands, function ( cmd ) { return cmd === command; }).length > 0 ) {
+				var handlers = commandHandlers[command];
+				if ( handlers ) {
+					$.each(handlers, function ( i, handler ) {
+						handler();
+					});
+				}
+			}
+		}
+
+		this.enableCommand = function ( /* command1, command2, ... */ ) {
+			for ( var argIndex = 0; argIndex < arguments.length; argIndex++ ) {
+				var command = arguments[argIndex];
+
+				if ( $.grep(availableCommands, function ( cmd ) { return cmd === command; }).length == 0 ) {
+					availableCommands.push(command);
+
+					$('.debug-command[data-command="' + command + '"]')
+						.prop('disabled', false);
+				}
+			}
+		}
+
+		this.disableCommand = function ( /* command1, command2, ... */ ) {
+			for ( var argIndex = 0; argIndex < arguments.length; argIndex++ ) {
+				var command = arguments[argIndex];			
+	
+				if ( $.grep(availableCommands, function ( cmd ) { return cmd === command; }).length > 0 ) {
+					for ( var i = 0; i < availableCommands.length; ) {
+						if ( availableCommands[i] === command ) {
+							availableCommands.splice(i, 1);
+						}
+						else {
+							i++;
+						}
+					}
+
+					$('.debug-command[data-command="' + command + '"]')
+						.prop('disabled', true);
+				}
+			}
+		}
+
+		this.attachHotKey = function ( keyCode, command ) {
+			hotKeyCommands[keyCode] = command;
+		}
+	})();
+
 	var zxdebug = new (function() {
 		// public
 		this.debug = debug;
-
 
 		// private
 		var self = this;
@@ -194,50 +381,105 @@
 		var break_request = false;
 		var settings = null;
 		var bus = null;
-		var z80 = null;
+		var cpu = null;
 		var display = null;
 
-		function debug( container, _z80, _bus, _display, _settings ) {
+		function debug( container, _cpu, _bus, _display, _settings ) {
 			settings = _settings;
-			z80 = _z80;
+			cpu = _cpu;
 			bus = _bus;
 			display = _display;
 
-			self.toolbar = new Toolbar(container, on_user_command);
-			self.registers = new RegistersBlock(container, z80);
-			self.disasm = new DisasmBlock(container, z80, bus);
-			self.memory = new MemoryBlock(container, bus);
+			$("<?=toolbar?>")
+				.appendTo(container);
 
-			self.toolbar.enable();
+			self.registers = new RegistersBlock(container, cpu);
+			self.disasm = new DisasmBlock(container, cpu, bus);
+			self.memory = new MemoryBlock(container, bus);
+			self.watches = new WatchBlock(container, bus);
+			var eClear = document.createElement('div');
+			eClear.style.clear = "both";
+			container.appendChild(eClear);
+
 			self.registers.update(true);
 			self.disasm.update();
 			self.memory.update();
+			self.watches.update();
 		}
 
-		function on_user_command(cmd, args) {
-			switch (cmd) {
-				case 'hex': 
-					hex = args.checked; 
-					self.registers.update(false);
-					self.disasm.update();
-					self.memory.update();
-					break;
+		var cmds = debugCommandManager;
+		cmds.attachHotKey(0x49, 'step-in');
+		cmds.attachHotKey(0x4f, 'step-out');
+		cmds.attachHotKey(0x54, 'step-to');
+		cmds.attachHotKey(0x42, 'toggle-bp');
+		cmds.attachHotKey(0x52, 'run');
+		cmds.attachHotKey(0x4d, 'mem-go-to');
+		cmds.attachHotKey(0x2b, 'mem-add-8h');
+		cmds.attachHotKey(0x6b, 'mem-add-8h');
+		cmds.attachHotKey(0x2d, 'mem-sub-8h');
+		cmds.attachHotKey(0x6d, 'mem-sub-8h');
+		cmds.attachHotKey(0x22, 'mem-add-80h');
+		cmds.attachHotKey(0x21, 'mem-sub-80h');
+		cmds.attachHotKey(0x48, 'toggle-hex');
+		cmds.attachHotKey(0x57, 'toggle-words');
 
-				case 'step_in': step_in(); break;
-				case 'step_out': step_out(); break;
-				case 'step_to': step_to(); break;
-				case 'change_memory_address': self.memory.change_memory_address(); break;
-				case 'shift_memory_address': self.memory.shift_memory_address(args.offset); break;
-				case 'words': self.memory.display_words(args.checked); break;
-				case 'toggle_break_point': toggle_break_point(); break;
-				case 'run_break': run_break(); break;
-			}
+		cmds.onCommand('step-in', step_in);
+		cmds.onCommand('step-out', step_out);
+		cmds.onCommand('step-to', step_to);
+		cmds.onCommand('toggle-bp', toggle_break_point);
+		cmds.onCommand('run', run_break);
+		cmds.onCommand('mem-go-to', function() { self.memory.change_memory_address(); });
+		cmds.onCommand('mem-add-8h', function() { self.memory.shift_memory_address(8); });
+		cmds.onCommand('mem-sub-8h', function() { self.memory.shift_memory_address(-8); });
+		cmds.onCommand('mem-add-80h', function() { self.memory.shift_memory_address(0x80); });
+		cmds.onCommand('mem-sub-80h', function() { self.memory.shift_memory_address(-0x80); });
+		cmds.onCommand('toggle-hex', updateNumberFormat);
+		cmds.onCommand('toggle-words', function() { self.memory.display_words($('#zxdebug_cb_words').is(':checked')); });
+		cmds.onCommand('enable-hotkeys', function() { cmds.enableHotkeys($('#zxdebug_cb_enable_hotkeys').is(':checked')); });
+		cmds.onCommand('add-watch', function() { self.watches.addWatch(); });
+		cmds.onCommand('remove-watches', function () { self.watches.removeWatches(); });
+
+		cmds.enableCommand(
+			'toggle-hex',
+			'step-in', 
+			'step-out', 
+			'step-to', 
+			'toggle-bp', 
+			'run',
+			'mem-go-to',
+			'mem-add-8h',
+			'mem-sub-8h',
+			'mem-add-80h',
+			'mem-sub-80h',
+			'toggle-words',
+			'enable-hotkeys',
+			'add-watch',
+			'remove-watches');
+
+		function updateNumberFormat() {
+			hex = $('#zxdebug_cb_hex').is(':checked');
+			self.registers.update(false);
+			self.disasm.update();
+			self.memory.update();
+			self.watches.update();
 		}
 
 		function step_in() {
-			self.toolbar.disable();
+			cmds.disableCommand(
+				'toggle-hex',
+				'step-in', 
+				'step-out', 
+				'step-to', 
+				'mem-go-to',
+				'mem-add-8h',
+				'mem-sub-8h',
+				'mem-add-80h',
+				'mem-sub-80h',
+				'toggle-words',
+				'add-watch',
+				'remove-watches');
 
-			var state = z80.get_state();
+			var state = cpu.get_state();
 			var cmd = disasm_instruction(bus, state.pc);
 			if ( /^(JP|JR|DJNZ|CALL|RST)/.test(cmd.mn) ) {
 				// прыжки и вызовы могут передать управление по заданному адресу
@@ -277,9 +519,21 @@
 		}
 
 		function step_out() {
-			self.toolbar.disable();
+			cmds.disableCommand(
+				'toggle-hex',
+				'step-in', 
+				'step-out', 
+				'step-to', 
+				'mem-go-to',
+				'mem-add-8h',
+				'mem-sub-8h',
+				'mem-add-80h',
+				'mem-sub-80h',
+				'toggle-words',
+				'add-watch',
+				'remove-watches');
 
-			var state = z80.get_state();
+			var state = cpu.get_state();
 			var cmd = disasm_instruction(bus, state.pc);
 			if ( /^(JP|JR|DJNZ)/.test(cmd.mn) ) {
 				if ( cmd.addr !== undefined ) {
@@ -336,7 +590,20 @@
 				break_request = true;
 			}
 			else {
-				self.toolbar.disable();
+				cmds.disableCommand(
+					'toggle-hex',
+					'step-in', 
+					'step-out', 
+					'step-to', 
+					'mem-go-to',
+					'mem-add-8h',
+					'mem-sub-8h',
+					'mem-add-80h',
+					'mem-sub-80h',
+					'toggle-words',
+					'add-watch',
+					'remove-watches');
+
 				run_to(-1);
 			}
 		}
@@ -376,21 +643,19 @@
 		function run_to(address1, address2) {
 			running = true;
 
-			var tstates_per_int = settings.turbo_mode ? settings.tstates_per_int_min : settings.turbo_tstates_per_int_min;
+			var tstatesPerIntrq = settings.get_turboMode() ? settings.get_tstatesPerIntrq() : settings.get_tstatesPerIntrqTurbo();
 
 			while (true) {
-				if ( z80.get_ts_cnt() >= tstates_per_int ) {
-					display.redraw();
-
-					z80.intrq();
-					z80.set_ts_cnt(0);
+				if ( cpu.get_tstates() >= tstatesPerIntrq ) {
+					bus.var_write('intrq');
+					cpu.set_tstates(0);
 					setTimeout(function() { run_to(address1, address2); }, 0);
 					return;
 				}
 
-				z80.process();
+				cpu.process();
 
-				var state = z80.get_state();
+				var state = cpu.get_state();
 				var bp = ( state.pc == address1 ) || ( state.pc == address2 );
 				if (!bp) {
 					for (var i = 0; i < break_points.length; i++) {
@@ -402,9 +667,24 @@
 				}
 
 				if ( bp || break_request ) {
-					display.redraw();
+					display.force_redraw();
 
-					self.toolbar.enable();
+					cmds.enableCommand(
+						'toggle-hex',
+						'step-in', 
+						'step-out', 
+						'step-to', 
+						'toggle-bp',
+						'run',
+						'mem-go-to',
+						'mem-add-8h',
+						'mem-sub-8h',
+						'mem-add-80h',
+						'mem-sub-80h',
+						'toggle-words',
+						'add-watch',
+						'remove-watches');
+
 					self.registers.update(true);
 					self.disasm.update();
 					self.memory.update();
@@ -415,138 +695,13 @@
 			}
 		}
 
-		function Toolbar(container, handler) {
-			// public
-			this.disable = disable;
-			this.enable = enable;
-
-			// private
-			var toolbar = document.createElement('div');
-			toolbar.innerHTML = "<?=toolbar?>";
-			container.appendChild(toolbar.children[0]);
-
-			var cb_hex = document.getElementById('zxdebug_cb_hex');
-			var btn_step_in = document.getElementById('zxdebug_btn_step_in');
-			var btn_step_out = document.getElementById('zxdebug_btn_step_out');
-			var btn_step_to = document.getElementById('zxdebug_btn_step_to');
-			var btn_mem_addr = document.getElementById('zxdebug_btn_mem_addr');
-			var btn_mem_add_08h = document.getElementById('zxdebug_btn_mem_add_08h');
-			var btn_mem_sub_08h = document.getElementById('zxdebug_btn_mem_sub_08h');
-			var btn_mem_add_80h = document.getElementById('zxdebug_btn_mem_add_80h');
-			var btn_mem_sub_80h = document.getElementById('zxdebug_btn_mem_sub_80h');
-			var cb_words = document.getElementById('zxdebug_cb_words');
-			var btn_toggle_bp = document.getElementById('zxdebug_btn_toggle_bp');
-			var btn_run_break = document.getElementById('zxdebug_btn_run_break')
-
-			var disabled = false;
-
-			function enable() {
-				disabled = false;
-				cb_hex.disabled = false;
-				btn_step_in.disabled = false;
-				btn_step_out.disabled = false;
-				btn_step_to.disabled = false;
-				btn_mem_addr.disabled = false;
-				btn_mem_add_08h.disabled = false;
-				btn_mem_sub_08h.disabled = false;
-				btn_mem_add_80h.disabled = false;
-				btn_mem_sub_80h.disabled = false;
-				cb_words.disabled = false;
-				//btn_toggle_bp.disabled = false;
-				//btn_run_break.disabled = false;
-			}
-
-			function disable() {
-				disabled = true;
-				cb_hex.disabled = true;
-				btn_step_in.disabled = true;
-				btn_step_out.disabled = true;
-				btn_step_to.disabled = true;
-				btn_mem_addr.disabled = true;
-				btn_mem_add_08h.disabled = true;
-				btn_mem_sub_08h.disabled = true;
-				btn_mem_add_80h.disabled = true;
-				btn_mem_sub_80h.disabled = true;
-				cb_words.disabled = true;	
-				//btn_toggle_bp.disabled = true;
-				//btn_run_break.disabled = true;							
-			}
-
-
-			if (document.addEventListener) {
-				document.addEventListener('keydown', onkeydown, false);
-			}
-			else {
-				document.attachEvent('onkeydown', onkeydown);
-			}
-
-			function onkeydown(e) {
-				var e = e || window.event;
-
-				switch (e.keyCode) {
-					case 0x42: do_command('toggle_break_point'); break;
-					case 0x52: do_command('run_break'); break;
-				}
-
-				if ( disabled ) {
-					return;
-				}
-
-				
-				switch (e.keyCode) {
-					case 0x48: 
-						cb_hex.checked = !cb_hex.checked;
-						do_command('hex', { checked: cb_hex.checked });
-						break;
-
-					case 0x49: do_command('step_in'); break;
-					case 0x4f: do_command('step_out'); break;
-					case 0x54: do_command('step_to'); break;
-					case 0x4d: do_command('change_memory_address'); break;
-					case 0x2b:
-					case 0x6b: do_command('shift_memory_address', { offset: 0x08 }); break;
-					case 0x2d:
-					case 0x6d: do_command('shift_memory_address', { offset: -0x08 }); break;
-					case 0x21: do_command('shift_memory_address', { offset: -0x80 }); break;
-					case 0x22: do_command('shift_memory_address', { offset: 0x80 }); break;
-					case 0x57: 
-						cb_words.checked = !cb_words.checked;
-						do_command('words', { checked: cb_words.checked });
-						break;
-
-					default: return;
-				}
-
-				e.preventDefault ? e.preventDefault() : ( e.returnValue = false );
-			}
-
-			cb_hex.onclick = function() { do_command('hex', { checked: cb_hex.checked }); };		
-			btn_step_in.onclick = function() { do_command('step_in'); };
-			btn_step_out.onclick = function() { do_command('step_out'); };
-			btn_step_to.onclick = function() { do_command('step_to'); };
-			btn_mem_addr.onclick = function() { do_command('change_memory_address'); };
-			btn_mem_add_08h.onclick = function() { do_command('shift_memory_address', { offset: 0x08 }); };
-			btn_mem_sub_08h.onclick = function() { do_command('shift_memory_address', { offset: -0x08 }); };
-			btn_mem_add_80h.onclick = function() { do_command('shift_memory_address', { offset: 0x80 }); };
-			btn_mem_sub_80h.onclick = function() { do_command('shift_memory_address', { offset: -0x80 }); };
-			cb_words.onclick = function() { do_command('words', { checked: cb_words.checked }); };
-			btn_toggle_bp.onclick = function() { do_command('toggle_break_point'); };
-			btn_run_break.onclick = function() { do_command('run_break'); };
-
-
-			function do_command(command, args) {
-				handler(command, args);
-			}
-		}
-
-		function RegistersBlock(container, z80) {
+		function RegistersBlock(container, cpu) {
 			// public
 			this.update = update;
 
 			// private
-			var registers = document.createElement('div');
-			registers.innerHTML = "<?=registers?>";
-			container.appendChild(registers.children[0]);
+			$("<?=registers?>")
+				.appendTo(container);
 
 			var r_pc = document.getElementById('zxdebug_r_pc');
 			var r_sp = document.getElementById('zxdebug_r_sp');
@@ -579,10 +734,10 @@
 			var iff  = document.getElementById('zxdebug_iff');
 			var imf  = document.getElementById('zxdebug_imf');
 
-			var last_state = z80.get_state();
+			var last_state = cpu.get_state();
 
 			function update( update_styles ) {
-				var state = z80.get_state();
+				var state = cpu.get_state();
 
 				// значения
 				r_pc.innerHTML = word_to_string(state.pc);
@@ -670,14 +825,13 @@
 			}
 		}
 
-		function DisasmBlock(container, z80, bus) {
+		function DisasmBlock(container, cpu, bus) {
 			// public
 			this.update = update;
 
 			// private
-			var trace_block = document.createElement('div');
-			trace_block.innerHTML = "<?=trace-block?>";
-			container.appendChild(trace_block.children[0]);
+			$("<?=trace-block?>")
+				.appendTo(container);
 
 			var dasm_block = document.getElementById('zxdebug_dasm');
 
@@ -699,7 +853,7 @@
 			};
 
 			function update() {
-				var state = z80.get_state();
+				var state = cpu.get_state();
 
 				var pc = state.pc;
 				if ( state.prefix_dd || state.prefix_fd || state.prefix_ed ) {
@@ -780,9 +934,8 @@
 			}
 
 			// private
-			var memory_block = document.createElement('div');
-			memory_block.innerHTML = "<?=memory-block?>";
-			container.appendChild(memory_block.children[0]);
+			$("<?=memory-block?>")
+				.appendTo(container);			
 
 			var memory_block = document.getElementById('zxdebug_memory');
 
@@ -819,28 +972,18 @@
 				var mem_html = '';
 
 				for (var y = 0; y < lines; y++) {
-
-					var req = {
-						mreq: true,
-						read: true,
-						address: ( address + ( y * 8 )) & 0xffff,
-						size: 1
-					};
+					var readAddress = ( address + ( y * 8 )) & 0xffff;
 
 					mem_html += '<div class="mem-line">';
-					mem_html += '<span class="addr">' + word_to_string(req.address) + '</span>';
+					mem_html += '<span class="addr">' + word_to_string(readAddress) + '</span>';
 					if ( display_words ) {
 						mem_html += '<span class="words">';
 
-						req.size = 2;
-
 						for (var x = 0; x < 4; x++) {
-
-							bus.request(req);
-							var word = req.data;
-							req.address = ( req.address + 2 ) & 0xffff;
-
-							mem_html += word_to_string(word, { hex: true, dont_suffix: true }) + ' ';
+							var lo = bus.mem_read(readAddress);
+							var hi = bus.mem_read((readAddress + 1) & 0xffff);
+							mem_html += word_to_string((hi << 8) | lo, { hex: true, dont_suffix: true }) + ' ';
+							readAddress = ( readAddress + 2 ) & 0xffff;
 						}
 
 						mem_html += '</span>';
@@ -848,15 +991,10 @@
 					else {
 						mem_html += '<span class="bytes">';
 
-						req.size = 1;
-
 						for (var x = 0; x < 8; x++) {
-
-							bus.request(req);
-							var v8 = req.data;
-							req.address = ( req.address + 1 ) & 0xffff;
-
+							var v8 = bus.mem_read(readAddress);
 							mem_html += byte_to_string(v8, { hex: true, dont_suffix: true }) + ' ';
+							readAddress = ( readAddress + 1 ) & 0xffff;
 						}
 
 						mem_html += '</span>';
@@ -867,6 +1005,105 @@
 
 				memory_block.innerHTML = mem_html;
 			}						
+		}
+
+		function WatchBlock(container, bus) {
+			// public
+			this.update = updateWatches;
+			this.addWatch = addWatch;
+			this.removeWatches = removeWatches;
+
+			// private
+			$("<?=watch-block?>")
+				.appendTo(container);
+
+			var $watch_block = $('#zxdebug_watch');
+
+			var watches = [];
+			var nextWatchId = 0;
+
+			function updateWatches() {
+				$watch_block.empty();
+
+				for ( var i = 0; i < watches.length; i++ ) {
+					var watch = watches[i];
+
+					var $item_block = $("<?=watch-item-block?>");
+					$item_block.find('.watch-item-selected').val(watch.id);
+					$item_block.find('.watch-item-name').text(watch.name);
+					$item_block.find('.watch-item-address').text(word_to_string(watch.address));
+					switch ( watch.length ) {
+						case 'byte': $item_block.find('.watch-item-value').text(byte_to_string(read_memory_byte(bus, watch.address))); break;
+						case 'word': $item_block.find('.watch-item-value').text(word_to_string(read_memory_word(bus, watch.address))); break;
+					}
+
+					$item_block
+						.appendTo($watch_block);
+				}
+			}
+
+			function addWatch() {
+				$dlg = $("<?=watch-add-dialog?>");
+				$dlg.dialog({
+					autoOpen: true,
+					title: 'Add watch',
+					modal: true,
+					width: 300,
+					height: 200,
+					buttons: [
+						{ text: 'Add', click: add },
+						{ text: 'Cancel', click: cancel }
+					],
+					close: function (e) { $(this).dialog('destroy'); $(this).remove(); }
+				});
+				$dlg.on('keydown', function (e) { e.stopPropagation(); });
+				$dlg.on('keyup', function (e) { e.stopPropagation(); });
+
+				$watch_name = $dlg.find('.watch-name');
+				$watch_address = $dlg.find('.watch-address');
+				$watch_length = $dlg.find('.watch-length');
+
+				function init() {
+					$watch_name.val('');
+					$watch_address.val('');
+					$watch_length.val('byte');
+				}
+
+				function add() {
+					var str_address = $.trim($watch_address.val());
+					var radix = 10;
+					if (str_address.length && str_address.charAt(str_address.length - 1).toLowerCase() == 'h') {
+						radix = 16;
+					}
+					if (str_address.length >= 2 & str_address.charAt(0) == '0' && str_address.charAt(1).toLowerCase() == 'x') {
+						radix = 16;
+					}
+					var address = parseInt(str_address, radix) || 0;
+
+					watches.push({
+						id: nextWatchId++,
+						name: $watch_name.val(),
+						address: address,
+						length: $watch_length.val()
+					});
+
+					updateWatches();
+
+					$dlg.dialog('close');
+					$dlg = null;					
+				}
+
+				function cancel() {
+					$dlg.dialog('close');
+					$dlg = null;
+				}
+			}
+
+			function removeWatches() {
+				var ids_to_remove = $watch_block.find('.watch-item-selected:checked').map(function (i, e) { return +$(e).val(); });
+				watches = $.grep(watches, function (watch, i) { return $.inArray(watch.id, ids_to_remove) == -1; });
+				updateWatches();
+			}
 		}
 
         /////////////////////////////
@@ -932,46 +1169,14 @@
 		}
 
 		function read_opcode_byte(bus, address) {
-			var state = {
-				mreq: true,
-				m1: true,
-				read: true,
-				address: address,
-				data: 0,
-				size: 1
-			};
-
-			bus.request(state);
-
-			return state.data;
+			return bus.instruction_read(address);
 		}
 		function read_memory_byte(bus, address) {
-			var state = {
-				mreq: true,
-				read: true,
-				address: address,
-				data: 0,
-				size: 1
-			};
-
-			bus.request(state);
-
-			return state.data;
+			return bus.mem_read(address);
 		}
 
 		function read_memory_word(bus, address) {
 			return read_memory_byte(bus, address) | ( read_memory_byte(bus, (address + 1) & 0xffff) << 8 ) ;
-			// var state = {
-			// 	mreq: true,
-			// 	read: true,
-			// 	address: address,
-			// 	data: 0,
-			// 	size: 2
-			// };
-
-			// bus.request(state);
-
-			// return state.data;			
 		}
 
 		function disasm_instruction(bus, address) {
@@ -2162,8 +2367,8 @@
 
                 result.addr = read_memory_word(bus, result.next);
                 result.next += 2;
-                result.bytes.push(addr & 0xff);
-                result.bytes.push(addr >> 8);
+                result.bytes.push(result.addr & 0xff);
+                result.bytes.push(result.addr >> 8);
 		        result.mn = 'JP addr';
 		        return result;
 		    }
@@ -2188,8 +2393,8 @@
 
                 result.addr = read_memory_word(bus, result.next);
                 result.next += 2;
-                result.bytes.push(addr & 0xff);
-                result.bytes.push(addr >> 8);
+                result.bytes.push(result.addr & 0xff);
+                result.bytes.push(result.addr >> 8);
 		        result.mn = 'JP ' + condition + ', addr';
 		        return result;
 		    }

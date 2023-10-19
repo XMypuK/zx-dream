@@ -1,3 +1,16 @@
+var DiskImageFormat = {
+	FDI: 'FDI',
+	TRD: 'TRD',
+	SCL: 'SCL',
+
+	getFromFileName: function(filename) {
+		var match = (/^[^\\\/]*\.(TRD|FDI|SCL)$/i).exec(filename);
+		if (!match)
+			throw new Error('Неподдерживаемый формат образа.');
+		return match[1].toUpperCase();
+	}
+}
+
 function DiskImage( _head_count, _write_protect, _filename, _description ) {
 	// public
 	this.get_filename = function() { return filename; }
@@ -460,56 +473,42 @@ DiskImage.createCustomImage = function ( cyl_count, head_count, trdos_format ) {
 	return image;
 }
 
-DiskImage.getCompatibleFormats = function ( image ) {
-	var formats = [];
-
-	formats.push('fdi');
-
-	var trdos_compatible = true;
+DiskImage.isTrDosCompatible = function (image) {
 	var cyl_count = image.get_cyl_count();
 	var head_count = image.get_head_count();
-
-	for ( var cyl_index = 0; trdos_compatible && cyl_index < cyl_count; cyl_index++ ) {
-		for ( var head_index = 0; trdos_compatible && head_index < head_count; head_index++ ) {
-
-			var track = image.get_track(cyl_index, head_index);
+	for ( var cyl = 0; cyl < cyl_count; cyl++ ) {
+		for ( var head = 0; head < head_count; head++ ) {
+			var track = image.get_track(cyl, head);
 			var sec_count = track.get_sec_count();
-			if ( sec_count == 16 ) {
-				for ( var sec_index = 0; trdos_compatible && sec_index < 16; sec_index++ ) {
-					var sector = track.get_sector(sec_index);
-					if ( sector.get_length_byte() != SectorData.SEC_LENGTH_0x0100 ) {
-						trdos_compatible = false;
-					}
-				}
-			}
-			else {
-				trdos_compatible = false;
+			if (sec_count != 16)
+				return false;
+			for ( var sec = 0; sec < sec_count; sec++ ) {
+				var secInfo = track.get_sector(sec);
+				if (secInfo.get_length_byte() != SectorData.SEC_LENGTH_0x0100)
+					return false;
 			}
 		}
 	}
+	return true;
+}
 
-	if ( trdos_compatible ) {
-		formats.push('scl');
-
-		if ( cyl_count == 40 || cyl_count == 80 ) {
-			formats.push('trd');
+DiskImage.getCompatibleFormats = function ( image ) {
+	var formats = [];
+	formats.push(DiskImageFormat.FDI);
+	if (DiskImage.isTrDosCompatible(image)) {
+		formats.push(DiskImageFormat.SCL);
+		if (image.get_cyl_count() == 40 || image.get_cyl_count() == 80) {
+			formats.push(DiskImageFormat.TRD);
 		}
 	}
-
 	return formats;
 }
 
 DiskImage.saveToTRD = function ( image ) {
-	var compatible = false;
 	var formats = DiskImage.getCompatibleFormats(image);
-	for ( var i = 0; i < formats.length; i++ ) {
-		if ( formats[i] == 'trd' ) {
-			compatible = true;
-		}
-	}
-	if ( !compatible ) {
-		return null;
-	}
+	var compatible = formats.indexOf(DiskImageFormat.TRD) >= 0;
+	if ( !compatible )
+		throw new Error('Несовместимый формат образа.');
 
 	var trd_data = [];
 
@@ -533,16 +532,10 @@ DiskImage.saveToTRD = function ( image ) {
 }
 
 DiskImage.saveToFDI = function ( image ) {
-	var compatible = false;
 	var formats = DiskImage.getCompatibleFormats(image);
-	for ( var i = 0; i < formats.length; i++ ) {
-		if ( formats[i] == 'fdi' ) {
-			compatible = true;
-		}
-	}
-	if ( !compatible ) {
-		return null;
-	}
+	var compatible = formats.indexOf(DiskImageFormat.FDI) >= 0;
+	if ( !compatible )
+		throw new Error('Несовместимый формат образа.');
 
 	var cyl_count = image.get_cyl_count();
 	var head_count = image.get_head_count();
@@ -606,7 +599,7 @@ DiskImage.saveToFDI = function ( image ) {
 	fdi_data[ 0x09 ] = (( fdi_data.length >> 8 ) & 0xff );
 
 	var desc = '\0';
-	var desc_data = string_to_bytes(desc);
+	var desc_data = stringToBytes(desc);
 	for ( var i = 0; i < desc_data.length; i++ ) {
 		fdi_data.push(desc_data[i]);
 	}
@@ -634,16 +627,10 @@ DiskImage.saveToFDI = function ( image ) {
 }
 
 DiskImage.saveToSCL = function ( image ) {
-	var compatible = false;
 	var formats = DiskImage.getCompatibleFormats(image);
-	for ( var i = 0; i < formats.length; i++ ) {
-		if ( formats[i] == 'scl' ) {
-			compatible = true;
-		}
-	}
-	if ( !compatible ) {
-		return null;
-	}
+	var compatible = formats.indexOf(DiskImageFormat.SCL) >= 0;
+	if ( !compatible )
+		throw new Error('Несовместимый формат образа.');
 
 	var scl_data = [];
 
@@ -741,7 +728,7 @@ DiskImage.saveToSCL = function ( image ) {
 					var data_track = image.get_track(data_cyl_index, data_head_index);
 					var data_sector = data_track.get_sector(data_sec_index);
 					for ( var i = 0; i < 0x0100; i++ ) {
-						fdi_data.push(data_sector.get_data_byte(i));
+						scl_data.push(data_sector.get_data_byte(i));
 					}
 
 					data_sec_index++;
@@ -783,4 +770,22 @@ DiskImage.saveToSCL = function ( image ) {
 	scl_data.push(( sum_hi_word >> 8 ) & 0xff );
 
 	return scl_data;
+}
+
+DiskImage.create = function (format, data) {
+	switch ( format ) {
+		case DiskImageFormat.TRD: return DiskImage.createFromTRD(data);
+		case DiskImageFormat.FDI: return DiskImage.createFromFDI(data);
+		case DiskImageFormat.SCL: return DiskImage.createFromSCL(data);
+		default: throw new Error('Неподдержвиаемый формат файла');
+	}
+}
+
+DiskImage.save = function (format, image) {
+	switch ( format ) {
+		case DiskImageFormat.TRD: return DiskImage.saveToTRD(image);
+		case DiskImageFormat.FDI: return DiskImage.saveToFDI(image);
+		case DiskImageFormat.SCL: return DiskImage.saveToSCL(image);
+		default: throw new Error('Неподдержвиаемый формат файла');
+	}
 }

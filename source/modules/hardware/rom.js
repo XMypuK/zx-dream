@@ -1,7 +1,11 @@
 function ZX_ROM() {
 	'use strict';
 	
+	var ROM_SIZE = 0x4000;
+
+	var _bus;
 	var memory = {};
+	var useTypedArrays = isTypedArraysSupported();
 
 	var roms = [
 		{ key: 'sos', name: '48.rom' },
@@ -10,21 +14,25 @@ function ZX_ROM() {
 		{ key: 'trdos', name: 'tr5_04t.rom' }
 	];
 
-	for (var i = 0; i < roms.length; i++) {
-		get_rom(roms[i]);
-	}
+	var ready$ = $.when(
+		get_rom(roms[0]),
+		get_rom(roms[1]),
+		get_rom(roms[2]),
+		get_rom(roms[3])
+	);
 
 	function get_rom(rom) {
-		ajax_get_text( 'get_base64.php?type=rom&name=' + rom.name, function(text) {
-			memory[ rom.key ] = base64_decode(text);
-			if ( memory[ rom.key ].length != 0x4000 ) {
-				throw new Error('Wrong ROM ' + rom.key + ' size');
+		return loadServerFile(rom.name).then(function (data) {
+			if (data.length != ROM_SIZE)
+				throw new Error('Wrong ROM ' + rom.key + ' size.');
+
+			if (useTypedArrays) {
+				memory[rom.key] = new Uint8Array(data);
+			}
+			else {
+				memory[rom.key] = data;
 			}
 		});
-	}
-
-	function ready() {
-		return memory.sos && memory.turbo && memory.sos128 && memory.trdos;
 	}
 
 	var rom_trdos = false;
@@ -43,37 +51,90 @@ function ZX_ROM() {
 		}
 	}	
 
-	var device = new ZX_Device({
-		id: 'rom',
-		reset: function ( bus ) {
-			bus.set_var('rom_trdos', rom_trdos);
-			bus.set_var('rom_turbo', rom_turbo);
-		},
-		mreq: function ( state, bus ) {
-			if ( state.m1 &&  ( state.address & 0xff00 ) == 0x3d00 && port_7ffd_value & 0x10 ) {
-				bus.set_var('rom_trdos', true);
-			}
+	function read_instruction(address) {
+		var data;
 
-			if ( state.address < 0x4000 && state.read ) {
-				state.data = read_byte(state.address);
-			}
+		if (( address & 0xff00 ) == 0x3d00 && port_7ffd_value & 0x10) {
+			_bus.var_write('rom_trdos', true);
+		}
 
-			if ( state.m1 && ( state.address & 0xc000 )) {
-				bus.set_var('rom_trdos', false);
+		if ( address < 0x4000 ) {
+			data = read_byte(address);
+		}
+
+		if ( address & 0xc000 ) {
+			_bus.var_write('rom_trdos', false);
+		}
+
+		return data;
+	}
+
+	function read(address) {
+		if ( address < 0x4000 ) {
+			return read_byte(address);
+		}
+	}
+
+	function var_write_port_7ffd_value(name, value) {
+		port_7ffd_value = value;
+	}
+
+	function var_write_rom_trdos(name, value) {
+		rom_trdos = value;
+	}
+
+	function var_write_rom_turbo(name, value) {
+		rom_turbo = value;
+	}
+
+	function var_read_rom_trdos(name) {
+		return rom_trdos;
+	}
+
+	function var_read_rom_turbo(name) {
+		return rom_turbo;
+	}
+
+	function reset() {
+		_bus.var_write('rom_trdos', false);
+		_bus.var_write('rom_turbo', false);
+	}
+
+	function opt_useTypedArrays(name, value) {
+		if (useTypedArrays != value) {
+			useTypedArrays = value;
+
+			if (useTypedArrays) {
+				for (var key in memory) {
+					if (memory[key]) {
+						memory[key] = new Uint8Array(memory[key]);
+					}
+				}
 			}
-		},
-		event: function ( name, options, bus ) {
-			if ( name == 'var_changed' ) {
-				switch ( options.name ) {
-					case 'port_7ffd_value': port_7ffd_value = options.value; break;
-					case 'rom_trdos': rom_trdos = options.value; break;
-					case 'rom_turbo': rom_turbo = options.value; break;
+			else {
+				for (var key in memory) {
+					if (memory[key]) {
+						memory[key] = Array.prototype.slice.call(memory[key]);
+					}
 				}
 			}
 		}
-	});
+	}
 
-	device.ready = ready;
+	this.get_ready$ = function () { 
+		return ready$; 
+	};
 
-	return device;
+	this.connect = function(bus) {
+		_bus = bus;
+		bus.on_instruction_read(read_instruction);
+		bus.on_mem_read(read);
+		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
+		bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
+		bus.on_var_write(var_write_rom_turbo, 'rom_turbo');
+		bus.on_var_read(var_read_rom_trdos, 'rom_trdos');
+		bus.on_var_read(var_read_rom_turbo, 'rom_turbo');
+		bus.on_reset(reset);
+		bus.on_opt(opt_useTypedArrays, OPT_USE_TYPED_ARRAYS);
+	}
 }

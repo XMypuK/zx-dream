@@ -1,157 +1,348 @@
 <style>
+	.settings-dialog__menu {
+		float: left;
+		width: 120px;
+		height: 100%;
+	}
+	.settings-dialog__workspace {
+		margin-left: 120px;
+		overflow-x: hidden;
+		overflow-y: auto;
+	}
+
+	.settings-dialog .settings-menu { border-right: 2px solid #3D8AF7; }
+	.settings-dialog .settings-menu__section { display: block; cursor: pointer; padding: 0.2em 0.5em; }
+	.settings-dialog .settings-menu__section.-active { background-color: #3D8AF7; color: #FFFFFF; }
+	.settings-dialog .settings-section { display: none; }
+	.settings-dialog .settings-section.-active { display: block; }
+	.settings-dialog .settings { padding: 0 0.5em; }
+
 	.settings-dialog table {
 		width: 100%;
 	}
 
 	.settings-dialog tr th {
-		text-align: right;
-	}
-
-	.settings-dialog tr:first-child th {
-		text-align: center;
+		text-align: left;
+		font-weight: normal;
 	}
 
 	.settings-dialog input[type=text] {
 		width: 80px;
 		text-align: center;
 	}
+
+	.ui-dialog .ui-dialog-buttonpane .ui-dialog-buttonset .reset-settings-button {
+		position: absolute;
+		left: 15px;
+	}
 </style>
 
 <template id="settings-dialog">
 	<div class="settings-dialog">
-		<table>
-			<tr>
-				<th></th>
-				<th>норма</th>
-				<th>турбо</th>
-			</tr>
-			<tr>
-				<th>Минимум тактов за прерывание:</th>
-				<td align="center"><input type="text" id="settings_tstates_per_int_min" /></td>
-				<td align="center"><input type="text" id="settings_turbo_tstates_per_int_min" /></td>
-			</tr>
-			<tr>
-				<th>Максимум тактов за прерывание:</th>
-				<td align="center"><input type="text" id="settings_tstates_per_int_max" /></td>
-				<td align="center"><input type="text" id="settings_turbo_tstates_per_int_max" /></td>
-			</tr>
-			<tr>
-				<td colspan="3"><hr /></td>
-			</tr>
-			<tr>
-				<th>Период прерываний:</th>
-				<td colspan="2"><input type="text" id="settings_int_period" /></td>
-			</tr>
-			<tr>
-				<th>Турбо-режим:</th>
-				<td colspan="2"><input type="checkbox" id="settings_turbo_mode" /></td>
-			</tr>
-			<tr>
-				<th>Расширенная память:</th>
-				<td colspan="2">
-					<select id="settings_extended_memory">
-						<option value="0">выключена</option>
-						<option value="1">pentagon</option>
-					</select>
-				</td>
-			</tr>
-			<tr>
-				<td colspan="3"><hr /></td>
-			</tr>			
-			<tr>
-				<th>Включить полутона:</th>
-				<td colspan="2"><input type="checkbox" id="settings_use_bright_bit" /></td>
-			</tr>
-			<tr>
-				<th>Отрисовка:</th>
-				<td colspan="2">
-					<select id="settings_renderer_type">
-						<option value="1">метод putImageData</option>
-						<option value="2">метод drawImage</option>
-						<option value="3">WebGL</option>
-					</select>
-				</td>
-			</tr>
-			<tr>
-				<th>Масштабирование:</th>
-				<td colspan="2">
-					<select id="settings_scale_type">
-						<option value="1">Предварительное</option>
-						<option value="2">При отрисовке</option>
-						<option value="3">Последующее</option>
-					</select>
-				</td>
-			</tr>
-		</table>
+		<div class="settings-dialog__menu settings-menu">
+			<a class="settings-menu__section -active" data-section="bus">Шина</a>
+			<a class="settings-menu__section" data-section="memory">Память</a>
+			<a class="settings-menu__section" data-section="display">Дисплей</a>
+			<a class="settings-menu__section" data-section="misc">Другое</a>
+		</div>
+		<div class="settings-dialog__workspace settings">
+			<div class="settings__section settings-section -active" data-section="bus">
+				<table>
+					<tr>
+						<th>Тактов за прерывание (норма):</th>
+						<td><input type="text" id="opt_tstatesPerIntrq" /></td>
+					</tr>
+					<tr>
+						<th>Тактов за прерывание (турбо):</th>
+						<td><input type="text" id="opt_tstatesPerIntrqTurbo" /></td>
+					</tr>
+					<tr>
+						<th>Период прерываний (мс):</th>
+						<td><input type="text" id="opt_intrqPeriod" /></td>
+					</tr>
+					<tr>
+						<th>Турбо-режим:</th>
+						<td><input type="checkbox" id="opt_turboMode" /></td>
+					</tr>
+				</table>
+			</div>
+			<div class="settings__section settings-section" data-section="memory">
+				<table>
+					<tr>
+						<th>Расширенная память:</th>
+						<td>
+							<select id="opt_extendedMemory">
+								<option value="0">выключена</option>
+								<option value="1">pentagon</option>
+							</select>
+						</td>
+					</tr>
+				</table>
+			</div>
+			<div class="settings__section settings-section"  data-section="display">
+				<table>
+					<tr>
+						<th>Включить полутона:</th>
+						<td><input type="checkbox" id="opt_semicolors" /></td>
+					</tr>
+					<tr>
+						<th>Отрисовка:</th>
+						<td><select id="opt_rendererType"></select></td>
+					</tr>
+					<tr>
+						<th>Метод масштабирования:</th>
+						<td><select id="opt_scaleType"></select></td>
+					</tr>			
+					<tr>
+						<th>Масштаб:</th>
+						<td><select id="opt_scaleValue"></select></td>
+					</tr>
+					<tr>
+						<th>Отрисовка по событию кадра анимации</th>
+						<td><input type="checkbox" id="opt_renderOnAnimationFrame" /></td>
+					</tr>
+				</table>
+			</div>
+			<div class="settings__section settings-section" data-section="misc">
+				<table>
+					<tr>
+						<th>Использовать типизированные массивы</th>
+						<td><input type="checkbox" id="opt_useTypedArrays" /></td>
+					</tr>
+				</table>
+			</div>
+		</div>
 	</div>
 </template>
 
 <script type="text/javascript">
-	function SettingsDialog( settings, on_apply ) {
-		$dlg = $("<?=settings-dialog?>");
-		$dlg.dialog({
-			autoOpen: true,
-			title: 'Настройки',
-			modal: true,
-			width: 600,
-			height: 410,
-			buttons: [
-				{ text: 'Применить', click: apply },
-				{ text: 'Отмена', click: cancel }
-			]
-		});
-		$dlg.on('keydown', function (e) { e.stopPropagation(); });
-		$dlg.on('keyup', function (e) { e.stopPropagation(); });
+	function SettingsDialog() {
+		var $dlg = $("<?=settings-dialog?>");
+		var openResult$ = null;
+		var defaultSettings = ZXContext.settings.get_defaultValues();
 
-		$tstates_per_int_min = $dlg.find('#settings_tstates_per_int_min');
-		$tstates_per_int_max = $dlg.find('#settings_tstates_per_int_max');
-		$turbo_tstates_per_int_min = $dlg.find('#settings_turbo_tstates_per_int_min');
-		$turbo_tstates_per_int_max = $dlg.find('#settings_turbo_tstates_per_int_max');
-		$int_period = $dlg.find('#settings_int_period');
-		$turbo_mode = $dlg.find('#settings_turbo_mode');
-		$extended_memory = $dlg.find('#settings_extended_memory');
-		$use_bright_bit = $dlg.find('#settings_use_bright_bit');
-		$renderer_type = $dlg.find('#settings_renderer_type');
-		$scale_type = $dlg.find('#settings_scale_type');
+		var $menu = $dlg.find('.settings-menu');
+		var $workspace = $dlg.find('.settings');
+		var $opt_tstatesPerIntrq = $dlg.find('#opt_tstatesPerIntrq');
+		var $opt_tstatesPerIntrqTurbo = $dlg.find('#opt_tstatesPerIntrqTurbo');
+		var $opt_intrqPeriod = $dlg.find('#opt_intrqPeriod');
+		var $opt_turboMode = $dlg.find('#opt_turboMode');
+		var $opt_extendedMemory = $dlg.find('#opt_extendedMemory');
+		var $opt_semicolors = $dlg.find('#opt_semicolors');
+		var $opt_rendererType = $dlg.find('#opt_rendererType');
+		var $opt_scaleType = $dlg.find('#opt_scaleType');
+		var $opt_scaleValue = $dlg.find('#opt_scaleValue');
+		var $opt_renderOnAnimationFrame = $dlg.find('#opt_renderOnAnimationFrame');
+		var $opt_useTypedArrays = $dlg.find('#opt_useTypedArrays');
 
-		init();
+		if (!isTypedArraysSupported()) {
+			$opt_useTypedArrays.prop('disabled', true);
+		}
+
+		this.open = open;
+
+		function open() {
+			if (!openResult$) {
+				openResult$ = $.Deferred();
+				init();
+			}
+			return openResult$;
+		}
 
 		function init() {
-			$tstates_per_int_min.val(settings.tstates_per_int_min);
-			$tstates_per_int_max.val(settings.tstates_per_int_max);
-			$turbo_tstates_per_int_min.val(settings.turbo_tstates_per_int_min);
-			$turbo_tstates_per_int_max.val(settings.turbo_tstates_per_int_max);
-			$int_period.val(settings.int_period);
-			$turbo_mode.prop('checked', settings.turbo_mode);
-			$extended_memory.val(settings.extended_memory);
-			$use_bright_bit.prop('checked', settings.use_bright_bit);
-			$renderer_type.val(settings.renderer_type);
-			$scale_type.val(settings.scale_type);;
+			$dlg.dialog({
+				autoOpen: true,
+				title: 'Настройки',
+				modal: true,
+				width: 600,
+				height: 440,
+				buttons: [
+					{ text: 'Сбросить все настройки', click: reset, "class": 'reset-settings-button' },
+					{ text: 'Применить', click: apply },
+					{ text: 'Отмена', click: cancel }
+				],
+				close: function (e) { 
+					$(this).dialog('destroy'); 
+					$(this).remove(); 
+
+					if (openResult$) {
+						openResult$.reject();
+						openResult$ = null;
+					}
+				}
+			});
+			$dlg.on('keydown', function (e) { e.stopPropagation(); });
+			$dlg.on('keyup', function (e) { e.stopPropagation(); });
+
+			$menu.on('click', function (e) {
+				var $item = $(e.target).closest('[data-section]', $menu);
+				if ($item.length == 0)
+					return;
+				var section = $item.attr('data-section');
+				$menu.find('.settings-menu__section[data-section!="' + section + '"]').removeClass('-active');
+				$menu.find('.settings-menu__section[data-section="' + section + '"]').addClass('-active');
+				$workspace.find('.settings-section[data-section!="' + section + '"]').removeClass('-active');
+				$workspace.find('.settings-section[data-section="' + section + '"]').addClass('-active');
+			});
+
+			bindData();
+		}
+		
+		function bindData() {
+			$opt_tstatesPerIntrq.val(ZXContext.settings.get_tstatesPerIntrq());
+			$opt_tstatesPerIntrqTurbo.val(ZXContext.settings.get_tstatesPerIntrqTurbo());
+			$opt_intrqPeriod.val(ZXContext.settings.get_intrqPeriod());
+			$opt_turboMode.prop('checked', ZXContext.settings.get_turboMode());
+			$opt_extendedMemory.val(ZXContext.settings.get_extendedMemory());
+			$opt_semicolors.prop('checked', ZXContext.settings.get_semicolors());
+
+			populateRendererSelector(ZXContext.settings.get_rendererType());
+			populateScaleTypeSelector(ZXContext.settings.get_scaleType());
+			populateScaleValueSelector(ZXContext.settings.get_scaleValue());
+			$opt_rendererType.on('change', function (e) { 
+				populateScaleTypeSelector($opt_scaleType.val()); 
+				populateScaleValueSelector($opt_scaleValue.val());
+			})
+			$opt_scaleType.on('change', function (e) {
+				populateScaleValueSelector($opt_scaleValue.val());
+			})
+
+			$opt_renderOnAnimationFrame.prop('checked', ZXContext.settings.get_renderOnAnimationFrame());
+			$opt_useTypedArrays.prop('checked', ZXContext.settings.get_useTypedArrays());
 		}
 
 		function apply() {
-			settings.tstates_per_int_min = parseInt($tstates_per_int_min.val()) || 0;
-			settings.tstates_per_int_max = parseInt($tstates_per_int_max.val()) || 0;
-			settings.turbo_tstates_per_int_min = parseInt($turbo_tstates_per_int_min.val()) || 0;
-			settings.turbo_tstates_per_int_max = parseInt($turbo_tstates_per_int_max.val()) || 0;
-			settings.int_period = parseInt($int_period.val()) || 0;
-			settings.turbo_mode = $turbo_mode.prop('checked');
-			settings.extended_memory = parseInt($extended_memory.val()) || 0;
-			settings.use_bright_bit = $use_bright_bit.prop('checked');
-			settings.renderer_type = parseInt($renderer_type.val()) || 0;
-			settings.scale_type = parseInt($scale_type.val()) || 0;
+			ZXContext.settings.set_tstatesPerIntrq(+$opt_tstatesPerIntrq.val() || defaultSettings.tstatesPerIntrq);
+			ZXContext.settings.set_tstatesPerIntrqTurbo(+$opt_tstatesPerIntrqTurbo.val() || defaultSettings.tstatesPerIntrqTurbo);
+			ZXContext.settings.set_intrqPeriod(+$opt_intrqPeriod.val() || defaultSettings.intrqPeriod);
+			ZXContext.settings.set_turboMode($opt_turboMode.prop('checked'));
+			ZXContext.settings.set_extendedMemory(+$opt_extendedMemory.val() || defaultSettings.extendedMemory);
+			ZXContext.settings.set_semicolors($opt_semicolors.prop('checked'));
+			ZXContext.settings.set_rendererType(+$opt_rendererType.val() || defaultSettings.rendererType);
+			ZXContext.settings.set_scaleType(+$opt_scaleType.val() || defaultSettings.scaleType);
+			ZXContext.settings.set_scaleValue(+$opt_scaleValue.val() || defaultSettings.scaleValue);
+			ZXContext.settings.set_renderOnAnimationFrame($opt_renderOnAnimationFrame.prop('checked'));
+			ZXContext.settings.set_useTypedArrays($opt_useTypedArrays.prop('checked'));
 
-			on_apply();
+			if (openResult$) {
+				openResult$.resolve();
+				openResult$ = null;
+			}
 
 			$dlg.dialog('close');
-			$dlg.dialog('destroy')
 			$dlg = null;
 		}
 
 		function cancel() {
+			if (openResult$) {
+				openResult$.reject();
+				openResult$ = null;
+			}			
 			$dlg.dialog('close');
-			$dlg.dialog('destroy')
 			$dlg = null;
+		}
+
+		function reset() {
+			ZXContext.settings.set_tstatesPerIntrq(defaultSettings.tstatesPerIntrq);
+			ZXContext.settings.set_tstatesPerIntrqTurbo(defaultSettings.tstatesPerIntrqTurbo);
+			ZXContext.settings.set_intrqPeriod(defaultSettings.intrqPeriod);
+			ZXContext.settings.set_turboMode(defaultSettings.turboMode);
+			ZXContext.settings.set_extendedMemory(defaultSettings.extendedMemory);
+			ZXContext.settings.set_semicolors(defaultSettings.semicolors);
+			ZXContext.settings.set_rendererType(defaultSettings.rendererType);
+			ZXContext.settings.set_scaleType(defaultSettings.scaleType);
+			ZXContext.settings.set_scaleValue(defaultSettings.scaleValue);
+			ZXContext.settings.set_renderOnAnimationFrame(defaultSettings.renderOnAnimationFrame);
+			ZXContext.settings.set_useTypedArrays(defaultSettings.useTypedArrays);
+
+			if (openResult$) {
+				openResult$.resolve();
+				openResult$ = null;
+			}
+			$dlg.dialog('close');
+			$dlg = null;
+		}
+
+		function populateRendererSelector( rendererType ) {
+			$opt_rendererType.empty();
+
+			var rendererTypes = getRendererTypes();
+			$.each(rendererTypes, function ( i, oType ) {
+				var $option = $('<option value="' + oType.value + '">' + oType.text + '</option>');
+				$opt_rendererType.append($option);
+			})
+
+			$opt_rendererType.val(rendererType);
+		}
+
+		function populateScaleTypeSelector( scaleType ) {
+			$opt_scaleType.empty();
+
+			var scaleTypes = getScaleTypes();
+			$.each(scaleTypes, function ( i, oType ) {
+				var $option = $('<option value="' + oType.value + '">' + oType.text + '</option>');
+				$opt_scaleType.append($option);
+			});
+
+			if ( $.grep(scaleTypes, function ( oType ) { return oType.value == scaleType; }).length > 0 ) {
+				$opt_scaleType.val(scaleType);
+			}
+		}
+
+		function populateScaleValueSelector( scaleValue ) {
+			$opt_scaleValue.empty();
+
+			var scaleValues = getScaleValues();
+			$.each(scaleValues, function ( i, oValue ) {
+				var $option = $('<option value="' + oValue.value + '">' + oValue.text + '</option>');
+				$opt_scaleValue.append($option);
+			});
+
+			// некоторые методы отрисовки не поддерживают дробных масштабов
+			if ( $.grep(scaleValues, function ( oValue ) { return oValue.value == scaleValue }).length == 0 ) {
+				scaleValue = Math.floor(scaleValue);
+			}
+
+			if ( $.grep(scaleValues, function ( oValue ) { return oValue.value == scaleValue }).length > 0 ) {
+				$opt_scaleValue.val(scaleValue);
+			}
+		}
+
+		function getRendererTypes() {
+			var result = [];
+			result.push({ value: 1, text: 'метод putImageData' });
+			result.push({ value: 2, text: 'метод drawImage' });
+			if (isWebGLSupported()) {
+				result.push({ value: 3, text: 'WebGL' });
+			}
+			return result;
+		}
+
+		function getScaleTypes() {
+			var rendererType = $opt_rendererType.val() || 2;
+
+			var result = [];
+			result.push({ value: 1, text: 'Предварительное' });
+			if ( rendererType != 1 ) { result.push({ value: 2, text: 'При отрисовке' }); }
+			result.push({ value: 3, text: 'Последующее' });
+			return result;
+		}
+
+		function getScaleValues() {
+			var rendererType = $opt_rendererType.val() || 2;
+			var scaleType = $opt_scaleType.val() || 2;
+
+			var useFractionalValues = !(( scaleType == 1 ) || ( rendererType == 3 && scaleType == 2 ));
+
+			var result = [];
+			result.push({ value: 1.0, text: '100%' });
+			if ( useFractionalValues ) { result.push({ value: 1.5, text: '150%' }); }
+			result.push({ value: 2.0, text: '200%' });
+			if ( useFractionalValues ) { result.push({ value: 2.5, text: '250%' }); }
+			result.push({ value: 3.0, text: '300%' });
+			if ( useFractionalValues ) { result.push({ value: 3.5, text: '350%' }); }
+			result.push({ value: 4.0, text: '400%' });
+			return result;
 		}
 	}
 </script>

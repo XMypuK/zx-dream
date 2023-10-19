@@ -1,0 +1,418 @@
+<include source="settings_dialog.html" includeType="embed" />
+<include source="drive_box.html" includeType="embed" />
+<include source="create_image_dialog.html" includeType="embed" />
+<include source="save_image_dialog.html" includeType="embed" />
+<include source="server_browser.html" includeType="embed" />
+<include source="local_browser.html" includeType="embed" />
+<include source="virtual_keyboard.html" includeType="embed" />
+<include source="virtual_mouse.html" includeType="embed" />
+<include source="local_open_snapshot_dialog.html" includeType="embed" />
+<include source="about_dialog.html" includeType="embed" />
+
+<style type="text/css">
+	body {
+		width: 100%;
+		margin: 8px 0;
+	}
+
+	.clear {
+		clear: both;
+	}
+
+	#main_container {
+		margin: 0 auto;
+	}
+
+	#left_field,
+	#right_field {
+		width: 250px;
+	}
+
+	#left_field,
+	#right_field,
+	#center_field {
+		float: left;
+	}
+
+	#commands {
+		margin: 200px 0 10px 0;
+	}
+	#commands a {
+		margin: 0;
+	}
+	#display {
+		position: relative;
+		border: 1px solid #a0a0a0;
+		border-radius: 5px;
+		box-shadow: 1px 1px #a0a0a0;
+		width: 576px;
+		height: 448px;
+		margin: 0 auto;
+	}
+
+	#display .error-message {
+		text-align: center;
+		color: #ff0000;
+		padding: 2em;
+	}
+
+	#vkeyb {
+		margin: 5px auto;
+		text-align: center;
+	}
+	#vmouse {
+		margin: 200px 10px 10px 10px;
+		text-align: center;
+	}
+
+	#debug {
+		display: none;
+		width: 900px;
+	}
+</style>
+
+<template id="workspace">
+	<div id="main_container">
+		<div id="left_field">
+			<div id="commands">
+				<a data-command="reset" title="Сброс"><img src="img/reset.png" alt="Сброс" /></a><!--
+			 --><a data-command="settings" title="Настройки"><img src="img/properties.png" alt="Настройки"/></a><!--
+			 --><a data-command="snapshot-open" title="Загрузить снимок"><img src="img/open.png" alt="Загрузить снимок" /></a><!--
+			 --><a data-command="snapshot-save" title="Сохранить снимок"><img src="img/save.png" alt="Сохранить снимок" /></a><!--
+             --><a data-command="about" title="Об эмуляторе"><img src="img/info.png" alt="Об эмуляторе"/></a>
+			</div>
+			<div id="drives"></div>	
+		</div>
+		<div id="center_field">
+			<div id="display"></div>
+			<div id="vkeyb"></div>		
+		</div>	
+		<div id="right_field">
+			<div id="vmouse"></div>
+		</div>
+		<div class="clear"></div>
+		<div id="debug_container">
+			<div id="debug"></div>
+		</div>
+	</div>
+</template>
+
+<script type="text/javascript">
+    function ZX_Workspace() {
+        var DB_COMMAND_OPEN = 'open';
+        var DB_COMMAND_OPEN_LOCAL = 'open-local';
+        var DB_COMMAND_SAVE_LOCAL = 'save-local';
+        var DB_COMMAND_CREATE = 'create';
+        var DB_COMMAND_EJECT = 'eject';
+
+        var $workspace = $("<?=workspace?>");
+        var $display = $workspace.find('#display');
+        var $vkeyb = $workspace.find('#vkeyb');
+        var $vmouse = $workspace.find('#vmouse');
+        var $drives = $workspace.find('#drives');
+        var $debug = $workspace.find('#debug');
+        var $container = $(document.body);
+
+        var display = $display[0];
+        var vkeyb = $vkeyb[0];
+        var vmouse = $vmouse[0];
+        var debug = $debug[0];
+        var drives = $drives[0];
+        var container = $container[0];
+
+        var driveBoxes = [];
+
+        this.get_container = function () {
+            return container;
+        }
+
+        this.get_display = function () {
+            return display;
+        }
+
+        this.get_keyboard = function () {
+            return vkeyb;
+        }
+
+        this.get_mouse = function () {
+            return vmouse;
+        }
+
+        this.get_debug = function () {
+            return debug;
+        }
+
+        this.init = init;
+        this.adjustWorkspaceLayout = adjustWorkspaceLayout;
+       
+        function init() {
+            $container.append($workspace);
+            initToolbar();
+            initLayout();
+            initVirtualKeyboard();
+            initVirtualMouse();
+            applySettings();
+            preload(0);
+            preload(1);
+            preload(2);
+            preload(3);
+        }
+
+        function initLayout() {
+            $(window).resize(adjustWorkspaceLayout);
+            adjustWorkspaceLayout();
+        }
+
+        function initVirtualKeyboard() {
+	        // подключение виртуальной клавиатуры
+            ZXContext.ui.keyboard = new VirtualKeyboard(vkeyb, function ( key, pressed ) {
+                ZXContext.hw.keyboard.switchKeys([key], pressed);
+            });
+            ZXContext.hw.keyboard.monitorKeyState(function ( keys, pressed ) {
+                for ( var i = 0; i < keys.length; i++ ) {
+                    ZXContext.ui.keyboard.keyStateChanged(keys[i], pressed);
+                }
+            });
+        }
+
+        function initVirtualMouse() {
+            // подключение виртуальной мыши
+            ZXContext.ui.mouse = new VirtualMouse(vmouse, ZXContext.hw.mouse);
+        }
+
+        function initToolbar() {
+            $('#commands>a').button({ text: false });
+            $('#commands>a').click(function (e) {
+                var command = $(e.target).closest('a').attr('data-command');
+                switch ( command ) {
+                    case 'reset': reset(); break;
+                    case 'settings': openProperties(); break;
+                    case 'snapshot-open': openSnapshot(); break;
+                    case 'snapshot-save': saveSnapshot(); break;
+                    case 'about': about(); break;
+                }
+            });
+
+            for (var i = 0; i < 4; i++) {
+                var driveBox = new DriveBox(drives, i, doDriveBoxAction)
+                driveBox.beginInit();
+                driveBox.addAction(DB_COMMAND_OPEN, 'открыть с сервера...');
+                driveBox.addAction(DB_COMMAND_OPEN_LOCAL, 'открыть с дикска...');
+                driveBox.addAction(DB_COMMAND_SAVE_LOCAL, 'сохранить на диск...');
+                driveBox.addAction(DB_COMMAND_CREATE, 'создать...');
+                driveBox.addAction(DB_COMMAND_EJECT, 'извлечь');
+                driveBox.endInit();
+                driveBoxes[i] = driveBox;
+            }
+        }
+
+        function adjustWorkspaceLayout() {
+            var $main_container = $('#main_container');
+            var $l = $('#left_field');
+            var $c = $('#center_field');
+            var $r = $('#right_field');
+
+            $main_container
+                .css('width', Math.ceil($l.outerWidth() + $c.outerWidth() + $r.outerWidth()) + 'px');
+        }
+
+        function reset() {
+            ZXContext.hw.bus.reset();
+        }
+
+        function openSnapshot() {
+            var dlg = new LocalOpenSnapshotDialog()
+            dlg.open().then(function (fileinput) {
+                try {
+                    var filename = (fileinput && fileinput.value || '').replace(/^.*[\\\/]/, '');
+                    if (!filename)
+                        throw new Error('Не выбран файл.');
+                    if (!(/\.sna$/i).test(filename))
+                        throw new Error('Неподдерживаемый формат файла.');
+                    return loadLocalFile(fileinput).then(function (data) {
+                        var snapshot = ZX_Snapshot.createFromSNA(data);
+                        ZX_Snapshot.restore(snapshot, ZXContext.hw.bus, ZXContext.hw.cpu);
+                    })
+                }
+                catch (error) {
+                    return $.Deferred().reject(error);
+                }
+            }).fail(function (errorMessage) {
+                if (errorMessage) {
+                    alert(errorMessage);
+                }
+            });
+        }
+
+        function saveSnapshot() {
+            var snapshot = ZX_Snapshot.take(ZXContext.hw.bus, ZXContext.hw.cpu);
+            var data = ZX_Snapshot.saveToSNA(snapshot);
+		    downloadBinaryData(data, 'snapshot.sna');
+        }
+
+        function openProperties() {
+            var dlg = new SettingsDialog();
+            dlg.open().then(function () {
+                applySettings();
+            });
+        }
+
+        function about() {
+            var dlg = new AboutDialog();
+        }
+
+        function applySettings() {
+            var s = ZXContext.settings;
+            ZXContext.hw.bus.opt(OPT_TSTATES_PER_INTRQ, s.get_turboMode() ? s.get_tstatesPerIntrqTurbo() : s.get_tstatesPerIntrq());
+            ZXContext.hw.bus.opt(OPT_INTRQ_PERIOD, s.get_intrqPeriod());
+            ZXContext.hw.bus.opt(OPT_EXTENDED_MEMORY, s.get_extendedMemory());
+            ZXContext.hw.bus.opt(OPT_SEMICOLORS, s.get_semicolors());
+            ZXContext.hw.bus.opt(OPT_RENDERER, s.get_rendererType());
+            ZXContext.hw.bus.opt(OPT_SCALE_METHOD, s.get_scaleType());
+            ZXContext.hw.bus.opt(OPT_SCALE, s.get_scaleValue());
+            ZXContext.hw.bus.opt(OPT_USE_TYPED_ARRAYS, s.get_useTypedArrays());
+            ZXContext.hw.bus.opt(OPT_RENDER_ON_ANIMATION_FRAME, s.get_renderOnAnimationFrame());
+        }
+
+        function doDriveBoxAction(command, driveIndex, driveBox) {
+            switch (command) {
+                case DB_COMMAND_OPEN: open(driveIndex, driveBox); break;
+                case DB_COMMAND_OPEN_LOCAL: openLocal(driveIndex, driveBox); break;
+                case DB_COMMAND_SAVE_LOCAL: saveLocal(driveIndex, driveBox); break;
+                case DB_COMMAND_CREATE: create(driveIndex, driveBox); break;
+                case DB_COMMAND_EJECT: eject(driveIndex, driveBox); break;
+            }
+        }
+
+        function open(driveIndex, driveBox) {
+            var browser = new ServerBrowser();
+            browser.open()
+                .then(function (filename) {
+                    driveBox.set_status(DriveBoxStatus.loading);
+                    return loadServerFile(filename).then(function (data) {
+                        var format = DiskImageFormat.getFromFileName(filename);
+                        var image = DiskImage.create(format, data);
+                        ZXContext.hw.betadisk.insert(driveIndex, image);
+                        driveBox.set_status(DriveBoxStatus.loaded);
+                        driveBox.set_title(filename);
+                        ZXContext.settings.set_drive(driveIndex, 'server:' + filename);
+                    });
+                })
+                .fail(function (errorMessage) {
+                    if (errorMessage) {
+                        driveBox.set_status(DriveBoxStatus.error);
+                        alert(errorMessage);
+                    }
+                });
+        }
+
+        function openLocal(driveIndex, driveBox) {
+            var browser = new LocalBrowser();
+            browser.open()
+                .then(function (fileinput) {
+                    var filename = (fileinput && fileinput.value || '').replace(/^.*[\\\/]/, '');
+                    if (!filename)
+                        return $.Deferred().reject('Не выбран файл.');
+                    var format;
+                    try { 
+                        format = DiskImageFormat.getFromFileName(filename); 
+                    }
+                    catch (error) { 
+                        return $.Deferred().reject(error); 
+                    }
+
+                    driveBox.set_status(DriveBoxStatus.loading);
+                    return loadLocalFile(fileinput).then(function (data) {
+                        var image = DiskImage.create(format, data);
+                        ZXContext.hw.betadisk.insert(driveIndex, image);
+                        driveBox.set_status(DriveBoxStatus.loaded);
+                        driveBox.set_title(filename);
+                        ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
+                    });
+                })
+                .fail(function (errorMessage) {
+                    if (errorMessage) {
+                        driveBox.set_status(DriveBoxStatus.error);
+                        alert(errorMessage);
+                    }
+                });
+        }
+
+        function saveLocal(driveIndex, driveBox) {
+            var image = ZXContext.hw.betadisk.get_image(driveIndex);
+            if (!image) {
+                alert('Диск отсутствует в приводе.');
+                return;
+            }
+
+            var formats = DiskImage.getCompatibleFormats(image);
+            var dlg = new SaveImageDialog();
+            dlg.open(formats)
+                .then(function (format) {
+                    var data = DiskImage.save(format, image);
+                    downloadBinaryData(data, 'custom_image.' + format);
+                })
+                .fail(function (errorMessage) {
+                    if (errorMessage) {
+                        alert(errorMessage);
+                    }
+                });
+        }
+
+        function create(driveIndex, driveBox) {
+            var dlg = new CreateImageDialog();
+            dlg.open()
+                .then(function (imageParams) {
+                    var image = DiskImage.createCustomImage(
+                        imageParams.cyl_count, 
+                        imageParams.head_count, 
+                        imageParams.trdos_format);
+                    ZXContext.hw.betadisk.insert(driveIndex, image);
+                    driveBox.set_status(DriveBoxStatus.loaded);
+                    driveBox.set_title('custom_image.fdi');
+                    ZXContext.settings.set_drive(driveIndex, 'local:custom_image.fdi')
+                })
+                .fail(function (errorMessage) {
+                    if (errorMessage) {
+                        alert(errorMessage);
+                    }
+                });
+        }
+
+        function eject(driveIndex, driveBox) {
+            ZXContext.hw.betadisk.eject(driveIndex);
+            driveBox.set_status(DriveBoxStatus.empty);
+            driveBox.set_title('');
+            ZXContext.settings.set_drive(driveIndex, '');
+        }
+
+        function preload(driveIndex) {
+            var prefixAndFilename = ZXContext.settings.get_drive(driveIndex);
+            if (!prefixAndFilename)
+                return;
+            var driveBox = driveBoxes[driveIndex];
+            driveBox.set_status(DriveBoxStatus.loading);
+            $.when()
+                .then(function () {
+                    var semicolonIndex = prefixAndFilename.indexOf(':');
+                    var prefix = (semicolonIndex > 0) ? prefixAndFilename.substr(0, semicolonIndex) : '';
+                    var filename = (semicolonIndex >= 0) ? prefixAndFilename.substr(semicolonIndex + 1) : prefixAndFilename;
+                    if (prefix !== 'local') {
+                        return loadServerFile(filename).then(function (data) {
+                            var format = DiskImageFormat.getFromFileName(filename);
+                            var image = DiskImage.create(format, data);
+                            ZXContext.hw.betadisk.insert(driveIndex, image);
+                            driveBox.set_status(DriveBoxStatus.loaded);
+                            driveBox.set_title(filename);
+                        });
+                    }
+                })
+                .fail(function (errorMessage) {
+                    if (errorMessage) {
+                        driveBox.set_status(DriveBoxStatus.error);
+                        alert(errorMessage);
+                    }
+                });
+        }
+    }
+</script>

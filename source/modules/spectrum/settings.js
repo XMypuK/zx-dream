@@ -1,81 +1,170 @@
 function ZX_Settings() {
-	this.use_bright_bit = true;
-	this.renderer_type = ScreenConstants.RENDERER_TYPE_DRAW_IMAGE;
-	this.scale_type = ScreenConstants.SCALE_TYPE_RENDER;
+	var defaultMode = /(\?|&)default=?(&|$)/.test(window.location.search);
+	var defaultValues = {
+		semicolors: true,
+		rendererType: isWebGLSupported() ? VAL_RENDERER_WEB_GL : VAL_RENDERER_DRAW_IMAGE,
+		scaleType: VAL_SCALE_METHOD_RENDER,
+		scaleValue: 2,
+		tstatesPerIntrq: 70000,
+		tstatesPerIntrqTurbo: 140000,
+		turboMode: true,
+		intrqPeriod: 20,
+		extendedMemory: 1,
+		useTypedArrays: isTypedArraysSupported(),
+		renderOnAnimationFrame: false,
+		drive0: 'Deja Vu #A.trd',
+		drive1: '',
+		drive2: '',
+		drive3: ''
+	};
+	var values = {
+		semicolors: readFromStorage('semicolors'),
+		rendererType: readFromStorage('rendererType'),
+		scaleType: readFromStorage('scaleType'),
+		scaleValue: readFromStorage('scaleValue'),
+		tstatesPerIntrq: readFromStorage('tstatesPerIntrq'),
+		tstatesPerIntrqTurbo: readFromStorage('tstatesPerIntrqTurbo'),
+		turboMode: readFromStorage('turboMode'),
+		intrqPeriod: readFromStorage('intrqPeriod'),
+		extendedMemory: readFromStorage('extendedMemory'),
+		useTypedArrays: readFromStorage('useTypedArrays'),
+		renderOnAnimationFrame: readFromStorage('renderOnAnimationFrame'),
+		drive0: readFromStorage('drive0'),
+		drive1: readFromStorage('drive1'),
+		drive2: readFromStorage('drive2'),
+		drive3: readFromStorage('drive3')
+	};
 
-	// интервал в тактах процессора, не ранее которого происходит прерывание
-	this.tstates_per_int_min = 70000;
-	// количество тактов процессора, после которых выполнение приостанавливается до следующего прерывания
-	this.tstates_per_int_max = 70000;
-
-	this.turbo_mode = true;
-	this.turbo_tstates_per_int_min = 140000;
-	this.turbo_tstates_per_int_max = 140000;
-	// интервал в милисекундах, не ранее которого происходит прерывание
-	this.int_period = 19;
-
-	this.drive_a = 'Deja Vu #A.trd';
-	this.drive_b = '';
-	this.drive_c = '';
-	this.drive_d = '';
-	this.extended_memory = 1;
-}
-
-ZX_Settings.get_default_settings = function() {
-	return new ZX_Settings();
-}
-
-ZX_Settings.get_local_settings = function() {
-	var settings = new ZX_Settings();
-
-	if ( localStorage ) {
-		settings.use_bright_bit				= value_or_default(localStorage.settings_use_bright_bit,			settings.use_bright_bit);
-		settings.renderer_type				= value_or_default(localStorage.settings_renderer_type,				settings.renderer_type);
-		settings.scale_type					= value_or_default(localStorage.settings_scale_type,				settings.scale_type);
-		settings.tstates_per_int_min		= value_or_default(localStorage.settings_tstates_per_int_min,		settings.tstates_per_int_min);
-		settings.tstates_per_int_max		= value_or_default(localStorage.settings_tstates_per_int_max,		settings.tstates_per_int_max);
-		settings.turbo_mode					= value_or_default(localStorage.settings_turbo_mode,				settings.turbo_mode);
-		settings.turbo_tstates_per_int_min	= value_or_default(localStorage.settings_turbo_tstates_per_int_min,	settings.turbo_tstates_per_int_min);
-		settings.turbo_tstates_per_int_max	= value_or_default(localStorage.settings_turbo_tstates_per_int_max,	settings.turbo_tstates_per_int_max);
-		settings.int_period					= value_or_default(localStorage.settings_int_period,				settings.int_period);
-		settings.drive_a					= value_or_default(localStorage.settings_drive_a,					settings.drive_a);
-		settings.drive_b					= value_or_default(localStorage.settings_drive_b,					settings.drive_b);
-		settings.drive_c					= value_or_default(localStorage.settings_drive_c,					settings.drive_c);
-		settings.drive_d					= value_or_default(localStorage.settings_drive_d,					settings.drive_d);
-		settings.extended_memory			= value_or_default(localStorage.settings_extended_memory,			settings.extended_memory);
+	function readFromStorage(name) {
+		var defaultValue = defaultValues[name];;
+		if (defaultMode || !localStorage)
+			return defaultValue;
+		var storageValue = localStorage['opt_' + name];
+		if (storageValue === undefined)
+			return defaultValue;
+		switch (typeof defaultValue) {
+			case 'number': return +storageValue;
+			case 'boolean': return storageValue == 'true';
+			default: return storageValue;
+		}
 	}
 
-	return settings;
-
-	function value_or_default( value, def ) {
-		if ( value !== undefined ) {
-			switch ( typeof def ) {
-				case 'number': return +value;
-				case 'boolean': return value == 'true';
-				default: return value;
-			}
+	function writeToStorage(name, value) {
+		if (!localStorage)
+			return;
+		if (value !== undefined) {
+			localStorage['opt_' + name] = value;
 		}
 		else {
-			return def;
+			delete localStorage['opt_' + name];
 		}
 	}
-};
 
-ZX_Settings.store_local_settings = function( settings ) {
-	if ( localStorage ) {
-		localStorage.settings_use_bright_bit			= settings.use_bright_bit;
-		localStorage.settings_renderer_type				= settings.renderer_type;
-		localStorage.settings_scale_type				= settings.scale_type;
-		localStorage.settings_tstates_per_int_min		= settings.tstates_per_int_min;
-		localStorage.settings_tstates_per_int_max		= settings.tstates_per_int_max;
-		localStorage.settings_turbo_mode				= settings.turbo_mode;
-		localStorage.settings_turbo_tstates_per_int_min	= settings.turbo_tstates_per_int_min;
-		localStorage.settings_turbo_tstates_per_int_max	= settings.turbo_tstates_per_int_max;
-		localStorage.settings_int_period				= settings.int_period;
-		localStorage.settings_drive_a					= settings.drive_a;
-		localStorage.settings_drive_b					= settings.drive_b;
-		localStorage.settings_drive_c					= settings.drive_c;
-		localStorage.settings_drive_d					= settings.drive_d;
-		localStorage.settings_extended_memory			= settings.extended_memory;
+	this.get_defaultValues = function() {
+		return $.extend({}, defaultValues);
 	}
-};
+	
+	// Включение/выключение полутонов (бит яркости)
+	this.get_semicolors = function() {
+		return values.semicolors;
+	}
+	this.set_semicolors = function(value) {
+		values.semicolors = value;
+		writeToStorage('semicolors', value);
+	}
+	// Выбор метода отрисовки изображения: putImageData, drawImage, WebGL.
+	this.get_rendererType = function() {
+		return values.rendererType;
+	}
+	this.set_rendererType = function(value) {
+		values.rendererType = value;
+		writeToStorage('rendererType', value);
+	}
+	// Выбор метода масштабирования.
+	// - Предварительное: подгатавливаются сэмплы необходимых размеров заранее.
+	// - При отрисовке: сэмплы масштабируются во время копирования на экран.
+	// - Последующее: масштабирование осуществляется средствами CSS.
+	this.get_scaleType = function() {
+		return values.scaleType;
+	} 
+	this.set_scaleType = function(value) {
+		values.scaleType = value;
+		writeToStorage('scaleType', value);
+	}
+	// Масштаб
+	this.get_scaleValue = function() {
+		return values.scaleValue;
+	}
+	this.set_scaleValue = function(value) {
+		values.scaleValue = value;
+		writeToStorage('scaleValue', value);
+	}
+	// Интервал в тактах процессора, после которого происходит прерывание.
+	this.get_tstatesPerIntrq = function() {
+		return values.tstatesPerIntrq;
+	}
+	this.set_tstatesPerIntrq = function(value) {
+		values.tstatesPerIntrq = value;
+		writeToStorage('tstatesPerIntrq', value);
+	}
+	// Интервал в тактах процессора, после которого происходит прерывание в турбо-режиме.
+	this.get_tstatesPerIntrqTurbo = function() {
+		return values.tstatesPerIntrqTurbo;
+	}
+	this.set_tstatesPerIntrqTurbo = function(value) {
+		values.tstatesPerIntrqTurbo = value;
+		writeToStorage('tstatesPerIntrqTurbo', value);
+	}
+	// Турбо-режим
+	this.get_turboMode = function() {
+		return values.turboMode;
+	}
+	this.set_turboMode = function(value) {
+		values.turboMode = value;
+		writeToStorage('turboMode', value);
+	}
+	// Интервал в милисекундах, не ранее которого происходит прерывание.
+	this.get_intrqPeriod = function() {
+		return values.intrqPeriod;
+	}
+	this.set_intrqPeriod = function(value) {
+		values.intrqPeriod = value;
+		writeToStorage('intrqPeriod', value);
+	}
+	// Расширенная память (> 128KB).
+	// 0 - выключена
+	// 1 - Pentagon (512KB)
+	this.get_extendedMemory = function() {
+		return values.extendedMemory;
+	}
+	this.set_extendedMemory = function(value) {
+		values.extendedMemory = value;
+		writeToStorage('extendedMemory', value);
+	}
+	// Включить/выключить использование типизированных массивов для эмуляции памяти и дисплея.
+	this.get_useTypedArrays = function() {
+		return values.useTypedArrays;
+	}
+	this.set_useTypedArrays = function(value) {
+		values.useTypedArrays = value;
+		writeToStorage('useTypedArrays', value);
+	}
+	// Включить/выключить отрисовку по событию requestAnimationFrame.
+	this.get_renderOnAnimationFrame = function() {
+		return values.renderOnAnimationFrame;
+	}
+	this.set_renderOnAnimationFrame = function(value) {
+		values.renderOnAnimationFrame = value;
+		writeToStorage('renderOnAnimationFrame', value);
+	}
+	// Установленные в приводах дискетты
+	this.get_drive = function(index) {
+		return values['drive' + index];
+	} 
+	this.set_drive = function(index, value) {
+		if (index < 0 || index > 3)
+			return;
+		values['drive' + index] = value;
+		writeToStorage('drive' + index, value);
+	}
+}
