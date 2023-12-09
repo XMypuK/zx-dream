@@ -87,6 +87,7 @@ function ZX_Z80 () {
     var int_request = false;
     var int_request_data = 0xff;
     var int_request_force = false;
+    var int_lock = false;
 
     /////////////////////////////////////
     // фуикции чтения/записи регистров //
@@ -251,17 +252,21 @@ function ZX_Z80 () {
     ///////////////////////////////////////////
 
     function process() {
-        // если выполняется команда с данными префиксами,
+        // Если выполняется команда с данными префиксами,
         // то не обрабатываем поступившие прерывания, 
-        // а ждем завершения чтения и выполнения команды
+        // а ждем завершения чтения и выполнения команды.
+        // Кроме того, маскируемое прерывание не выполняется 
+        // сразу после выполнения инструкций EI, DI (флаг int_lock).
         if (!prefix_bit && !prefix_ext) {
             // проверка на запрос немаскируемого прерывания
             if (nmi_request && process_nmi_request())
                 return;
             // проверка на запрос маскируемого прерывания
-            if (int_request && process_int_request()) 
+            if (int_request && !int_lock && process_int_request()) 
                 return;
         }
+
+        int_lock = false;
 
         // считываем очередной код
         var opcode = read_opcode();
@@ -734,7 +739,9 @@ function ZX_Z80 () {
 
                 pc = read_mem_word(sp);
                 sp = ( sp + 2 ) & 0xffff;
-                set_iff1(get_iff2());
+                if (!(opcode & 0x08)) {
+                    set_iff1(get_iff2());
+                }
 
                 return;
             }
@@ -2092,6 +2099,7 @@ function ZX_Z80 () {
             var allow_int = !!(opcode & 0x08);
             set_iff1(allow_int);
             set_iff2(allow_int);
+            int_lock = true;
             return;
         }
 
@@ -2735,12 +2743,12 @@ function ZX_Z80 () {
     function set_state( state ) {
         a_ = ( state.af_ >> 8 );
         f_.set( state.af_ & 0xff );
-        regs.b_ = ( state.bc_ >> 8 );
-        regs.c_ = ( state.bc_ & 0xff );
-        regs.d_ = ( state.de_ >> 8 );
-        regs.e_ = ( state.de_ & 0xff );
-        regs.h_ = ( state.hl_ >> 8 );
-        regs.l_ = ( state.hl_ & 0xff );
+        regs_.b = ( state.bc_ >> 8 );
+        regs_.c = ( state.bc_ & 0xff );
+        regs_.d = ( state.de_ >> 8 );
+        regs_.e = ( state.de_ & 0xff );
+        regs_.h = ( state.hl_ >> 8 );
+        regs_.l = ( state.hl_ & 0xff );
 
         a = ( state.af >> 8 );
         f.set( state.af & 0xff );
@@ -2827,7 +2835,7 @@ function ZX_Z80 () {
     this.connect = function (bus) {
         _bus = bus;
         _bus.on_reset(reset);
-        _bus.on_var_write(nmirq, 'nmirq');
-        _bus.on_var_write(intrq, 'intrq');
+        _bus.on_var_write(function () { nmirq(); }, 'nmirq');
+        _bus.on_var_write(function () { intrq(0xFF); }, 'intrq');
     }
 }
