@@ -10,28 +10,37 @@ function ZX_Keyboard() {
 		document.attachEvent('onkeyup', onkeyup);
 	}
 
-	function get_key_code(event) {
-		var key_code = event.keyCode;
-		switch (key_code) {
-			case 186: key_code = 59; break; // ;
-			case 187: key_code = 61; break; // =
-			case 188: key_code = 44; break; // ,
+	function getKeyId(event) {
+		var code = event.keyCode;
+		switch (code) {
+			case 186: code = 59; break; // ;
+			case 187: code = 61; break; // =
+			case 188: code = 44; break; // ,
 			case 109: // не опечатка ли в таблице? - нет! :)
-			case 189: key_code = 45; break; // -
-			case 190: key_code = 46; break; // .
-			case 191: key_code = 47; break; // /
-			case 192: key_code = 96; break; // `
-			case 219: key_code = 91; break; // [
-			case 220: key_code = 92; break; // \
-			case 221: key_code = 93; break; // ]
-			case 222: key_code = 94; break; // '
+			case 189: code = 45; break; // -
+			case 190: code = 46; break; // .
+			case 191: code = 47; break; // /
+			case 192: code = 96; break; // `
+			case 219: code = 91; break; // [
+			case 220: code = 92; break; // \
+			case 221: code = 93; break; // ]
+			case 222: code = 94; break; // '
 		}
-		return key_code;
+		return {
+			code: code,
+			location: event.location
+		}
 	}
 
 	function onkeydown(e) {
-		var key_code = get_key_code(e || window.event);
-		var keys = decode_keys(key_code);
+		var keyId = getKeyId(e || window.event);
+		if (keyId.code == 0x10) {
+			switch (keyId.location) {
+				case 1: leftShiftPressed = true; break;
+				case 2: rightShiftPressed = true; break;
+			}
+		}
+		var keys = decodeKeys(keyId);
 		if ( keys.length ) {
 			switch_keys(keys, true);
 			e.preventDefault ? e.preventDefault() : (e.returnValue = false);
@@ -39,8 +48,20 @@ function ZX_Keyboard() {
 	}
 
 	function onkeyup(e) {
-		var key_code = get_key_code(e || window.event);
-		var keys = decode_keys(key_code);
+		var keyId = getKeyId(e || window.event);
+		var keyId2 = null;
+		if (keyId.code == 0x10) {
+			leftShiftPressed = false;
+			rightShiftPressed = false;
+			switch (keyId.location) {
+				case 1: keyId2 = { code: 0x10, location: 2 }; break;
+				case 2: keyId2 = { code: 0x10, location: 1 }; break;
+			}
+		}
+		var keys = decodeKeys(keyId);
+		if (keyId2) {
+			keys = keys.concat(decodeKeys(keyId2));
+		}
 		if ( keys.length ) {
 			switch_keys(keys, false);
 			e.preventDefault ? e.preventDefault() : (e.returnValue = false);
@@ -48,14 +69,21 @@ function ZX_Keyboard() {
 	}
 
 	var key_states = [ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff ];
+	var leftShiftPressed = false;
+	var rightShiftPressed = false;
 
-	function decode_keys( key_code ) {
+	function decodeKeys( keyId ) {
 		var keys = [
 			//{ index: 1, bit: 4 }
 		];
 
-		switch (key_code) {
-			case 0x10: keys.push({ index: 0, bit: 0 }); break; // Shift (Caps Shift)
+		switch (keyId.code) {
+			case 0x10: 
+				if (keyId.location == 0 || keyId.location == 1)
+					keys.push({ index: 0, bit: 0 }); // Shift (Caps Shift)
+				else if (keyId.location == 2)
+					keys.push({ index: 7, bit: 1 }); // Ctrl (Symbol Shift)
+				break;
 			case 0x5a: keys.push({ index: 0, bit: 1 }); break; // Z
 			case 0x58: keys.push({ index: 0, bit: 2 }); break; // X
 			case 0x43: keys.push({ index: 0, bit: 3 }); break; // C
@@ -98,7 +126,12 @@ function ZX_Keyboard() {
 			case 0x48: keys.push({ index: 6, bit: 4 }); break; // H
 
 			case 0x20: keys.push({ index: 7, bit: 0 }); break; // Space
-			case 0x11: keys.push({ index: 7, bit: 1 }); break; // Ctrl (Symbol Shift)
+			case 0x11: 
+				if (keyId.location == 0 || keyId.location == 1)
+					keys.push({ index: 7, bit: 1 }); // Ctrl (Symbol Shift)
+				else if (keyId.location == 2)
+					keys.push({ index: 0, bit: 0 }); // Shift (Caps Shift)
+				break;
 			case 0x4d: keys.push({ index: 7, bit: 2 }); break; // M
 			case 0x4e: keys.push({ index: 7, bit: 3 }); break; // N
 			case 0x42: keys.push({ index: 7, bit: 4 }); break; // B
