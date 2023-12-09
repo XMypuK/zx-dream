@@ -1,17 +1,32 @@
 function ZX_Mouse () {
-	var buttons = 0x0f;
-	var scrollPos = 0; // 0 - 15
+	var _bus;
+	var buttons = 0x0F;
+	var scrollPos = 0x0F; // 0 - 15
 	var x = 1; // 0 - 255
 	var y = 2; // 0 - 255
 	var listeners = [];
 	
 	function io_read(address) {
-		if (address == 0xfadf)
-			return ( scrollPos << 4 ) | buttons;
-		if (address == 0xfbdf)
-			return x;
-		if (address == 0xffdf)
-			return y;
+		// Kempston Mouse Interface Ports are:
+		//   FADF: buttons + scroll
+		//   FBDF: x
+		//   FFDF: y
+		//   FEDF: last value of port 7FFD (in some implemetations)
+		// Ports are usually decoded by the next address lines:
+		//   A10, A8: variable
+		//   A5: 0
+		//   A7: 1
+		//	 A0, A9: 1 (in some implementations, but not here *)
+		//   * found the next behaviour:
+		//	   if check A0 and A9 then mouse is detected in ZX-Format #8, but not in Deja Vu #8;
+		//     if check A0 and not A9 then mouse is deteced in Deja Vu #8, but not in ZX-Format #8;
+		//	   if don't check A0 (whatever A9 is) then mouse is deteced in both both Deja Vu #8 and ZX-Format #8.
+		switch (address & 0x05A0) {
+			case 0x0080: return ( scrollPos << 4 ) | buttons;
+			case 0x0180: return x;
+			case 0x0580: return y;
+			case 0x0480: return _bus.var_read('port_7ffd_value');
+		}
 	}
 
 	function notifyListeners( state ) {
@@ -55,6 +70,7 @@ function ZX_Mouse () {
 	}
 
 	this.connect = function (bus) {
+		_bus = bus;
 		bus.on_io_read(io_read);
 	}
 }
