@@ -97,11 +97,11 @@ function ZX_Bus() {
 	}
 
 	function io_read(address) {
-		var result = 0xff;
+		var result = 0xFF;
 		for ( var i = 0; i < io_read_handlers.length; i++ ) {
 			var subresult = io_read_handlers[i](address);
 			if (subresult !== undefined) {
-				result = subresult;
+				result &= subresult;
 			}
 		}
 		return result;
