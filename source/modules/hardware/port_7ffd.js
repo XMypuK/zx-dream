@@ -6,7 +6,9 @@ function ZX_Port7FFD() {
 
 	function io_write(address, data) {
 		var locked = port_value & 0x20;
-		if (address == 0x7ffd && !locked) {
+		// в Pentagon128 проверка доступа к порту 
+		// идет только по линиям A1, A15
+		if (!(address & 0x8002) && !locked) {
 			_bus.var_write('port_7ffd_value', data);
 		}
 	}

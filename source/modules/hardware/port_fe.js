@@ -5,7 +5,9 @@ function ZX_PortFE() {
 	var port_value = 0x00;
 
 	function io_write(address, data) {
-		if (( address & 0xff ) == 0xfe) {
+		// в Pentagon128 проверка доступа к порту
+		// осуществляется только по линии A0
+		if (!( address & 0x01 )) {
 			_bus.var_write('port_fe_value', data);
 		}
 	}
