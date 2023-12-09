@@ -1,0 +1,115 @@
+<include includeType="embed" source="memory_view.js" />
+<include includeType="embed" source="memory_watch.js" />
+<include includeType="embed" source="memory_dump.js" />
+
+<script type="text/javascript">
+    function DebugMemory(root, onChange) {
+        this._root = root;
+        this._onChange = onChange || function () { };
+        
+        this.state = this._root.state;
+        this.bus = this._root.bus;
+        this.updating = ko.observable(false);
+        this.editable = ko.pureComputed(function () { return !this._root.running(); }, this);
+		this.writeScopeCounter = ko.observable(0).extend({ incdec: true });
+		this.writeScopeCounter.subscribe(function (value) {
+            if (value === 0 && !this.updating()) {
+                this._onChange();
+            }
+		}, this);
+
+		this.views = [];
+		this.watchList = [];
+		var dumpView = new MemoryView(this, 'C000', 128);
+		this.views.push(dumpView);
+		this.dump = new MemoryDump(this, dumpView);
+
+		this.cursorIndex = ko.observable(0).extend({ incdec: true });
+		this.cursorUp = function () { 
+            this.cursorIndex.dec(1, 0); 
+        }
+		this.cursorDown = function () { 
+            this.cursorIndex.inc(1, this.watchList.length); 
+        }
+        this.watchPageUp = function () {
+            var idx = this.cursorIndex();
+            if (idx >= 0 && idx < this.watchList.length) {
+                this.shiftView(this.watchList[idx].formula, -0x10);
+            }
+        }
+        this.watchPageDown = function () {
+            var idx = this.cursorIndex();
+            if (idx >= 0 && idx < this.watchList.length) {
+                this.shiftView(this.watchList[idx].formula, 0x10);
+            }
+        }
+        this.watchPrev = function () {
+            var idx = this.cursorIndex();
+            if (idx >= 0 && idx < this.watchList.length) {
+                this.shiftView(this.watchList[idx].formula, -1);
+            }
+        }
+        this.watchNext = function () {
+            var idx = this.cursorIndex();
+            if (idx >= 0 && idx < this.watchList.length) {
+                this.shiftView(this.watchList[idx].formula, 1);
+            }
+        }
+        this.dumpPageUp = function () {
+            this.shiftView(dumpView.formula, -0x80)
+        }
+        this.dumpPageDown = function () {
+            this.shiftView(dumpView.formula, 0x80)
+        }
+        this.dumpPrev = function () {
+            this.shiftView(dumpView.formula, -1)
+        }
+        this.dumpNext = function () {
+            this.shiftView(dumpView.formula, 1)
+        }        
+        this.shiftView = function (formulaObservable, shift) {
+            var formulaParts = this.splitFormula(formulaObservable());
+            var formula = formulaParts.base;
+            formulaParts.offset += shift;
+            if (formulaParts.offset >= 0) {
+                formula += ' +' + DebugUtils.wordToString(formulaParts.offset);
+            }
+            else {
+                formula += ' -' + DebugUtils.wordToString(-formulaParts.offset);
+            }
+            formulaObservable(formula);
+        }
+		this.editFormula = function () {
+			if (this.cursorIndex() >= 0 && this.cursorIndex() < this.watchList.length) {
+				this.watchList[this.cursorIndex()].formula.editing(true);
+			}
+		}
+        this.splitFormula = function (formula) {
+            var complexFormulaMatch = /^(.+?)(\s[+-][0-9A-F]{4})?$/i.exec(formula || '');
+            return {
+                base: complexFormulaMatch && complexFormulaMatch[1] || '',
+                offset: parseInt(complexFormulaMatch && complexFormulaMatch[2] || '0', 16) || 0
+            };
+        }
+
+        this.update = function (calcModification) {
+            this.updating(true);
+            for ( var i = 0; i < this.views.length; i++ ) {
+				this.views[i].update(calcModification);
+			}
+            this.updating(false);
+        }
+
+		var watchFormulas = '6000;7000;8000;9000;A000;B000;C000;D000;E000;F000;IX;IY;HL;DE;BC;SP:w'.split(';');
+		for ( var i = 0; i < watchFormulas.length; i++ ) {
+			var defParts = watchFormulas[i].split(':');
+			var view = new MemoryView(this, defParts[0]);
+			var watch = new MemoryWatch(this, view);
+			if (defParts[1] === 'w') {
+				watch.wordFormat(true);
+			}
+			this.views.push(view);
+			this.watchList.push(watch);
+		}
+    }
+</script>

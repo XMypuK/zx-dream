@@ -1,12 +1,10 @@
+<include source="drive_dispatcher.html" includeType="embed" />
 <include source="settings_dialog.html" includeType="embed" />
-<include source="drive_box.html" includeType="embed" />
 <include source="create_image_dialog.html" includeType="embed" />
 <include source="save_image_dialog.html" includeType="embed" />
 <include source="server_browser.html" includeType="embed" />
-<include source="local_browser.html" includeType="embed" />
 <include source="virtual_keyboard.html" includeType="embed" />
 <include source="virtual_mouse.html" includeType="embed" />
-<include source="local_open_snapshot_dialog.html" includeType="embed" />
 <include source="about_dialog.html" includeType="embed" />
 
 <style type="text/css">
@@ -67,7 +65,7 @@
 
 	#debug {
 		display: none;
-		width: 900px;
+		width: 970px;
 	}
 </style>
 
@@ -99,12 +97,6 @@
 
 <script type="text/javascript">
     function ZX_Workspace() {
-        var DB_COMMAND_OPEN = 'open';
-        var DB_COMMAND_OPEN_LOCAL = 'open-local';
-        var DB_COMMAND_SAVE_LOCAL = 'save-local';
-        var DB_COMMAND_CREATE = 'create';
-        var DB_COMMAND_EJECT = 'eject';
-
         var $workspace = $("<?=workspace?>");
         var $display = $workspace.find('#display');
         var $vkeyb = $workspace.find('#vkeyb');
@@ -119,8 +111,6 @@
         var debug = $debug[0];
         var drives = $drives[0];
         var container = $container[0];
-
-        var driveBoxes = [];
 
         this.get_container = function () {
             return container;
@@ -152,10 +142,6 @@
             initVirtualKeyboard();
             initVirtualMouse();
             applySettings();
-            preload(0);
-            preload(1);
-            preload(2);
-            preload(3);
         }
 
         function initLayout() {
@@ -193,17 +179,10 @@
                 }
             });
 
-            for (var i = 0; i < 4; i++) {
-                var driveBox = new DriveBox(drives, i, doDriveBoxAction)
-                driveBox.beginInit();
-                driveBox.addAction(DB_COMMAND_OPEN, 'открыть с сервера...');
-                driveBox.addAction(DB_COMMAND_OPEN_LOCAL, 'открыть с дикска...');
-                driveBox.addAction(DB_COMMAND_SAVE_LOCAL, 'сохранить на диск...');
-                driveBox.addAction(DB_COMMAND_CREATE, 'создать...');
-                driveBox.addAction(DB_COMMAND_EJECT, 'извлечь');
-                driveBox.endInit();
-                driveBoxes[i] = driveBox;
-            }
+            var driveDispatcher = new ZX_DriveDispatcher(drives);
+            driveDispatcher.addDriveBoxes();
+            driveDispatcher.preloadImages();
+            ZXContext.ui.driveDispatcher = driveDispatcher;
         }
 
         function adjustWorkspaceLayout() {
@@ -221,27 +200,40 @@
         }
 
         function openSnapshot() {
-            var dlg = new LocalOpenSnapshotDialog()
-            dlg.open().then(function (fileinput) {
-                try {
-                    var filename = (fileinput && fileinput.value || '').replace(/^.*[\\\/]/, '');
-                    if (!filename)
-                        throw new Error('Не выбран файл.');
-                    if (!(/\.sna$/i).test(filename))
-                        throw new Error('Неподдерживаемый формат файла.');
-                    return loadLocalFile(fileinput).then(function (data) {
-                        var snapshot = ZX_Snapshot.createFromSNA(data);
-                        ZX_Snapshot.restore(snapshot, ZXContext.hw.bus, ZXContext.hw.cpu);
-                    })
-                }
-                catch (error) {
-                    return $.Deferred().reject(error);
-                }
-            }).fail(function (errorMessage) {
-                if (errorMessage) {
-                    alert(errorMessage);
-                }
+            var $input = $('<input type="file" accept=".sna,.z80" style="visibility: hidden;" />').appendTo(document.body);
+            $input.on('change', function (e) {
+                var filename = ($input.val() || '').replace(/^.*[\\\/]/, '');
+
+                if (!filename)
+                    return;
+
+                $.when()
+                .then(function () {
+                    try {
+                        var format = ((/\.(SNA|Z80)/i).exec(filename)[1] || '').toUpperCase();
+                        if (format != 'SNA' && format != 'Z80')
+                            throw new Error('Неподдерживаемый формат файла.');
+                        return loadLocalFile($input[0]).then(function (data) {
+                            var snapshot = null;
+                            switch (format) {
+                                case 'SNA': snapshot = ZX_Snapshot.createFromSNA(data); break;
+                                case 'Z80': snapshot = ZX_Snapshot.createFromZ80(data); break;
+                            }
+                            if (snapshot) {
+                                ZX_Snapshot.restore(snapshot, ZXContext.hw.bus, ZXContext.hw.cpu);
+                            }
+                        })
+                    }
+                    catch (error) {
+                        return $.Deferred().reject(error);
+                    }
+                }).fail(function (errorMessage) {
+                    if (errorMessage) {
+                        alert(errorMessage);
+                    }
+                });
             });
+            $input.click();
         }
 
         function saveSnapshot() {
@@ -272,147 +264,6 @@
             ZXContext.hw.bus.opt(OPT_SCALE, s.get_scaleValue());
             ZXContext.hw.bus.opt(OPT_USE_TYPED_ARRAYS, s.get_useTypedArrays());
             ZXContext.hw.bus.opt(OPT_RENDER_ON_ANIMATION_FRAME, s.get_renderOnAnimationFrame());
-        }
-
-        function doDriveBoxAction(command, driveIndex, driveBox) {
-            switch (command) {
-                case DB_COMMAND_OPEN: open(driveIndex, driveBox); break;
-                case DB_COMMAND_OPEN_LOCAL: openLocal(driveIndex, driveBox); break;
-                case DB_COMMAND_SAVE_LOCAL: saveLocal(driveIndex, driveBox); break;
-                case DB_COMMAND_CREATE: create(driveIndex, driveBox); break;
-                case DB_COMMAND_EJECT: eject(driveIndex, driveBox); break;
-            }
-        }
-
-        function open(driveIndex, driveBox) {
-            var browser = new ServerBrowser();
-            browser.open()
-                .then(function (filename) {
-                    driveBox.set_status(DriveBoxStatus.loading);
-                    return loadServerFile(filename).then(function (data) {
-                        var format = DiskImageFormat.getFromFileName(filename);
-                        var image = DiskImage.create(format, data);
-                        ZXContext.hw.betadisk.insert(driveIndex, image);
-                        driveBox.set_status(DriveBoxStatus.loaded);
-                        driveBox.set_title(filename);
-                        ZXContext.settings.set_drive(driveIndex, 'server:' + filename);
-                    });
-                })
-                .fail(function (errorMessage) {
-                    if (errorMessage) {
-                        driveBox.set_status(DriveBoxStatus.error);
-                        alert(errorMessage);
-                    }
-                });
-        }
-
-        function openLocal(driveIndex, driveBox) {
-            var browser = new LocalBrowser();
-            browser.open()
-                .then(function (fileinput) {
-                    var filename = (fileinput && fileinput.value || '').replace(/^.*[\\\/]/, '');
-                    if (!filename)
-                        return $.Deferred().reject('Не выбран файл.');
-                    var format;
-                    try { 
-                        format = DiskImageFormat.getFromFileName(filename); 
-                    }
-                    catch (error) { 
-                        return $.Deferred().reject(error); 
-                    }
-
-                    driveBox.set_status(DriveBoxStatus.loading);
-                    return loadLocalFile(fileinput).then(function (data) {
-                        var image = DiskImage.create(format, data);
-                        ZXContext.hw.betadisk.insert(driveIndex, image);
-                        driveBox.set_status(DriveBoxStatus.loaded);
-                        driveBox.set_title(filename);
-                        ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
-                    });
-                })
-                .fail(function (errorMessage) {
-                    if (errorMessage) {
-                        driveBox.set_status(DriveBoxStatus.error);
-                        alert(errorMessage);
-                    }
-                });
-        }
-
-        function saveLocal(driveIndex, driveBox) {
-            var image = ZXContext.hw.betadisk.get_image(driveIndex);
-            if (!image) {
-                alert('Диск отсутствует в приводе.');
-                return;
-            }
-
-            var formats = DiskImage.getCompatibleFormats(image);
-            var dlg = new SaveImageDialog();
-            dlg.open(formats)
-                .then(function (format) {
-                    var data = DiskImage.save(format, image);
-                    downloadBinaryData(data, 'custom_image.' + format);
-                })
-                .fail(function (errorMessage) {
-                    if (errorMessage) {
-                        alert(errorMessage);
-                    }
-                });
-        }
-
-        function create(driveIndex, driveBox) {
-            var dlg = new CreateImageDialog();
-            dlg.open()
-                .then(function (imageParams) {
-                    var image = DiskImage.createCustomImage(
-                        imageParams.cyl_count, 
-                        imageParams.head_count, 
-                        imageParams.trdos_format);
-                    ZXContext.hw.betadisk.insert(driveIndex, image);
-                    driveBox.set_status(DriveBoxStatus.loaded);
-                    driveBox.set_title('custom_image.fdi');
-                    ZXContext.settings.set_drive(driveIndex, 'local:custom_image.fdi')
-                })
-                .fail(function (errorMessage) {
-                    if (errorMessage) {
-                        alert(errorMessage);
-                    }
-                });
-        }
-
-        function eject(driveIndex, driveBox) {
-            ZXContext.hw.betadisk.eject(driveIndex);
-            driveBox.set_status(DriveBoxStatus.empty);
-            driveBox.set_title('');
-            ZXContext.settings.set_drive(driveIndex, '');
-        }
-
-        function preload(driveIndex) {
-            var prefixAndFilename = ZXContext.settings.get_drive(driveIndex);
-            if (!prefixAndFilename)
-                return;
-            var driveBox = driveBoxes[driveIndex];
-            driveBox.set_status(DriveBoxStatus.loading);
-            $.when()
-                .then(function () {
-                    var semicolonIndex = prefixAndFilename.indexOf(':');
-                    var prefix = (semicolonIndex > 0) ? prefixAndFilename.substr(0, semicolonIndex) : '';
-                    var filename = (semicolonIndex >= 0) ? prefixAndFilename.substr(semicolonIndex + 1) : prefixAndFilename;
-                    if (prefix !== 'local') {
-                        return loadServerFile(filename).then(function (data) {
-                            var format = DiskImageFormat.getFromFileName(filename);
-                            var image = DiskImage.create(format, data);
-                            ZXContext.hw.betadisk.insert(driveIndex, image);
-                            driveBox.set_status(DriveBoxStatus.loaded);
-                            driveBox.set_title(filename);
-                        });
-                    }
-                })
-                .fail(function (errorMessage) {
-                    if (errorMessage) {
-                        driveBox.set_status(DriveBoxStatus.error);
-                        alert(errorMessage);
-                    }
-                });
         }
     }
 </script>

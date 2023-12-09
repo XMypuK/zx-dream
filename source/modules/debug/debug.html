@@ -1,2564 +1,690 @@
+<include includeType="embed" source="consts.js" />
+<include includeType="embed" source="utils.js" />
+<include includeType="embed" source="ko_bindings.js" />
+<include includeType="embed" source="command_dispatcher.js" />
+<include includeType="embed" source="registers.js" />
+<include includeType="embed" source="dasm_record.js" />
+<include includeType="embed" source="ports.js" />
+<include includeType="embed" source="memory.html" />
+<include includeType="embed" source="dasm.js" />
+
 <style>
-	.debug-toolbar {
-		background-color: #cccccc;
-		border: 1px solid #444444;
-		border-bottom: none;
-	}
+	.debugger { font: 14px Consolas, monospace; box-sizing: border-box; position: relative; }
+	.debugger .hex-edit-control, 
+	.debugger .text-edit-control { position: absolute; z-index: 9999; margin: 0; border: 0; outline: 0; padding: 0; background-color: #ffffff; text-align: center; font: 14px Consolas, monospace; box-sizing: border-box; }
 
-	.zxdebug-registers {
-		font-family: Courier New, monospace; 
-		font-size: 14px;
-	}
+	.debugger-row { }
+	.debugger-row > .debugger-block { display: inline-block; border: 1px solid #444444; border-left-style: none; border-top-style: none; vertical-align: top; }
+	.debugger-row:first > .debugger-block { border-top-style: solid; }
+	.debugger-row > .debugger-block:first { border-left-style: solid; }
+	.debugger-row > .debugger-block > .header { height: 18px; background-color: #444444; color: #ffffff; text-align: center; }
 
-	.zxdebug-registers td, .zxdebug-registers th {
-		text-align: center;
-	}
+	.debugger .toolbar { border: none; border-top: 1px solid #444444; height: 18px; }
+	.debugger .toolbar-button { display: inline-block; cursor: pointer; width: 18px; height: 18px; background-color: transparent; background-repeat: no-repeat; background-position: center center; border: 0; vertical-align: top; }
+	.debugger .toolbar-button:hover { background-color: #aaf7ff; }
+	.debugger .toolbar-separator { display: inline-block; width: 1px; height: 18px; margin: 0 4px; background-color: #cccccc; vertical-align: top; }
+	.debugger .toolbar-button.-button_break { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path d="M2 2v12h12V2H2zm10.75 10.75h-9.5v-9.5h9.5v9.5z"/></svg>'); }
+	.debugger .toolbar-button.-button_run { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.25 3l1.166-.624 8 5.333v1.248l-8 5.334-1.166-.624V3zm1.5 1.401v7.864l5.898-3.932L5.75 4.401z"/></svg>'); }
+	.debugger .toolbar-button.-button_step-over { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M14.25 5.75v-4h-1.5v2.542c-1.145-1.359-2.911-2.209-4.84-2.209-3.177 0-5.92 2.307-6.16 5.398l-.02.269h1.501l.022-.226c.212-2.195 2.202-3.94 4.656-3.94 1.736 0 3.244.875 4.05 2.166h-2.83v1.5h4.163l.962-.975V5.75h-.004zM8 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>'); }
+	.debugger .toolbar-button.-button_step-in { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 9.532h.542l3.905-3.905-1.061-1.06-2.637 2.61V1H7.251v6.177l-2.637-2.61-1.061 1.06 3.905 3.905H8zm1.956 3.481a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></svg>'); }
+	.debugger .toolbar-button.-button_run-until-cursor { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000" transform="rotate(270)"><g id="SVGRepo_bgCarrier" stroke-width="0"/><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/><g id="SVGRepo_iconCarrier"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 9.532h.542l3.905-3.905-1.061-1.06-2.637 2.61V1H7.251v6.177l-2.637-2.61-1.061 1.06 3.905 3.905H8zm1.956 3.481a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/></g></svg>'); }
+	.debugger .toolbar-button.-button_run-until-address { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" fill="%23000000" version="1.1" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path transform="rotate(-90,8,8.0065)" d="m8 9.532h0.542l3.905-3.905-1.061-1.06-2.637 2.61v-6.177h-1.498v6.177l-2.637-2.61-1.061 1.06 3.905 3.905z" clip-rule="evenodd" fill-rule="evenodd"/><path d="m11.262 13.532h-2.247v1.498h5.992v-1.498h-2.247v-11.05h2.247v-1.498h-5.992v1.498h2.247z" fill="%23000" stroke-width=".02"/></svg>'); }
+	.debugger .toolbar-button.-button_toggle-bp-at-cursor { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path d="M8 4c.367 0 .721.048 1.063.145a3.943 3.943 0 0 1 1.762 1.031 3.944 3.944 0 0 1 1.03 1.762c.097.34.145.695.145 1.062 0 .367-.048.721-.145 1.063a3.94 3.94 0 0 1-1.03 1.765 4.017 4.017 0 0 1-1.762 1.031C8.72 11.953 8.367 12 8 12s-.721-.047-1.063-.14a4.056 4.056 0 0 1-1.765-1.032A4.055 4.055 0 0 1 4.14 9.062 3.992 3.992 0 0 1 4 8c0-.367.047-.721.14-1.063a4.02 4.02 0 0 1 .407-.953A4.089 4.089 0 0 1 5.98 4.546a3.94 3.94 0 0 1 .957-.401A3.89 3.89 0 0 1 8 4z"/></svg>'); }
+	.debugger .toolbar-button.-button_toggle-bp-at-address { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" fill="%23000000" version="1.1" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="m4.9835 4c0.367 0 0.721 0.048 1.063 0.145a3.943 3.943 0 0 1 1.762 1.031 3.944 3.944 0 0 1 1.03 1.762c0.097 0.34 0.145 0.695 0.145 1.062s-0.048 0.721-0.145 1.063a3.94 3.94 0 0 1-1.03 1.765 4.017 4.017 0 0 1-1.762 1.031c-0.343 0.094-0.696 0.141-1.063 0.141s-0.721-0.047-1.063-0.14a4.056 4.056 0 0 1-1.765-1.032 4.055 4.055 0 0 1-1.032-1.766 3.992 3.992 0 0 1-0.14-1.062c0-0.367 0.047-0.721 0.14-1.063a4.02 4.02 0 0 1 0.407-0.953 4.089 4.089 0 0 1 1.433-1.438 3.94 3.94 0 0 1 0.957-0.401 3.89 3.89 0 0 1 1.063-0.145z"/><path d="m11.262 13.532h-2.247v1.498h5.992v-1.498h-2.247v-11.05h2.247v-1.498h-5.992v1.498h2.247z" fill="%23000" stroke-width=".02"/></svg>'); }
+	.debugger .toolbar-button.-button_prev-page { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" fill="%23000000" version="1.1" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="m7.32 7.976 4.357 4.357-0.618 0.62-4.667-4.669v-0.618l4.667-4.666 0.618 0.619z" clip-rule="evenodd" fill-rule="evenodd"/><path d="m4.536 7.976 4.357 4.357-0.618 0.62-4.667-4.669v-0.618l4.667-4.666 0.618 0.619z" clip-rule="evenodd" fill-rule="evenodd"/></svg>'); }
+	.debugger .toolbar-button.-button_prev { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.928 7.976l4.357 4.357-.618.62L5 8.284v-.618L9.667 3l.618.619-4.357 4.357z"/></svg>'); }
+	.debugger .toolbar-button.-button_next { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.072 8.024L5.715 3.667l.618-.62L11 7.716v.618L6.333 13l-.618-.619 4.357-4.357z"/></svg>'); }
+	.debugger .toolbar-button.-button_next-page { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" fill="%23000000" version="1.1" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="m8.68 8.024-4.357-4.357 0.618-0.62 4.667 4.669v0.618l-4.667 4.666-0.618-0.619z" clip-rule="evenodd" fill-rule="evenodd"/><path d="m11.464 8.024-4.357-4.357 0.618-0.62 4.667 4.669v0.618l-4.667 4.666-0.618-0.619z" clip-rule="evenodd" fill-rule="evenodd"/></svg>'); }
+	.debugger .toolbar-button.-button_load { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path d="M1.5 14h11l.48-.37 2.63-7-.48-.63H14V3.5l-.5-.5H7.71l-.86-.85L6.5 2h-5l-.5.5v11l.5.5zM2 3h4.29l.86.85.35.15H13v2H8.5l-.35.15-.86.85H3.5l-.47.34-1 3.08L2 3zm10.13 10H2.19l1.67-5H7.5l.35-.15.86-.85h5.79l-2.37 6z"/></svg>');}
+	.debugger .toolbar-button.-button_save { background-image: url('data:image/svg+xml,<svg width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="%23000000"><path fill-rule="evenodd" clip-rule="evenodd" d="M13.353 1.146l1.5 1.5L15 3v11.5l-.5.5h-13l-.5-.5v-13l.5-.5H13l.353.146zM2 2v12h12V3.208L12.793 2H11v4H4V2H2zm6 0v3h2V2H8z"/></svg>');}
 
-	.zxdebug-registers .changed {
-		color: #ff0000;
-	}
+	.regs { cursor: default; }
+	.regs .registers-table { border-collapse: collapse; }
+	.regs .registers-table th, 
+	.regs .registers-table td { padding: 0.05em 0.5em;  }
+	.regs .registers-table th { background-color: #444444; color: #ffffff; font-weight: normal; }
+	.regs .registers-table td { background-color: #eeeeee; padding-right: 0.75em; }
+	.regs .registers-table td.-no-padding { padding: 0; }
+	.regs .registers-table .-modified { background-color: #ffcccc; }
+	.regs .registers-inner-table { width: 100%; border-collapse: collapse; }
+	.regs .registers-inner-table td { padding-right: 0.5em; }
 
-	.zxdebug-trace {
-		display: inline-block;
-		padding: 0px 0px;
-		width: 33%;
-		vertical-align: top;
+	.ports { cursor: default; }
+	.ports .port-list { border-collapse: collapse; }
+	.ports .port-item > * { padding: 0.05em 0.5em; }
+	.ports .port-item > th { background-color: #444444; color: #ffffff; font-weight: normal; }
+	.ports .port-item > td { padding-right: 0.75em; }
+	.ports .filler > td { padding: 0.05em 0.5em; }
 
-		font-family: Courier New, monospace; 
-		font-size: 14px;
+	.dasm { width: 300px; }
+	.dasm .dasm-line { white-space: nowrap; cursor: default; }
+	.dasm .dasm-line > * { padding: 0.05em 0.5em; display: inline-block; }
+	.dasm .dasm-line > .addr { background-color: #444444; color: #ffffff;  }
+	.dasm .dasm-line > .bytes { width: 80px; }
+	.dasm .dasm-line > .mnemonics { padding-left: 1em; }
+	.dasm .dasm-line.-pointer > .mnemonics { background: transparent url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAA8UlEQVQokXWSMU4DQQxFny0qjkCFEDRUEeIC2TZlityDA+wqe5sUlGl3b4CookgglIpjzKeYHZidHb40xdj+/t+WIcJJGLpr6vCszn2RNl4Y2ucKMUzPgeBZMEJ6wOzA2K3+UQ25xUzZAN0BR8busWKzatUxRbJ0gzgytE812yUxIAMpKd8CB4Z2lY3jucVACVPkwj1mr5Pt37raVov/FJD+XFWJ0lScHp9IW5r+lJc55cZs1v2CtKPp34r2flXM52CJ/I3ZhqY/ZyLpACqK0e4XZhvW+/OycbwgLxIB+MBsx3r/XsnNtj9XG9vakS8u7AfXLUyfEUTHWAAAAABJRU5ErkJggg==") no-repeat left center; }
+	.dasm .dasm-line.-break-point > .mnemonics { background: transparent url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABw0lEQVQokV2SP08bQRDFf299RiGyqLBBQXcySJaBhi8RWZbo+Ap8CMqkT5UiSpU2HV16BAjJckfhdEG44GJsgSLb8r87blLcnXEy0mpnd2bfm5l9IjUHJJlPAk68mlZiee5qHGs0NqnXTwyOiaI9SUObTlvqds+5uGgbJC4DUY5gp6dVfP+L+X5TZi6lEsQxhGHIzc0Hu739rsFgJkg8ILFGY9MODr6ys9PU4yMGSMIACgUUBO8w+8x0+sxg8ANYOMDZ0dEJ29sNskdIICHnEGCzGba19Va7u2cEQdXAOQM0mRwrilyejHOYhGX78t73961UOgQ8D8DieE9xnJaXJf6/TIJicQOpYrDmZQMd5ixaZQHMuVcfFopjLJsoms9bJElajoRyFudQdjbn0NNTj/E4FCROkNDtnvPwELK+vuxLKwBIaDTCOp0r6/fvgEUB4OP9/W8rFv+oXH5PpVKUWfolOchoBNfXLV1efmI+/yWYKpcY5fIb6vWmarUzarV9S5INvbws6Pd7dDpX1m5/02Ty0+DZQbyUnKX9egRB1UqlQ0kV4hjG45B+/86iqAcMler0X62uCNwzWFsR+CIT9lLsfwFyZMUjvdOb3QAAAABJRU5ErkJggg==") no-repeat left center; }
+	.dasm .dasm-line.-pointer.-break-point > .mnemonics { background: transparent url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAB3RJTUUH5wsCDQM1bwp8swAAAitJREFUKM9Nkj9oU2EUxX/3e++lTVILbWoM0rRNURCcKi5VQbBSKE5uCm4F0clF1KEQiji0uDgUl3YSxEVEutvWLLFDHWqKgq0tNWkMbZAk5N/78j6H/DEH7nLvPRfOuQeasGnjUzzggTJd1Zqo7pKupmemp4eW7l9entmtDsR+lQdFpGAqlaQcHLxnbW3TgNe64tkd0uzsGNHoUn9PYGbhUk2enz1PuO5DtL7C6OgdLCt+vLX1zuTzZQEswJSmpsLO5OQysdjMtsrLXKBOJlDhet7gdwVCoVP099/sKRS21eHhz3kwClC9ExO3iUSmTTYLYgDhrdXg2WiJnF9jqlVMOBywxsefMDIyZmiKR5XLt8R1lSgFRsA0ySuOZn64QC7ooSwLotELOhi8CNhNrY1GDK0REZCWX2JA4LWjmRv+y7HfA8fpF6XCBnxtqwsohekmtiECSPMo1C2tTfsNSK2WxPMQpQDTWQbhoWvzIhti0PUhJydZSqWMgKcE0Pv7H0inM/j9TZIxAMxqm/ifEGdqPqRYxKRSn00ut7cD2gY8e309aRwnjuO8IhIIIBXuasXC0WkGahaUiphEIimbmytF181lwLMAdRVkvFjcaeTz375MDN6I2Hbv4g9Lho5KdbW7myaRWG1sbLyslsvfg5A/B7oTOdPK7IPVp4v3Uunf1958LaA1lEoZcrk947pZoCDgCXgdg9p49PFxnwGfB30e9BkIpMBn/gccgH8BS+jjLMdqIQAAAABJRU5ErkJggg==") no-repeat left center; }
+	.dasm .dasm-line.-cursor { background-color: #dfdfdf; }
+	.dasm .dasm-line.-cursor > .addr { background-color: #7f7f7f; }
+	.-focused .dasm .dasm-line.-cursor { background-color: #aaf7ff; }
 
-		border: 1px solid #444444;
-		border-top: none;
-		box-sizing: border-box;
-		-moz-box-sizing: border-box;
-		-webkit-box-sizing: border-box;
-	}
+	.watch { overflow-x: auto; }
+	.watch .watch-list { border: 0; border-collapse: collapse; }
+	.watch .watch-line { white-space: nowrap; cursor: default; }
+	.watch .watch-line > * { padding: 0.05em 0.5em; }
+	.watch .watch-line > .formula { background-color: #444444; color: #ffffff; width: 80px; text-align: right; }
+	.watch .watch-line > .addr { background-color: #444444; color: #ffffff; }
+	.watch .watch-line > .format { font-style: italic; }
+	.watch .watch-line > .data { white-space: nowrap; padding-left: 0; padding-right: 0; }
+	.watch .watch-line > .data > .mem-value { padding: 0 0.25em; margin: 0; }
+	.watch .watch-line > .data > .mem-value.-modified { background-color: #ffcccc; }
+	.watch .watch-line > .symbols { }
+	.watch .watch-line.-cursor > * { background-color: #dfdfdf; }
+	.watch .watch-line.-cursor > .formula,
+	.watch .watch-line.-cursor > .addr { background-color: #7f7f7f; }
+	.-focused .watch .watch-line.-cursor > * { background-color: #aaf7ff; }
+	.-focused .watch .watch-line.-cursor > .formula,
+	.-focused .watch .watch-line.-cursor > .addr { background-color: #7f7f7f; }
 
-	.zxdebug-trace .debug-toolbar {
-		border: none;
-		border-bottom: 1px solid #444444;
-	}
+	.dump { cursor: default; }
+	.dump .dump-data { border: 0; border-collapse: collapse; }
+	.dump .dump-row > * { padding: 0.05em 0.5em; }
+	.dump .dump-row > .addr { background-color: #444444; color: #ffffff; }
+	.dump .dump-row > .data { white-space: nowrap; padding-left: 0; padding-right: 0; }
+	.dump .dump-row > .data > .mem-value { padding: 0 0.25em; margin: 0; }
+	.dump .dump-row > .data > .mem-value.-modified { background-color: #ffcccc; }
+	.dump .dump-row > .symbols { }
 
-	.zxdebug-trace .dasm-line {
-		padding: 0px 5px;
-	}
-
-	.zxdebug-trace .dasm-line-active {
-		padding: 0px 5px;
-		background-color: #444444;
-		color: #ffffff;
-	}
-
-	.zxdebug-trace .addr {
-		width: 50px;
-		display: inline-block;
-	}
-
-	.zxdebug-trace .bytes {
-		width: 80px;
-		display: inline-block;
-	}
-
-	.zxdebug-memory {
-		display: inline-block;
-		padding: 0px 0px;
-		width: 34%;
-		vertical-align: top;
-
-		font-family: Courier New, monospace; 
-		font-size: 14px;
-
-		border: 1px solid #444444;
-		border-left: none;
-		border-top: none;
-		box-sizing: border-box;
-		-moz-box-sizing: border-box;
-		-webkit-box-sizing: border-box;
-
-		overflow-x: auto;
-	}
-
-	.zxdebug-memory .debug-toolbar {
-		border: none;
-		border-bottom: 1px solid #444444;
-	}
-
-	.zxdebug-memory .mem-line {
-		padding: 0px 5px;
-		white-space: nowrap;
-	}
-
-	.zxdebug-memory .addr {
-		width: 50px;
-		display: inline-block;
-	}
-
-	.zxdebug-watch {
-		display: inline-block;
-		padding: 0px 0px;
-		width: 33%;
-		vertical-align: top;
-		font-family: Courier New, monospace; 
-		font-size: 14px;
-
-		border: 1px solid #444444;
-		border-left: none;
-		border-top: none;
-		box-sizing: border-box;
-		-moz-box-sizing: border-box;
-		-webkit-box-sizing: border-box;
-	}
-
-	.zxdebug-watch .debug-toolbar {
-		border: none;
-		border-bottom: 1px solid #444444;
-	}
 </style>
 
-<template id="toolbar">
-	<div class="debug-toolbar">
-		<input id="zxdebug_cb_hex" type="checkbox" class="debug-command" data-command="toggle-hex" checked /><label for="zxdebug_cb_hex">hex</label>
-		<input id="zxdebug_cb_enable_hotkeys" type="checkbox" class="debug-command" data-command="enable-hotkeys" /><label for="zxdebug_cb_enable_hotkeys">enable hotkeys</label>
-	</div>
-</template>
-
-<template id="registers">
-	<div class="zxdebug-registers">
-		<table border="1" style="border-collapse: collapse;" cellpadding="2" width="100%">
-			<tr>
-				<th colspan="2">AF</th>
-				<th colspan="2">BC</th>
-				<th colspan="2">DE</th>
-				<th colspan="2">HL</th>
-				<th colspan="2">IX</th>
-				<th colspan="2">IY</th>
-				<th colspan="2">PC</th>
-				<th colspan="2">SP</th>
-				<th colspan="2">AF'</th>
-				<th colspan="2">BC'</th>
-				<th colspan="2">DE'</th>
-				<th colspan="2">HL'</th>
-			</tr>
-			<tr>
-				<td id="zxdebug_r_af" colspan="2"></td>
-				<td id="zxdebug_r_bc" colspan="2"></td>
-				<td id="zxdebug_r_de" colspan="2"></td>
-				<td id="zxdebug_r_hl" colspan="2"></td>
-				<td id="zxdebug_r_ix" colspan="2"></td>
-				<td id="zxdebug_r_iy" colspan="2"></td>
-				<td id="zxdebug_r_pc" colspan="2"></td>
-				<td id="zxdebug_r_sp" colspan="2"></td>
-				<td id="zxdebug_r_af_" colspan="2"></td>
-				<td id="zxdebug_r_bc_" colspan="2"></td>
-				<td id="zxdebug_r_de_" colspan="2"></td>
-				<td id="zxdebug_r_hl_" colspan="2"></td>
-			</tr>
-			<tr>
-				<td id="zxdebug_r_a"></td>
-				<td id="zxdebug_r_f"></td>
-				<td id="zxdebug_r_b"></td>
-				<td id="zxdebug_r_c"></td>
-				<td id="zxdebug_r_d"></td>
-				<td id="zxdebug_r_e"></td>
-				<td id="zxdebug_r_h"></td>
-				<td id="zxdebug_r_l"></td>
-				<td rowspan="2" colspan="8">
-					<table width="100%">
+<template id="debugger">
+	<div class="debugger" data-bind="attr: { 'data-focus-context': CTX_DISASM }, commandDispatcher: commandDispatcher">
+		<div class="debugger-row">
+			<div class="debugger-block">
+				<div class="header">CPU</div>
+				<div class="regs" data-bind="with: registers">
+					<table class="registers-table">
 						<tr>
-							<td id="zxdebug_f_s" width="16%"></td>
-							<td id="zxdebug_f_z" width="16%"></td>
-							<td id="zxdebug_f_h" width="16%"></td>
-							<td id="zxdebug_f_p" width="16%"></td>
-							<td id="zxdebug_f_n" width="16%"></td>
-							<td id="zxdebug_f_c" width="16%"></td>
+							<th>PC</th><td data-bind='hex16: pc, event: { dblclick: function () { pc.editing(true); } }'></td>
+							<td class="-no-padding" rowspan="2" colspan="2">
+								<table class="registers-inner-table">
+									<tr>
+										<th>R</th><td data-bind='hex8: r, event: { dblclick: function () { r.editing(true); } }'></td>
+										<th>IFF</th><td data-bind='bit2: iff, event: { dblclick: function () { iff.editing(true); } }'></td>
+									</tr>
+									<tr>
+										<th>I</th><td data-bind="hex8: i, event: { dblclick: function () { i.editing(true); } }"></td>
+										<th>IMF</th><td data-bind='bit2: imf, event: { dblclick: function () { imf.editing(true); } }'></td>
+									</tr>
+								</table>
+							</td>				
 						</tr>
 						<tr>
-							<th>S</th>
-							<th>Z</th>
-							<th>H</th>
-							<th>P/V</th>
-							<th>N</th>
-							<th>C</th>
-						</tr>							
-					</table>						
-				</td>
-				<td colspan="2"></td>
-				<td id="zxdebug_iff" colspan="2"></td>
-				<td id="zxdebug_imf" colspan="2"></td>
-				<td id="zxdebug_r_i"></td>
-				<td id="zxdebug_r_r"></td>
-			</tr>
-			<tr>
-				<th width="4.16%">A</th>
-				<th width="4.16%">F</th>
-				<th width="4.16%">B</th>
-				<th width="4.16%">C</th>
-				<th width="4.16%">D</th>
-				<th width="4.16%">E</th>
-				<th width="4.16%">H</th>
-				<th width="4.16%">L</th>
-				<th width="8.32%" colspan="2"></th>
-				<th width="8.32%" colspan="2">IFF</th>
-				<th width="8.32%" colspan="2">IMF</th>
-				<th width="4.16%">I</th>
-				<th width="4.16%">R</th>
-			</tr>
-		</table>
-	</div>
-</template>
-
-<template id="trace-block">
-	<div class="zxdebug-trace">
-		<div class="debug-toolbar">
-			<button class="debug-command" data-command="step-in">Si</button>
-			<button class="debug-command" data-command="step-out">So</button>
-			<button class="debug-command" data-command="step-to">St</button>
-			<button class="debug-command" data-command="toggle-bp">BP</button>
-			<button class="debug-command" data-command="run">Run</button>
+							<th>SP</th><td data-bind='hex16: sp, event: { dblclick: function () { sp.editing(true); } }'></td>
+						</tr>
+						<tr>
+							<th>IX</th><td data-bind='hex16: ix, event: { dblclick: function () { ix.editing(true); } }'></td>
+							<th>HL'</th><td data-bind='hex16: hl_, event: { dblclick: function () { hl_.editing(true); } }'></td>
+						</tr>
+						<tr>
+							<th>IY</th><td data-bind='hex16: iy, event: { dblclick: function () { iy.editing(true); } }'></td>
+							<th>DE'</th><td data-bind='hex16: de_, event: { dblclick: function () { de_.editing(true); } }'></td>
+						</tr>
+						<tr>
+							<th>HL</th><td data-bind='hex16: hl, event: { dblclick: function () { hl.editing(true); } }'></td>
+							<th>BC'</th><td data-bind='hex16: bc_, event: { dblclick: function () { bc_.editing(true); } }'></td>
+						</tr>
+						<tr>
+							<th>DE</th><td data-bind='hex16: de, event: { dblclick: function () { de.editing(true); } }'></td>
+							<th>AF'</th><td data-bind='hex16: af_, event: { dblclick: function () { af_.editing(true); } }'></td>
+						</tr>
+						<tr>
+							<th>BC</th><td data-bind='hex16: bc, event: { dblclick: function () { bc.editing(true); } }'></td>
+							<td class="-no-padding" rowspan="2" colspan="2">
+								<table class="registers-inner-table">
+									<tr>
+										<th>S</th>
+										<th>P</th>
+										<th>Z</th>
+										<th>N</th>
+										<th>H</th>
+										<th>C</th>
+									</tr>
+									<tr>
+										<td data-bind='bit1: fs, event: { dblclick: function () { fs.editing(true); } }'></td>
+										<td data-bind='bit1: fp, event: { dblclick: function () { fp.editing(true); } }'></td>
+										<td data-bind='bit1: fz, event: { dblclick: function () { fz.editing(true); } }'></td>
+										<td data-bind='bit1: fn, event: { dblclick: function () { fn.editing(true); } }'></td>
+										<td data-bind='bit1: fh, event: { dblclick: function () { fh.editing(true); } }'></td>
+										<td data-bind='bit1: fc, event: { dblclick: function () { fc.editing(true); } }'></td>
+									</tr>
+								</table>
+							</td>
+						</tr>
+						<tr>
+							<th>AF</th><td data-bind='hex16: af, event: { dblclick: function () { af.editing(true); } }'></td>
+						</tr>
+					</table>
+				</div>
+				<div class="toolbar">
+					<button class="toolbar-button -button_load" title="Load state" data-bind="command: CMD_STATE_LOAD"></button><!--
+				 --><button class="toolbar-button -button_save" title="Save state" data-bind="command: CMD_STATE_SAVE"></button><!--
+				 --><span class="toolbar-separator"></span><!--
+				 --><button class="toolbar-button -button_bdi-start-logging" title="BDI Start Logging" data-bind="command: CMD_BDI_START_LOGGING"></button><!--
+				 --><button class="toolbar-button -button_bdi-stop-logging" title="BDI Stop Logging" data-bind="command: CMD_BDI_STOP_LOGGING"></button>
+				</div>
+			</div><!--
+		 --><div class="debugger-block">
+				<div class="header">MISC</div>
+				<div class="ports">
+					<table class="port-list">
+						<tr class="port-item">
+							<th>7FFD</th>
+							<td data-bind="hex8: ports.port_7FFD, event: { dblclick: function () { ports.port_7FFD.editing(true); }}"></td>
+						</tr>
+						<tr class="port-item">
+							<th>FE</th>
+							<td data-bind="hex8: ports.port_FE, event: { dblclick: function () { ports.port_FE.editing(true); }}"></td>
+						</tr>
+						<tr class="port-item">
+							<th>CMD/STS</th>
+							<td>
+								<span data-bind="hex8: betaDiskState().vg93.command"></span>/<span data-bind="hex8: betaDiskState().vg93.status"></span>
+							</td>
+						</tr>
+						<tr class="port-item">
+							<th>TR/SC</th>
+							<td>
+								<span data-bind="hex8: betaDiskState().vg93.track"></span>/<span data-bind="hex8: betaDiskState().vg93.sector"></span>
+							</td>
+						</tr>
+						<tr class="port-item">
+							<th>DATA</th>
+							<td data-bind="hex8: betaDiskState().vg93.data"></td>
+						</tr>
+						<tr class="filler"><td colspan="2">&nbsp;</td></tr>
+						<tr class="port-item">
+							<th>MS</th>
+							<td data-bind="text: ms().toFixed(3)"></td>
+						</tr>
+						<tr class="port-item">
+							<th>TSTATES</th>
+							<td data-bind="text: tstates"></td>
+						</tr>
+					</table>
+				</div>
+				<div class="toolbar">
+				</div>				
+		 	</div><!--
+		 --><div class="debugger-block" data-bind="attr: { 'data-focus-context': CTX_DUMP }, css: { '-focused': commandDispatcher.context() == CTX_DUMP }, with: memory">
+				<div class="header">DUMP: <span data-bind="editable: dump.formula, event: { dblclick: function () { dump.formula.editing(true); } }"></span></div>
+				<div class="dump">
+					<table class="dump-data" data-bind="foreach: dump">
+						<tr class="dump-row">
+						    <td class="addr" data-bind="text: DebugUtils.wordToString(addr())"></td><!--
+						 --><td class="data" data-bind="foreach: data"><span class="mem-value" data-bind="hex8: $rawData, event: { dblclick: function () { $rawData.editing(true); } }"></span></td><!--
+						 --><td class="symbols" data-bind="symbols: data"></td>
+						</tr>
+					</table>
+				</div>
+				<div class="toolbar">
+					<button class="toolbar-button -button_prev-page" title="Previous page (PageUp)" data-bind="command: CMD_DUMP_PAGE_UP"></button><!--
+				 --><button class="toolbar-button -button_prev" title="Previous (Left)" data-bind="command: CMD_DUMP_PREV"></button><!--
+				 --><button class="toolbar-button -button_next" title="Next (Right)" data-bind="command: CMD_DUMP_NEXT"></button><!--
+				 --><button class="toolbar-button -button_next-page" title="Next page (PageDown)" data-bind="command: CMD_DUMP_PAGE_DOWN"></button>
+				</div>
+			</div>
 		</div>
-		<div id="zxdebug_dasm"></div>
-	</div>
-</template>
-
-<template id="memory-block">
-	<div class="zxdebug-memory">
-		<div class="debug-toolbar">
-			<button class="debug-command" data-command="mem-go-to">G</button>
-			<button class="debug-command" data-command="mem-add-8h">+8</button>
-			<button class="debug-command" data-command="mem-sub-8h">-8</button>
-			<button class="debug-command" data-command="mem-add-80h">+80h</button>
-			<button class="debug-command" data-command="mem-sub-80h">-80h</button>
-			<input type="checkbox" id="zxdebug_cb_words" class="debug-command" data-command="toggle-words" /><label for="zxdebug_cb_words">words</label>		
+		<div class="debugger-row">
+			<div class="debugger-block" data-bind="attr: { 'data-focus-context': CTX_DISASM }, css: { '-focused': commandDispatcher.context() == CTX_DISASM }">
+				<div class="header">INSTRUCTIONS</div>
+				<div class="dasm" data-bind="with: disasm">
+					<div class="dasm-block" data-bind="foreach: visibleRecords">
+						<div class="dasm-line" data-bind="css: { '-cursor': $parent.cursorIndex() == ($parent.visibleIndex() + $index()), '-pointer': $parent.pointerIndex() == ($parent.visibleIndex() + $index()), '-break-point': $root.breakPoints.orderedSearch(addr) >= 0 }">
+							<span class="addr" data-bind="text: DebugUtils.wordToString(addr)"></span><!--
+						 --><span class="bytes" data-bind="text: DebugUtils.bytesToString(bytes)"></span><!--
+						 --><span class="mnemonics" data-bind="text: $data.get_fullMnemonics()"></span>
+						</div>
+					</div>
+					<div class="toolbar" data-bind="with: $root">
+						<button class="toolbar-button" title="Run/Break (R)" data-bind="command: CMD_RUN_BREAK, css: { '-button_break': running(), '-button_run': !running() }"></button><!--
+					 --><span class="toolbar-separator"></span><!--
+					 --><button class="toolbar-button -button_step-over" title="Step over (O)" data-bind="command: CMD_STEP_OVER"></button><!--
+					 --><button class="toolbar-button -button_step-in" title="Step in (P)" data-bind="command: CMD_STEP_IN"></button><!--
+					 --><button class="toolbar-button -button_run-until-cursor" title="Run until cursor (I)" data-bind="command: CMD_RUN_UNTIL_CURSOR"></button><!--
+					 --><button class="toolbar-button -button_run-until-address" title="Run until address (U)" data-bind="command: CMD_RUN_UNTIL_ADDRESS"></button><!--
+					 --><span class="toolbar-separator"></span><!--
+					 --><button class="toolbar-button -button_toggle-bp-at-cursor" title="Toggle break point at cursor (K)" data-bind="command: CMD_TOGGLE_BREAK_POINT_AT_CURSOR"></button><!--
+					 --><button class="toolbar-button -button_toggle-bp-at-address" title="Toggle break point at address (J)" data-bind="command: CMD_TOGGLE_BREAK_POINT_AT_ADDRESS"></button>
+					</div>
+				</div>
+			</div><!--
+		 --><div class="debugger-block" data-bind="attr: { 'data-focus-context': CTX_WATCH }, css: { '-focused': commandDispatcher.context() == CTX_WATCH }">
+				<div class="header">WATCH</div>
+				<div class="watch" data-bind="with: memory">
+					<table class="watch-list" data-bind="foreach: watchList">
+						<tr class="watch-line" data-bind="css: { '-cursor': $parent.cursorIndex() == $index() }">
+							<td class="formula" data-bind="editable: formula, event: { dblclick: function () { formula.editing(true); } }"></td><!--
+						 --><td class="addr" data-bind="text: DebugUtils.wordToString(addr())"></td><!--
+						 --><td class="format" data-bind="text: wordFormat() ? 'w' : 'b', click: function () { wordFormat(!wordFormat()); }"></td><!--
+						 --><td class="data">
+							<!-- ko if: wordFormat --><!-- ko foreach: data --><span class="mem-value" data-bind="hex16: $rawData, event: { dblclick: function () { $rawData.editing(true); } }"></span><!-- /ko --><!-- /ko -->
+							<!-- ko ifnot: wordFormat --><!-- ko foreach: data --><span class="mem-value" data-bind="hex8: $rawData, event: { dblclick: function () { $rawData.editing(true); } }"></span><!-- /ko --><!-- /ko -->
+							</td><!--
+						 --><td class="symbols" data-bind="symbols: bytes"></td>
+						</tr>
+					</table>
+					<div class="toolbar">
+						<button class="toolbar-button -button_prev-page" title="Previous page (PageUp)" data-bind="command: CMD_WATCH_PAGE_UP"></button><!--
+					 --><button class="toolbar-button -button_prev" title="Previous (Left)" data-bind="command: CMD_WATCH_PREV"></button><!--
+					 --><button class="toolbar-button -button_next" title="Next (Right)" data-bind="command: CMD_WATCH_NEXT"></button><!--
+					 --><button class="toolbar-button -button_next-page" title="Next page (PageDown)" data-bind="command: CMD_WATCH_PAGE_DOWN"></button>
+					</div>
+				</div>
+			</div>
 		</div>
-		<div id="zxdebug_memory"></div>
-	</div>
-</template>
-
-<template id="watch-block">
-	<div class="zxdebug-watch">
-		<div class="debug-toolbar">
-			<button class="debug-command" data-command="add-watch">Add</button>
-			<button class="debug-command" data-command="remove-watches">Remove</button>
-		</div>
-		<div id="zxdebug_watch"></div>
-	</div>
-</template>
-
-<template id="watch-item-block">
-	<div class="zxdebug-watch-item">
-		<label>
-			<input type="checkbox" class="watch-item-selected" />
-			<span class="watch-item-address"></span>
-			<span class="watch-item-name"></span>
-			<span class="watch-item-value"></span>
-		<label>
-	</div>
-</template>
-
-<template id="watch-add-dialog">
-	<div class="zxdebug-watch-add-dialog">
-		<table>
-			<tbody>
-				<tr>
-					<td>Name:</td>
-					<td><input type="text" class="watch-name"</td>
-				</tr>
-				<tr>
-					<td>Address:</td>
-					<td><input type="text" class="watch-address"></td>
-				</tr>
-				<tr>
-					<td>Length:</td>
-					<td>
-						<select class="watch-length">
-							<option value="byte">byte</option>
-							<option value="word">word</option>
-						</select>
-					</td>
-				</tr>
-			</tbody>
-		</table>
 	</div>
 </template>
 
 <script type="text/javascript">
-	var debugCommandManager = new (function() {
-		var self = this;
 
-		var availableCommands = []; // [ "commandName1", "commandName2", ... ]
-		var hotKeyCommands = {}; // { keyCode: "commandName", ... }
-		var commandHandlers = {}; // { "command": [ function(){}, function(){}, ... ], ... }
-		var enableHotkeys = false;
 
-		$(document).on('keydown', function ( event ) {
-			if ( enableHotkeys && hotKeyCommands[event.which] !== undefined ) {
-				self.doCommand(hotKeyCommands[event.which]);
-			}
-		});
+	function ZX_Debug(container) {
+		this.settings = ZXContext.settings;
+		this.bus = ZXContext.hw.bus;
+		this.cpu = ZXContext.hw.cpu;
+		this.display = ZXContext.hw.display;
+		this.clock = ZXContext.hw.clock;
+		this.betadisk = ZXContext.hw.betadisk;
 
-		$(document).on('click', function ( event ) {
-			$target = $(event.target);
-			if ( $target.hasClass('debug-command') ) {
-				var command = $target.attr('data-command');
-				if ( command ) {
-					self.doCommand(command);
-				}
-			}
-		});
+		this.running = ko.observable(false);
+		this.breakPoints = ko.observableArray([]).extend({ ordered: true });
+		this.breakRequest = ko.observable(false);
+		this.state = ko.observable();
+		this.ms = ko.observable(0);
+		this.tstates = ko.observable(0);
+		this.betaDiskState = ko.observable();
 
-		this.enableHotkeys = function (value) {
-			if ( value !== undefined ) {
-				enableHotkeys = !!value;
+		$("<?=debugger?>").appendTo(container);
+		this.disasm = new Dasm(this);
+		this.registers = new DebugRegisters(this, function () { this.update(false); }.bind(this));
+		this.ports = new DebugPorts(this, function () { this.update(false); }.bind(this));
+		this.memory = new DebugMemory(this, function () { this.update(false); }.bind(this));
+
+		this.commandDispatcher = new DebugCommandDispatcher(container);
+		this.commandDispatcher.registerHandler([CMD_DASM_CURSOR_UP], this.disasm.cursorUp.bind(this.disasm));
+		this.commandDispatcher.registerHandler([CMD_DASM_CURSOR_DOWN], this.disasm.cursorDown.bind(this.disasm));
+		this.commandDispatcher.registerHandler([CMD_DASM_CURSOR_PAGE_UP], this.disasm.cursorPageUp.bind(this.disasm));
+		this.commandDispatcher.registerHandler([CMD_DASM_CURSOR_PAGE_DOWN], this.disasm.cursorPageDown.bind(this.disasm));
+		this.commandDispatcher.registerHandler([CMD_STEP_OVER], function () { this.stepOver();}.bind(this));
+		this.commandDispatcher.registerHandler([CMD_STEP_IN], function () { this.stepIn(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_RUN_UNTIL_CURSOR], function () { this.runUntilCursor(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_RUN_UNTIL_ADDRESS], function () { this.runUntilAddress(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_RUN_BREAK], function () { this.toggleRunning(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_TOGGLE_BREAK_POINT_AT_CURSOR], function () { this.toggleBpAtCursor(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_TOGGLE_BREAK_POINT_AT_ADDRESS], function () { this.toggleBpAtAddress(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_WATCH_CURSOR_UP], function () { this.memory.cursorUp(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_WATCH_CURSOR_DOWN], function () { this.memory.cursorDown(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_WATCH_EDIT_FORMULA], function () { this.memory.editFormula(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_WATCH_PAGE_UP], function () { this.memory.watchPageUp(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_WATCH_PAGE_DOWN], function () { this.memory.watchPageDown(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_WATCH_PREV], function () { this.memory.watchPrev(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_WATCH_NEXT], function () { this.memory.watchNext(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_DUMP_PAGE_UP], function () { this.memory.dumpPageUp(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_DUMP_PAGE_DOWN], function () { this.memory.dumpPageDown(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_DUMP_PREV], function () { this.memory.dumpPrev(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_DUMP_NEXT], function () { this.memory.dumpNext(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_STATE_LOAD], function () { this.load(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_STATE_SAVE], function () { this.save(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_BDI_START_LOGGING], function () { this.bdiStartLogging(); }.bind(this));
+		this.commandDispatcher.registerHandler([CMD_BDI_STOP_LOGGING], function () { this.bdiStopLogging(); }.bind(this));
+		this.commandDispatcher.assignHotKey(0x26, [CTX_DISASM], CMD_DASM_CURSOR_UP);
+		this.commandDispatcher.assignHotKey(0x28, [CTX_DISASM], CMD_DASM_CURSOR_DOWN);
+		this.commandDispatcher.assignHotKey(0x21, [CTX_DISASM], CMD_DASM_CURSOR_PAGE_UP);
+		this.commandDispatcher.assignHotKey(0x22, [CTX_DISASM], CMD_DASM_CURSOR_PAGE_DOWN);
+		this.commandDispatcher.assignHotKey(0x4F, [CTX_DISASM, CTX_WATCH, CTX_DUMP], CMD_STEP_OVER);
+		this.commandDispatcher.assignHotKey(0x50, [CTX_DISASM, CTX_WATCH, CTX_DUMP], CMD_STEP_IN);
+		this.commandDispatcher.assignHotKey(0x49, [CTX_DISASM, CTX_WATCH, CTX_DUMP], CMD_RUN_UNTIL_CURSOR);
+		this.commandDispatcher.assignHotKey(0x55, [CTX_DISASM, CTX_WATCH, CTX_DUMP], CMD_RUN_UNTIL_ADDRESS);
+		this.commandDispatcher.assignHotKey(0x52, [CTX_DISASM, CTX_WATCH, CTX_DUMP], CMD_RUN_BREAK);
+		this.commandDispatcher.assignHotKey(0x4B, [CTX_DISASM, CTX_WATCH, CTX_DUMP], CMD_TOGGLE_BREAK_POINT_AT_CURSOR);
+		this.commandDispatcher.assignHotKey(0x4A, [CTX_DISASM, CTX_WATCH, CTX_DUMP], CMD_TOGGLE_BREAK_POINT_AT_ADDRESS);
+		this.commandDispatcher.assignHotKey(0x26, [CTX_WATCH], CMD_WATCH_CURSOR_UP);
+		this.commandDispatcher.assignHotKey(0x28, [CTX_WATCH], CMD_WATCH_CURSOR_DOWN);
+		this.commandDispatcher.assignHotKey(0x0D, [CTX_WATCH], CMD_WATCH_EDIT_FORMULA);
+		this.commandDispatcher.assignHotKey(0x21, [CTX_WATCH], CMD_WATCH_PAGE_UP);
+		this.commandDispatcher.assignHotKey(0x22, [CTX_WATCH], CMD_WATCH_PAGE_DOWN);
+		this.commandDispatcher.assignHotKey(0x25, [CTX_WATCH], CMD_WATCH_PREV);
+		this.commandDispatcher.assignHotKey(0x27, [CTX_WATCH], CMD_WATCH_NEXT);
+		this.commandDispatcher.assignHotKey(0x21, [CTX_DUMP], CMD_DUMP_PAGE_UP);
+		this.commandDispatcher.assignHotKey(0x22, [CTX_DUMP], CMD_DUMP_PAGE_DOWN);
+		this.commandDispatcher.assignHotKey(0x25, [CTX_DUMP], CMD_DUMP_PREV);
+		this.commandDispatcher.assignHotKey(0x27, [CTX_DUMP], CMD_DUMP_NEXT);
+
+		this.update = function (calcModification) {
+			this.state(this.cpu.get_state());
+			this.ms(this.clock.get_ms());
+			this.tstates(this.clock.get_tstates());
+			this.betaDiskState(this.betadisk.get_state());
+			this.disasm.update();
+			this.registers.update(calcModification);
+			this.ports.update(calcModification);
+			this.memory.update(calcModification);
+		}
+
+		this.commandDispatcher.enable([
+			CMD_DASM_CURSOR_UP, CMD_DASM_CURSOR_DOWN, CMD_DASM_CURSOR_PAGE_UP, CMD_DASM_CURSOR_PAGE_DOWN,
+			CMD_STEP_OVER, CMD_STEP_IN, CMD_RUN_UNTIL_CURSOR, CMD_RUN_UNTIL_ADDRESS, CMD_RUN_BREAK,
+			CMD_TOGGLE_BREAK_POINT_AT_CURSOR, CMD_TOGGLE_BREAK_POINT_AT_ADDRESS, CMD_WATCH_CURSOR_UP,
+			CMD_WATCH_CURSOR_DOWN, CMD_WATCH_EDIT_FORMULA, CMD_WATCH_PAGE_UP, CMD_WATCH_PAGE_DOWN,
+			CMD_DUMP_PAGE_UP, CMD_DUMP_PAGE_DOWN, CMD_WATCH_PREV, CMD_WATCH_NEXT, CMD_DUMP_PREV, CMD_DUMP_NEXT,
+			CMD_STATE_LOAD, CMD_STATE_SAVE, CMD_BDI_START_LOGGING, CMD_BDI_STOP_LOGGING
+		]);
+
+		this.update(true);
+		ko.applyBindings(this, container);
+
+		this.toggleRunning = function () {
+			if ( this.running() ) {
+				this.breakRequest(true);
 			}
 			else {
-				return enableHotkeys;
-			}
-		};
-
-		this.onCommand = function ( command, handler ) {
-			commandHandlers[command] = commandHandlers[command] || [];
-			commandHandlers[command].push(handler);
-		}
-
-		this.doCommand = function ( command ) {
-			if ( $.grep(availableCommands, function ( cmd ) { return cmd === command; }).length > 0 ) {
-				var handlers = commandHandlers[command];
-				if ( handlers ) {
-					$.each(handlers, function ( i, handler ) {
-						handler();
-					});
-				}
+				this.run([]);
 			}
 		}
 
-		this.enableCommand = function ( /* command1, command2, ... */ ) {
-			for ( var argIndex = 0; argIndex < arguments.length; argIndex++ ) {
-				var command = arguments[argIndex];
-
-				if ( $.grep(availableCommands, function ( cmd ) { return cmd === command; }).length == 0 ) {
-					availableCommands.push(command);
-
-					$('.debug-command[data-command="' + command + '"]')
-						.prop('disabled', false);
-				}
-			}
-		}
-
-		this.disableCommand = function ( /* command1, command2, ... */ ) {
-			for ( var argIndex = 0; argIndex < arguments.length; argIndex++ ) {
-				var command = arguments[argIndex];			
-	
-				if ( $.grep(availableCommands, function ( cmd ) { return cmd === command; }).length > 0 ) {
-					for ( var i = 0; i < availableCommands.length; ) {
-						if ( availableCommands[i] === command ) {
-							availableCommands.splice(i, 1);
-						}
-						else {
-							i++;
-						}
-					}
-
-					$('.debug-command[data-command="' + command + '"]')
-						.prop('disabled', true);
-				}
-			}
-		}
-
-		this.attachHotKey = function ( keyCode, command ) {
-			hotKeyCommands[keyCode] = command;
-		}
-	})();
-
-	var zxdebug = new (function() {
-		// public
-		this.debug = debug;
-
-		// private
-		var self = this;
-		var hex = true;
-		var break_points = [];
-		var running = false;
-		var break_request = false;
-		var settings = null;
-		var bus = null;
-		var cpu = null;
-		var display = null;
-
-		function debug( container, _cpu, _bus, _display, _settings ) {
-			settings = _settings;
-			cpu = _cpu;
-			bus = _bus;
-			display = _display;
-
-			$("<?=toolbar?>")
-				.appendTo(container);
-
-			self.registers = new RegistersBlock(container, cpu);
-			self.disasm = new DisasmBlock(container, cpu, bus);
-			self.memory = new MemoryBlock(container, bus);
-			self.watches = new WatchBlock(container, bus);
-			var eClear = document.createElement('div');
-			eClear.style.clear = "both";
-			container.appendChild(eClear);
-
-			self.registers.update(true);
-			self.disasm.update();
-			self.memory.update();
-			self.watches.update();
-		}
-
-		var cmds = debugCommandManager;
-		cmds.attachHotKey(0x49, 'step-in');
-		cmds.attachHotKey(0x4f, 'step-out');
-		cmds.attachHotKey(0x54, 'step-to');
-		cmds.attachHotKey(0x42, 'toggle-bp');
-		cmds.attachHotKey(0x52, 'run');
-		cmds.attachHotKey(0x4d, 'mem-go-to');
-		cmds.attachHotKey(0x2b, 'mem-add-8h');
-		cmds.attachHotKey(0x6b, 'mem-add-8h');
-		cmds.attachHotKey(0x2d, 'mem-sub-8h');
-		cmds.attachHotKey(0x6d, 'mem-sub-8h');
-		cmds.attachHotKey(0x22, 'mem-add-80h');
-		cmds.attachHotKey(0x21, 'mem-sub-80h');
-		cmds.attachHotKey(0x48, 'toggle-hex');
-		cmds.attachHotKey(0x57, 'toggle-words');
-
-		cmds.onCommand('step-in', step_in);
-		cmds.onCommand('step-out', step_out);
-		cmds.onCommand('step-to', step_to);
-		cmds.onCommand('toggle-bp', toggle_break_point);
-		cmds.onCommand('run', run_break);
-		cmds.onCommand('mem-go-to', function() { self.memory.change_memory_address(); });
-		cmds.onCommand('mem-add-8h', function() { self.memory.shift_memory_address(8); });
-		cmds.onCommand('mem-sub-8h', function() { self.memory.shift_memory_address(-8); });
-		cmds.onCommand('mem-add-80h', function() { self.memory.shift_memory_address(0x80); });
-		cmds.onCommand('mem-sub-80h', function() { self.memory.shift_memory_address(-0x80); });
-		cmds.onCommand('toggle-hex', updateNumberFormat);
-		cmds.onCommand('toggle-words', function() { self.memory.display_words($('#zxdebug_cb_words').is(':checked')); });
-		cmds.onCommand('enable-hotkeys', function() { cmds.enableHotkeys($('#zxdebug_cb_enable_hotkeys').is(':checked')); });
-		cmds.onCommand('add-watch', function() { self.watches.addWatch(); });
-		cmds.onCommand('remove-watches', function () { self.watches.removeWatches(); });
-
-		cmds.enableCommand(
-			'toggle-hex',
-			'step-in', 
-			'step-out', 
-			'step-to', 
-			'toggle-bp', 
-			'run',
-			'mem-go-to',
-			'mem-add-8h',
-			'mem-sub-8h',
-			'mem-add-80h',
-			'mem-sub-80h',
-			'toggle-words',
-			'enable-hotkeys',
-			'add-watch',
-			'remove-watches');
-
-		function updateNumberFormat() {
-			hex = $('#zxdebug_cb_hex').is(':checked');
-			self.registers.update(false);
-			self.disasm.update();
-			self.memory.update();
-			self.watches.update();
-		}
-
-		function step_in() {
-			cmds.disableCommand(
-				'toggle-hex',
-				'step-in', 
-				'step-out', 
-				'step-to', 
-				'mem-go-to',
-				'mem-add-8h',
-				'mem-sub-8h',
-				'mem-add-80h',
-				'mem-sub-80h',
-				'toggle-words',
-				'add-watch',
-				'remove-watches');
-
-			var state = cpu.get_state();
-			var cmd = disasm_instruction(bus, state.pc);
+		this.stepIn = function() {
+			var cmd = DasmRecord.read(this.bus, this.state().pc);
 			if ( /^(JP|JR|DJNZ|CALL|RST)/.test(cmd.mn) ) {
 				// прыжки и вызовы могут передать управление по заданному адресу
-				if ( cmd.addr !== undefined ) {
-					run_to(cmd.next, cmd.addr);
+				if ( cmd.operands.addr !== undefined ) {
+					this.run([cmd.get_next(), cmd.operands.addr]);
 				}
 				else {
 					var addr;
 					if ( /HL/.test(cmd.mn) ) {
-						addr = state.hl;
+						addr = this.state().hl;
 					}
 					else if ( /IX/.test(cmd.mn) ) {
-						addr = state.ix;
+						addr = this.state().ix;
 					}
 					else if ( /IY/.test(cmd.mn) ) {
-						addr = state.iy;
+						addr = this.state().iy;
 					}
 					else {
 						throw Error('Unknown control command');
 					}
 
-					run_to(cmd.next, addr);
+					this.run([cmd.get_next(), addr]);
 				}
 			}
 			else if ( /^RET/.test(cmd.mn) ) {
-				// команды RET... может передать управление как следующей команде, так и по адресу в стеке
-                var addr = read_memory_word(bus, state.sp);
-				run_to(cmd.next, addr);
+				// команды RET... могут передать управление как следующей команде, так и по адресу в стеке
+                var addr = this.bus.mem_read(this.state().sp) | (this.bus.mem_read((this.state().sp + 1) & 0xFFFF) << 8);
+				this.run([cmd.get_next(), addr]);
 			}
 			else if ( /^(HALT|(LD|CP|IN|OT)[ID]R)/.test(cmd.mn) ) {
 				// блочные команды и команда HALT могут откинуть PC на начало команды
-				run_to(cmd.next, state.pc);
+				this.run([cmd.get_next(), this.state().pc]);
 			}
 			else {
-				run_to(cmd.next);
-			}			
+				this.run([cmd.get_next()]);
+			}
 		}
 
-		function step_out() {
-			cmds.disableCommand(
-				'toggle-hex',
-				'step-in', 
-				'step-out', 
-				'step-to', 
-				'mem-go-to',
-				'mem-add-8h',
-				'mem-sub-8h',
-				'mem-add-80h',
-				'mem-sub-80h',
-				'toggle-words',
-				'add-watch',
-				'remove-watches');
-
-			var state = cpu.get_state();
-			var cmd = disasm_instruction(bus, state.pc);
+		this.stepOver = function () {
+			var cmd = DasmRecord.read(this.bus, this.state().pc);
 			if ( /^(JP|JR|DJNZ)/.test(cmd.mn) ) {
-				if ( cmd.addr !== undefined ) {
-					run_to(cmd.next, cmd.addr);
+				if ( cmd.operands.addr !== undefined ) {
+					this.run([cmd.get_next(), cmd.operands.addr]);
 				}
 				else {
 					var addr;
-					if ( /HL/.test(cmd.mn) ) {
-						addr = state.hl;
-					}
-					else if ( /IX/.test(cmd.mn) ) {
-						addr = state.ix;
-					}
-					else if ( /IY/.test(cmd.mn) ) {
-						addr = state.iy;
-					}
-					else {
+					if ( /HL/.test(cmd.mn) )
+						addr = this.state().hl;
+					else if ( /IX/.test(cmd.mn) )
+						addr = this.state().ix;
+					else if ( /IY/.test(cmd.mn) )
+						addr = this.state().iy;
+					else
 						throw Error('Unknown control command');
-					}
 
-					run_to(cmd.next, addr);
+					this.run([cmd.get_next(), addr]);
 				}
 			}
 			else if ( /^RET/.test(cmd.mn) ) {
-                var addr = read_memory_word(bus, state.sp);
-				run_to(cmd.next, addr);
+                var addr = this.bus.mem_read(this.state().sp) | (this.bus.mem_read((this.state().sp + 1) & 0xFFFF) << 8);
+				this.run([cmd.get_next(), addr]);
 			}
 			else {
-				run_to(cmd.next);
+				this.run([cmd.get_next()]);
 			}
 		}
 
-		function step_to() {
-			var str_address = prompt('Введите адрес точки останова:', '');
-			if ( str_address != null ) {
-				str_address = str_address.replace(/^\s+|\s+$/g, '');
-				var radix = 10;
-				if (str_address.length && str_address.charAt(str_address.length - 1).toLowerCase() == 'h') {
-					radix = 16;
-				}
-				if (str_address.length >= 2 & str_address.charAt(0) == '0' && str_address.charAt(1).toLowerCase() == 'x') {
-					radix = 16;
-				}
-				var addr = parseInt(str_address, radix);
-				if (!isNaN(addr)) {
-					self.toolbar.disable();
-					run_to(addr);
-				}
+		this.runUntilCursor = function () {
+			var record = this.disasm.records()[this.disasm.cursorIndex()];
+			this.run([record.addr]);
+		}
+
+		this.runUntilAddress = function () {
+			var addrStr = prompt('Введите адрес назначения (HEX):', '');
+			if (!addrStr)
+				return;
+			var addr = parseInt(addrStr, 16);
+			if (isNaN(addr))
+				return;
+			this.run([addr]);
+		}
+
+		this.toggleBpAtCursor = function () {
+			var record = this.disasm.records()[this.disasm.cursorIndex()];
+			if (record) {
+				this.toggleBp(record.addr);
 			}
 		}
 
-		function run_break() {
-			if ( running ) {
-				break_request = true;
+		this.toggleBpAtAddress = function () {
+			var addrStr = prompt('Введите адрес назначения (HEX):', '');
+			if (!addrStr)
+				return;
+			var addr = parseInt(addrStr, 16);
+			if (isNaN(addr))
+				return;
+			this.toggleBp(addr);
+		}
+
+		this.toggleBp = function (address) {
+			var bpIndex = this.breakPoints.orderedSearch(address);
+			if (bpIndex < 0) {
+				this.breakPoints.orderedInsert(address);
 			}
 			else {
-				cmds.disableCommand(
-					'toggle-hex',
-					'step-in', 
-					'step-out', 
-					'step-to', 
-					'mem-go-to',
-					'mem-add-8h',
-					'mem-sub-8h',
-					'mem-add-80h',
-					'mem-sub-80h',
-					'toggle-words',
-					'add-watch',
-					'remove-watches');
-
-				run_to(-1);
+				this.breakPoints.splice(bpIndex, 1);
 			}
 		}
 
-		function toggle_break_point() {
-			var str_address = prompt('Введите адрес точки останова:', '');
-			if ( str_address != null ) {
-				str_address = str_address.replace(/^\s+|\s+$/g, '');
-				var radix = 10;
-				if (str_address.length && str_address.charAt(str_address.length - 1).toLowerCase() == 'h') {
-					radix = 16;
-				}
-				if (str_address.length >= 2 & str_address.charAt(0) == '0' && str_address.charAt(1).toLowerCase() == 'x') {
-					radix = 16;
-				}
-				var addr = parseInt(str_address, radix);
-				if (!isNaN(addr)) {
-					var deleted = false;
-					for (var i = 0; i < break_points.length; i++) {
-						if ( break_points[ i ] == addr ) {
-							break_points.splice(i, 1);
-							deleted = true;
-							alert('Точка останова удалена');
-							break;
-						}
-					}
+		this.run = function (untilAddresses) {
+			untilAddresses = untilAddresses || [];
+			var firstInstruction = true;
+			this.running(true);
+			this.disasm.pointerIndex(-1);
+			this.disasm.cursorIndex(-1);
 
-					if (!deleted) {
-						break_points.push(addr);
-						alert('Точка останова добавлена');
+			this.commandDispatcher.disable([
+				CMD_DASM_CURSOR_UP, CMD_DASM_CURSOR_DOWN, CMD_DASM_CURSOR_PAGE_UP, CMD_DASM_CURSOR_PAGE_DOWN,
+				CMD_STEP_IN, CMD_STEP_OVER, CMD_RUN_UNTIL_CURSOR, CMD_RUN_UNTIL_ADDRESS, CMD_WATCH_CURSOR_UP,
+				CMD_WATCH_CURSOR_DOWN, CMD_WATCH_EDIT_FORMULA, CMD_WATCH_PAGE_UP, CMD_WATCH_PAGE_DOWN,
+				CMD_DUMP_PAGE_UP, CMD_DUMP_PAGE_UP, CMD_WATCH_PREV, CMD_WATCH_NEXT, CMD_DUMP_PREV, CMD_DUMP_NEXT,
+				CMD_STATE_LOAD, CMD_STATE_SAVE
+			]);
+
+			this.clock.runDebug(
+				function (state) {
+					if (firstInstruction) {
+						firstInstruction = false;
+						return false;
 					}
-				}
-			}
+					return untilAddresses.indexOf(state.pc) >= 0 || this.breakPoints.orderedSearch(state.pc) >= 0 || this.breakRequest();
+				}.bind(this),
+				function () {
+					this.display.force_redraw();
+					this.commandDispatcher.enable([
+						CMD_DASM_CURSOR_UP, CMD_DASM_CURSOR_DOWN, CMD_DASM_CURSOR_PAGE_UP, CMD_DASM_CURSOR_PAGE_DOWN,
+						CMD_STEP_IN, CMD_STEP_OVER, CMD_RUN_UNTIL_CURSOR, CMD_RUN_UNTIL_ADDRESS, CMD_WATCH_CURSOR_UP,
+						CMD_WATCH_CURSOR_DOWN, CMD_WATCH_EDIT_FORMULA, CMD_WATCH_PAGE_UP, CMD_WATCH_PAGE_DOWN,
+						CMD_DUMP_PAGE_UP, CMD_DUMP_PAGE_UP, CMD_WATCH_PREV, CMD_WATCH_NEXT, CMD_DUMP_PREV, CMD_DUMP_NEXT,
+						CMD_STATE_LOAD, CMD_STATE_SAVE
+					]);
+
+					this.update(true);
+					this.running(false);
+					this.breakRequest(false);
+				}.bind(this));
 		}
 
-
-		function run_to(address1, address2) {
-			running = true;
-
-			var tstatesPerIntrq = settings.get_turboMode() ? settings.get_tstatesPerIntrq() : settings.get_tstatesPerIntrqTurbo();
-
-			while (true) {
-				if ( cpu.get_tstates() >= tstatesPerIntrq ) {
-					bus.var_write('intrq');
-					cpu.set_tstates(0);
-					setTimeout(function() { run_to(address1, address2); }, 0);
+		this.load = function () {
+			var $input = $('<input type="file" accept=".json" style="visibility: hidden;" />').appendTo(document.body);
+			$input.on('change', function (e) {
+				var filename = $input.val();
+				if (!filename)
 					return;
-				}
-
-				cpu.process();
-
-				var state = cpu.get_state();
-				var bp = ( state.pc == address1 ) || ( state.pc == address2 );
-				if (!bp) {
-					for (var i = 0; i < break_points.length; i++) {
-						if ( state.pc == break_points[i] ) {
-							bp = true;
-							break;
+				loadLocalFile($input[0]).then(function (data) {
+					var chars = new Array(data.length);
+					for (var i = 0; i < data.length; i++) {
+						chars[i] = String.fromCharCode(data[i]);
+					}
+					return chars.join('');
+				}).then(function (debugStateJson) {
+					var debugState = JSON.parse(debugStateJson);
+					for ( var i = 0; i < 8; i++ ) {
+						this.bus.var_write('port_7ffd_value', i);
+						var data = debugState.memory[i];
+						for ( var addr = 0xC000, dataIndex = 0; addr <= 0xFFFF; addr++, dataIndex++ ) {
+							this.bus.mem_write(addr, data[dataIndex]);
 						}
 					}
-				}
-
-				if ( bp || break_request ) {
-					display.force_redraw();
-
-					cmds.enableCommand(
-						'toggle-hex',
-						'step-in', 
-						'step-out', 
-						'step-to', 
-						'toggle-bp',
-						'run',
-						'mem-go-to',
-						'mem-add-8h',
-						'mem-sub-8h',
-						'mem-add-80h',
-						'mem-sub-80h',
-						'toggle-words',
-						'add-watch',
-						'remove-watches');
-
-					self.registers.update(true);
-					self.disasm.update();
-					self.memory.update();
-					running = false;
-					break_request = false;
-					return;
-				}
-			}
-		}
-
-		function RegistersBlock(container, cpu) {
-			// public
-			this.update = update;
-
-			// private
-			$("<?=registers?>")
-				.appendTo(container);
-
-			var r_pc = document.getElementById('zxdebug_r_pc');
-			var r_sp = document.getElementById('zxdebug_r_sp');
-			var r_ix = document.getElementById('zxdebug_r_ix');
-			var r_iy = document.getElementById('zxdebug_r_iy');
-			var r_hl = document.getElementById('zxdebug_r_hl');
-			var r_h  = document.getElementById('zxdebug_r_h');
-			var r_l  = document.getElementById('zxdebug_r_l');
-			var r_de = document.getElementById('zxdebug_r_de');
-			var r_d  = document.getElementById('zxdebug_r_d');
-			var r_e  = document.getElementById('zxdebug_r_e');
-			var r_bc = document.getElementById('zxdebug_r_bc');
-			var r_b  = document.getElementById('zxdebug_r_b');
-			var r_c  = document.getElementById('zxdebug_r_c');
-			var r_af = document.getElementById('zxdebug_r_af');
-			var r_a  = document.getElementById('zxdebug_r_a');
-			var r_f  = document.getElementById('zxdebug_r_f');
-			var r_hl_= document.getElementById('zxdebug_r_hl_');
-			var r_de_= document.getElementById('zxdebug_r_de_');
-			var r_bc_= document.getElementById('zxdebug_r_bc_');
-			var r_af_= document.getElementById('zxdebug_r_af_');
-			var r_i  = document.getElementById('zxdebug_r_i');
-			var r_r  = document.getElementById('zxdebug_r_r');
-			var f_s  = document.getElementById('zxdebug_f_s');
-			var f_z  = document.getElementById('zxdebug_f_z');
-			var f_h  = document.getElementById('zxdebug_f_h');
-			var f_p  = document.getElementById('zxdebug_f_p');
-			var f_n  = document.getElementById('zxdebug_f_n');
-			var f_c  = document.getElementById('zxdebug_f_c');
-			var iff  = document.getElementById('zxdebug_iff');
-			var imf  = document.getElementById('zxdebug_imf');
-
-			var last_state = cpu.get_state();
-
-			function update( update_styles ) {
-				var state = cpu.get_state();
-
-				// значения
-				r_pc.innerHTML = word_to_string(state.pc);
-				r_sp.innerHTML = word_to_string(state.sp);
-				r_ix.innerHTML = word_to_string(state.ix);
-				r_iy.innerHTML = word_to_string(state.iy);
-
-				r_hl.innerHTML = word_to_string(state.hl);
-				r_h.innerHTML = byte_to_string(state.hl >> 8);
-				r_l.innerHTML = byte_to_string(state.hl & 0xff);
-
-				r_de.innerHTML = word_to_string(state.de);
-				r_d.innerHTML = byte_to_string(state.de >> 8);
-				r_e.innerHTML = byte_to_string(state.de & 0xff);
-
-				r_bc.innerHTML = word_to_string(state.bc);
-				r_b.innerHTML = byte_to_string(state.bc >> 8);
-				r_c.innerHTML = byte_to_string(state.bc & 0xff);
-
-				r_af.innerHTML = word_to_string(state.af);
-				r_a.innerHTML = byte_to_string(state.af >> 8);
-				r_f.innerHTML = byte_to_string(state.af & 0xff);
-
-				r_hl_.innerHTML = word_to_string(state.hl_);
-				r_de_.innerHTML = word_to_string(state.de_);
-				r_bc_.innerHTML = word_to_string(state.bc_);
-				r_af_.innerHTML = word_to_string(state.af_);
-
-				r_i.innerHTML = byte_to_string(state.i);
-				r_r.innerHTML = byte_to_string(state.r);
-
-				f_s.innerHTML = ( state.af & 0x80 ) ? 1 : 0;
-				f_z.innerHTML = ( state.af & 0x40 ) ? 1 : 0;
-				f_h.innerHTML = ( state.af & 0x10 ) ? 1 : 0;
-				f_p.innerHTML = ( state.af & 0x04 ) ? 1 : 0;
-				f_n.innerHTML = ( state.af & 0x02 ) ? 1 : 0;
-				f_c.innerHTML = ( state.af & 0x01 ) ? 1 : 0;
-
-				iff.innerHTML = (( state.iff & 0x02 ) ? '1' : '0' ) + (( state.iff & 0x01 ) ? '1' : '0' );
-				imf.innerHTML = (( state.imf & 0x02 ) ? '1' : '0' ) + (( state.imf & 0x01 ) ? '1' : '0' );
-
-				if ( update_styles ) {
-					// стили
-					r_pc.className = ( state.pc != last_state.pc ) ? 'changed' : '';
-					r_sp.className = ( state.sp != last_state.sp ) ? 'changed' : '';
-					r_ix.className = ( state.ix != last_state.ix ) ? 'changed' : '';
-					r_iy.className = ( state.iy != last_state.iy ) ? 'changed' : '';
-
-					r_hl.className = ( state.hl != last_state.hl ) ? 'changed' : '';
-					r_h.className = (( state.hl >> 8 ) != ( last_state.hl >> 8 )) ? 'changed' : '';
-					r_l.className = (( state.hl & 0xff ) != ( last_state.hl & 0xff )) ? 'changed' : '';
-
-					r_de.className = ( state.de != last_state.de ) ? 'changed' : '';
-					r_d.className = (( state.de >> 8 ) != ( last_state.de >> 8 )) ? 'changed' : '';
-					r_e.className = (( state.de & 0xff ) != ( last_state.de & 0xff )) ? 'changed' : '';
-
-					r_bc.className = ( state.bc != last_state.bc ) ? 'changed' : '';
-					r_b.className = (( state.bc >> 8 ) != ( last_state.bc >> 8 )) ? 'changed' : '';
-					r_c.className = (( state.bc & 0xff ) != ( last_state.bc & 0xff )) ? 'changed' : '';
-
-					r_af.className = ( state.af != last_state.af ) ? 'changed' : '';
-					r_a.className = (( state.af >> 8 ) != ( last_state.af >> 8 )) ? 'changed' : '';
-					r_f.className = (( state.af & 0xff ) != ( last_state.af & 0xff )) ? 'changed' : '';		
-
-					r_hl_.className = ( state.hl_ != last_state.hl_ ) ? 'changed' : '';
-					r_de_.className = ( state.de_ != last_state.de_ ) ? 'changed' : '';
-					r_bc_.className = ( state.bc_ != last_state.bc_ ) ? 'changed' : '';
-					r_af_.className = ( state.af_ != last_state.af_ ) ? 'changed' : '';
-
-					r_i.className = ( state.i != last_state.i ) ? 'changed' : '';
-					r_r.className = ( state.r != last_state.r ) ? 'changed' : '';
-
-					f_s.className = (( state.af & 0x80 ) ^ ( last_state.af & 0x80 )) ? 'changed' : '';
-					f_z.className = (( state.af & 0x40 ) ^ ( last_state.af & 0x40 )) ? 'changed' : '';
-					f_h.className = (( state.af & 0x10 ) ^ ( last_state.af & 0x10 )) ? 'changed' : '';
-					f_p.className = (( state.af & 0x04 ) ^ ( last_state.af & 0x04 )) ? 'changed' : '';
-					f_n.className = (( state.af & 0x02 ) ^ ( last_state.af & 0x02 )) ? 'changed' : '';
-					f_c.className = (( state.af & 0x01 ) ^ ( last_state.af & 0x01 )) ? 'changed' : '';
-
-					iff.className = ( state.iff != last_state.iff ) ? 'changed' : '';
-					imf.className = ( state.imf != last_state.imf ) ? 'changed' : '';
-				}
-
-				last_state = state;			
-			}
-		}
-
-		function DisasmBlock(container, cpu, bus) {
-			// public
-			this.update = update;
-
-			// private
-			$("<?=trace-block?>")
-				.appendTo(container);
-
-			var dasm_block = document.getElementById('zxdebug_dasm');
-
-			var buffer_length = 16;
-			var buffer = [
-				// {
-				// 	addr: 0x0038,
-				// 	res: { mn: 'NOP', bytes: [ 0x00 ], next: 0x0039 }
-				// }
-			];
-
-			function get_index_by_addr(addr) {
-				for (var i = 0; i < buffer.length; i++) {
-					if ( buffer[i].addr == addr ) {
-						return i;
+					this.bus.var_write('port_7ffd_value', debugState.io['7ffd']);
+					this.bus.var_write('port_fe_value', debugState.io['fe']);
+					this.bus.var_write('rom_trdos', debugState.rom['trdos']);
+					this.bus.var_write('rom_turbo', debugState.rom['turbo']);
+					this.cpu.set_state(debugState.cpu);
+					this.breakPoints([]);
+					for (var i = 0; i < debugState.breakPoints.length; i++) {
+						this.breakPoints.orderedInsert(debugState.breakPoints[i]);
 					}
-				}
-				return -1;
-			};
-
-			function update() {
-				var state = cpu.get_state();
-
-				var pc = state.pc;
-				if ( state.prefix_dd || state.prefix_fd || state.prefix_ed ) {
-					pc--;
-				}
-
-				if ( state.prefix_cb ) {
-					pc--;
-				}
-
-				var index = get_index_by_addr(pc);
-				if (index < 0) {
-					buffer.splice(0, buffer.length);
-					var addr = pc;
-					for (var i = 0; i < buffer_length; i++) {
-						buffer[i] = {
-							addr: addr,
-						 	res: disasm_instruction(bus, addr)
-						};
-						addr = buffer[i].res.next;
-					}
-					index = 0;
-				}
-
-				update_dasm_block(index);
-			}
-
-			function update_dasm_block( active_index ) {
-				var dasm_html = "";
-				for (var i = 0; i < buffer.length; i++) {
-					var addr = buffer[i].addr;
-					var res = buffer[i].res;
-					var mnemonics = res.mn;
-					if ( res.addr !== undefined ) {
-						mnemonics = mnemonics.replace('addr', word_to_string(res.addr));
-					}
-					if ( res.offs !== undefined ) {
-						var offset = res.offs;
-						if ( offset & 0x80 ) {
-							offset = -((offset ^ 0xff) + 1);
-						}
-						mnemonics = mnemonics.replace(/\+\s*offs/gi, (offset >= 0 ? '+ ' : '- ') + byte_to_string(Math.abs(offset)));
-					}
-					if ( res.val8 !== undefined ) {
-						mnemonics = mnemonics.replace('val8', byte_to_string(res.val8));
-					}
-					if ( res.val16 !== undefined ) {
-						mnemonics = mnemonics.replace('val16', word_to_string(res.val16));
-					}
-					if ( res.port !== undefined ) {
-						mnemonics = mnemonics.replace('port', byte_to_string(res.port));
-					}
-
-					dasm_html += '<div class="dasm-line' + ( i == active_index ? '-active' : '' ) + '">';
-					dasm_html += '<span class="addr">' + word_to_string(addr) + '</span>';
-					dasm_html += '<span class="bytes">' + bytes_to_hex_string(res.bytes) + '</span>';
-					dasm_html += '<span class="mnemonics">' + mnemonics + '</span>';
-					dasm_html += '</div>';
-				}
-
-				dasm_block.innerHTML = dasm_html;
-			}
-		}
-
-		function MemoryBlock(container, bus) {
-			// public
-			this.shift_memory_address = shift_memory_address;
-			this.change_memory_address = change_memory_address;
-			this.update = update;
-			this.display_words = function(value) {
-				if ( value !== undefined ) {
-					display_words = value;
-					update();
-				}
-				else {
-					return display_words;
-				}
-			}
-
-			// private
-			$("<?=memory-block?>")
-				.appendTo(container);			
-
-			var memory_block = document.getElementById('zxdebug_memory');
-
-			var address = 0x0000;
-			var display_words = false;
-			var lines = 16;
-
-
-			function shift_memory_address(offset) {
-				address = ( address + offset ) & 0xffff;
-				update();
-			}
-
-			function change_memory_address() {
-				var str_address = prompt('Введите новый адрес: ', '');
-				if ( str_address != null ) {
-					str_address = str_address.replace(/^\s+|\s+$/g, '');
-					var radix = 10;
-					if (str_address.length && str_address.charAt(str_address.length - 1).toLowerCase() == 'h') {
-						radix = 16;
-					}
-					if (str_address.length >= 2 & str_address.charAt(0) == '0' && str_address.charAt(1).toLowerCase() == 'x') {
-						radix = 16;
-					}
-					var addr = parseInt(str_address, radix);
-					if (!isNaN(addr)) {
-						address = addr;
-						update();
-					}
-				}				
-			}
-
-			function update() {
-				var mem_html = '';
-
-				for (var y = 0; y < lines; y++) {
-					var readAddress = ( address + ( y * 8 )) & 0xffff;
-
-					mem_html += '<div class="mem-line">';
-					mem_html += '<span class="addr">' + word_to_string(readAddress) + '</span>';
-					if ( display_words ) {
-						mem_html += '<span class="words">';
-
-						for (var x = 0; x < 4; x++) {
-							var lo = bus.mem_read(readAddress);
-							var hi = bus.mem_read((readAddress + 1) & 0xffff);
-							mem_html += word_to_string((hi << 8) | lo, { hex: true, dont_suffix: true }) + ' ';
-							readAddress = ( readAddress + 2 ) & 0xffff;
-						}
-
-						mem_html += '</span>';
-					}
-					else {
-						mem_html += '<span class="bytes">';
-
-						for (var x = 0; x < 8; x++) {
-							var v8 = bus.mem_read(readAddress);
-							mem_html += byte_to_string(v8, { hex: true, dont_suffix: true }) + ' ';
-							readAddress = ( readAddress + 1 ) & 0xffff;
-						}
-
-						mem_html += '</span>';
-					}
-
-					mem_html += '</div>';
-				}
-
-				memory_block.innerHTML = mem_html;
-			}						
-		}
-
-		function WatchBlock(container, bus) {
-			// public
-			this.update = updateWatches;
-			this.addWatch = addWatch;
-			this.removeWatches = removeWatches;
-
-			// private
-			$("<?=watch-block?>")
-				.appendTo(container);
-
-			var $watch_block = $('#zxdebug_watch');
-
-			var watches = [];
-			var nextWatchId = 0;
-
-			function updateWatches() {
-				$watch_block.empty();
-
-				for ( var i = 0; i < watches.length; i++ ) {
-					var watch = watches[i];
-
-					var $item_block = $("<?=watch-item-block?>");
-					$item_block.find('.watch-item-selected').val(watch.id);
-					$item_block.find('.watch-item-name').text(watch.name);
-					$item_block.find('.watch-item-address').text(word_to_string(watch.address));
-					switch ( watch.length ) {
-						case 'byte': $item_block.find('.watch-item-value').text(byte_to_string(read_memory_byte(bus, watch.address))); break;
-						case 'word': $item_block.find('.watch-item-value').text(word_to_string(read_memory_word(bus, watch.address))); break;
-					}
-
-					$item_block
-						.appendTo($watch_block);
-				}
-			}
-
-			function addWatch() {
-				$dlg = $("<?=watch-add-dialog?>");
-				$dlg.dialog({
-					autoOpen: true,
-					title: 'Add watch',
-					modal: true,
-					width: 300,
-					height: 200,
-					buttons: [
-						{ text: 'Add', click: add },
-						{ text: 'Cancel', click: cancel }
-					],
-					close: function (e) { $(this).dialog('destroy'); $(this).remove(); }
+					this.update(true);
+				}.bind(this)).then(function () {
+					$input.remove();
 				});
-				$dlg.on('keydown', function (e) { e.stopPropagation(); });
-				$dlg.on('keyup', function (e) { e.stopPropagation(); });
+			}.bind(this));
+			$input.click();
+		}
 
-				$watch_name = $dlg.find('.watch-name');
-				$watch_address = $dlg.find('.watch-address');
-				$watch_length = $dlg.find('.watch-length');
-
-				function init() {
-					$watch_name.val('');
-					$watch_address.val('');
-					$watch_length.val('byte');
+		this.save = function () {
+			var _7ffd = this.bus.var_read('port_7ffd_value');
+			var _fe = this.bus.var_read('port_fe_value');
+			var debugState = {
+				cpu: this.cpu.get_state(),
+				io: { '7ffd': _7ffd, 'fe': _fe },
+				rom: { 
+					'trdos': this.bus.var_read('rom_trdos'),
+					'turbo': this.bus.var_read('rom_turbo')
+				},
+				memory: [],
+				breakPoints: this.breakPoints()
+			};
+			for ( var i = 0; i < 8; i++ ) {
+				this.bus.var_write('port_7ffd_value', i);
+				var data = new Array(0x4000);
+				for ( var addr = 0xC000, dataIndex = 0; addr <= 0xFFFF; addr++, dataIndex++ ) {
+					data[dataIndex] = this.bus.mem_read(addr);
 				}
-
-				function add() {
-					var str_address = $.trim($watch_address.val());
-					var radix = 10;
-					if (str_address.length && str_address.charAt(str_address.length - 1).toLowerCase() == 'h') {
-						radix = 16;
-					}
-					if (str_address.length >= 2 & str_address.charAt(0) == '0' && str_address.charAt(1).toLowerCase() == 'x') {
-						radix = 16;
-					}
-					var address = parseInt(str_address, radix) || 0;
-
-					watches.push({
-						id: nextWatchId++,
-						name: $watch_name.val(),
-						address: address,
-						length: $watch_length.val()
-					});
-
-					updateWatches();
-
-					$dlg.dialog('close');
-					$dlg = null;					
-				}
-
-				function cancel() {
-					$dlg.dialog('close');
-					$dlg = null;
-				}
+				debugState.memory.push(data);
 			}
+			this.bus.var_write('port_7ffd_value', _7ffd);
+			downloadText(JSON.stringify(debugState), 'zx-state-' + Date.now() + '.json')
+		}
 
-			function removeWatches() {
-				var ids_to_remove = $watch_block.find('.watch-item-selected:checked').map(function (i, e) { return +$(e).val(); });
-				watches = $.grep(watches, function (watch, i) { return $.inArray(watch.id, ids_to_remove) == -1; });
-				updateWatches();
+		this.bdiStartLogging = function () {
+			ZXContext.hw.betadisk.startLogging();
+		}
+
+		this.bdiStopLogging = function () {
+			var log = ZXContext.hw.betadisk.stopLogging();
+			if (log) {
+				var logLines = this.translateBdiLog(log).join('\n');
+				downloadText(logLines, 'bdi_trace_' + Date.now() + '.txt');
 			}
 		}
 
-        /////////////////////////////
-		// Вспомогательные функции //
-		/////////////////////////////
+		this.translateBdiLog = function (log) {
+			var records = new Array(log.length);
+			for ( var i = 0; i < log.length; i++ ) {
+				records[i] = this.translateBdiLogRecord(log[i]);
+			}
+			return records;
+		}
 
-		function byte_to_string(value, options) {
-			if ( hex || ( options && options.hex )) {
-				var cc1 = (( value >> 4 ) & 0x0f ) + 0x30;
-				if ( cc1 > 0x39 ) { cc1 += 0x27; }
-
-				var cc2 = (( value >> 0 ) & 0x0f ) + 0x30;
-				if ( cc2 > 0x39 ) { cc2 += 0x27; }
-
-				var s = String.fromCharCode(cc1, cc2);
-				if ( !options || !options.dont_suffix ) {
-					s += 'h';
+		this.translateBdiLogRecord = function(data) {
+			var chunks = [];
+			chunks.push(('00000000' + data.ts.toFixed(3)).substr(-12) + ': ');
+			chunks.push(DebugUtils.byteToString(data.value));
+			switch (data.op) {
+				case 'i': chunks.push('<-'); break;
+				case 'o': chunks.push('->'); break;
+			}
+			chunks.push('(' + DebugUtils.byteToString(data.port) + ')');
+			if (data.op == 'i') {
+				switch (data.port) {
+					case 0x1F: chunks.push('Get Status (' + DebugUtils.byteToString(data.value) + ')'); break;
+					case 0x3F: chunks.push('Get Track (' + DebugUtils.byteToString(data.value) + ')'); break;
+					case 0x5F: chunks.push('Get Sector (' + DebugUtils.byteToString(data.value) + ')'); break;
+					case 0x7F: chunks.push('Get Data (' + DebugUtils.byteToString(data.value) + ')'); break;
+					case 0xFF: chunks.push('Get System Register (INTRQ=' + +!!(data.value & 0x80) + ', DRQ=' + +!!(data.value & 0x40) + ')'); break;
 				}
-				return s;
 			}
 			else {
-				return value.toString();
-			}
-		}
-
-		function word_to_string(value, options) {
-			if ( hex || ( options && options.hex )) {
-				var cc1 = (( value >> 12 ) & 0x0f ) + 0x30;
-				if ( cc1 > 0x39 ) { cc1 += 0x27; }
-
-				var cc2 = (( value >> 8 ) & 0x0f ) + 0x30;
-				if ( cc2 > 0x39 ) { cc2 += 0x27; }
-
-				var cc3 = (( value >> 4 ) & 0x0f ) + 0x30;
-				if ( cc3 > 0x39 ) { cc3 += 0x27; }
-
-				var cc4 = (( value >> 0 ) & 0x0f ) + 0x30;
-				if ( cc4 > 0x39 ) { cc4 += 0x27; }
-
-				var s = String.fromCharCode(cc1, cc2, cc3, cc4);
-				if ( !options || !options.dont_suffix ) {
-					s += 'h';
-				}
-				return s;
-			}
-			else {
-				return value.toString();
-			}
-		}
-
-		function bytes_to_hex_string (bytes) {
-			var s = '';
-			for (var i = 0; i < bytes.length; i++) {
-				var cc1 = (( bytes[i] >> 4 ) & 0x0f ) + 0x30;
-				if ( cc1 > 0x39 ) { cc1 += 0x27; }
-
-				var cc2 = (( bytes[i] >> 0 ) & 0x0f ) + 0x30;
-				if ( cc2 > 0x39 ) { cc2 += 0x27; }
-
-				s += String.fromCharCode(cc1, cc2);
-			}
-			return s;
-		}
-
-		function read_opcode_byte(bus, address) {
-			return bus.instruction_read(address);
-		}
-		function read_memory_byte(bus, address) {
-			return bus.mem_read(address);
-		}
-
-		function read_memory_word(bus, address) {
-			return read_memory_byte(bus, address) | ( read_memory_byte(bus, (address + 1) & 0xffff) << 8 ) ;
-		}
-
-		function disasm_instruction(bus, address) {
-		    var result = {
-		        mn: '',
-		        next: address,
-		        bytes: []
-		    };
-
-			var opcode = read_opcode_byte(bus, result.next++);
-		    result.bytes.push(opcode);
-
-			var prefix_ix = ( opcode == 0xdd );
-			var prefix_iy = ( opcode == 0xfd );
-			var prefix_ed = ( opcode == 0xed );
-			var prefix_cb = ( opcode == 0xcb );
-			var offset = 0;
-
-			if ( prefix_ix || prefix_iy ) {
-				opcode = read_opcode_byte(bus, result.next);
-
-				if ( opcode == 0xdd || opcode == 0xfd || opcode == 0xed ) {
-					result.mn = 'NOP';
-					return result;
-				}
-
-		        result.next++;
-		        result.bytes.push(opcode);
-
-				if ( opcode == 0xcb ) {
-					prefix_cb = true;
-					offset = read_memory_byte(bus, result.next++);
-		            result.bytes.push(offset);
+				switch (data.port) {
+					case 0x1F:
+						if ((data.value & 0xE0) == 0x00) {
+							chunks.push(((data.value & 0x10) ? 'Seek' : 'Restore') + ' (HLD=' + +!!(data.value & 0x08) + ', VERIFY=' + +!!(data.value & 0x04) + ', RATE=' + (data.value & 0x03) + ')');
+						}
+						else if (!(data.value & 0x80)) {
+							var cmd;
+							switch (data.value & 0x60) {
+								case 0x20: cmd = 'Step'; break;
+								case 0x40: cmd = 'Step In'; break;
+								case 0x60: cmd = 'Step Out'; break;
+							}
+							chunks.push(cmd + ' (UPDATE=' + +!!(data.value & 0x10) + ', HLD=' + +!!(data.value & 0x08) + ', VERIFY=' + +!!(data.value & 0x04) + ', RATE=' + (data.value & 0x03) + ')');
+						}
+						else if ((data.value & 0xE0) == 0x80) {
+							chunks.push('Read Sector (MULTIPLE=' + +!!(data.value & 0x10) + ', HEAD=' + +!!(data.value & 0x08) + ', ENGAGE=' + +!!(data.value & 0x04) + ', HCHK=' + +!!(data.value & 0x02) + ')');
+						}
+						else if ((data.value & 0xE0) == 0xA0) {
+							chunks.push('Write Sector (MULTIPLE=' + +!!(data.value & 0x10) + ', HEAD=' + +!!(data.value & 0x08) + ', ENGAGE=' + +!!(data.value & 0x04) + ', HCHK=' + +!!(data.value & 0x02) + ', TYPE=' + +!!(data.value & 0x01) + ')');
+						}
+						else if ((data.value & 0xF0) != 0xD0) {
+							var cmd;
+							switch (data.value & 0xF0) {
+								case 0xC0: cmd = 'Read Address'; break;
+								case 0xE0: cmd = 'Read Track'; break;
+								case 0xF0: cmd = 'Write Track'; break
+							}
+							chunks.push(cmd + ' (ENGAGE=' + +!!(data.value & 0x04) + ')');
+						}
+						else {
+							chunks.push('Force Interrupt (Immediate=' + +!!(data.value & 0x08) + ', IndexPulse=' + +!!(data.value & 0x04) + ', Unready=' + +!!(data.value & 0x02) + ', Ready=' + +!!(data.value & 0x01) + ')');
+						}
+						break;
+					case 0x3F: chunks.push('Set Track (' + DebugUtils.byteToString(data.value) + ')'); break;
+					case 0x5F: chunks.push('Set Sector (' + DebugUtils.byteToString(data.value) + ')'); break;
+					case 0x7F: chunks.push('Set Data (' + DebugUtils.byteToString(data.value) + ')'); break;
+					case 0xFF: chunks.push('Set System Register (DDEN=' + +!(data.value & 0x40) + ', HEAD=' + +!(data.value & 0x10) + ', HLT=' + +!!(data.value & 0x08) + ', RESET=' + +!(data.value & 0x04) + ', DRIVE=' + (data.value & 0x03) + ')'); break;
 				}
 			}
-
-			if ( prefix_ed ) {
-				opcode = read_opcode_byte(bus, result.next++);
-		        result.bytes.push(opcode);
-
-		        // 010xx111
-		        if ( ( opcode & 0xe7 ) == 0x47 ) {
-		            // LD A, I
-		            // LD A, R
-		            // LD I, A
-		            // LD R, A
-		            var subcode = (opcode >> 3) & 0x03;
-		            switch (subcode) {
-		                case 0x00: result.mn = 'LD I, A'; break;
-		                case 0x01: result.mn = 'LD R, A'; break;
-		                case 0x02: result.mn = 'LD A, I'; break;
-		                case 0x03: result.mn = 'LD A, R'; break;
-		            }
-
-		            return result;
-		        }
-
-		        // 01xxx011
-		        if ( (opcode & 0xc7 ) == 0x43 ) {
-		            // LD dd, (nn)
-		            // LD (nn), dd
-
-		            var to_reg = !!(opcode & 0x08);
-		            var dd = (opcode >> 4) & 0x03;
-
-		            var reg_name;
-		            switch (dd) {
-		            	case 0x00: reg_name = 'BC'; break;
-		            	case 0x01: reg_name = 'DE'; break;
-		            	case 0x02: reg_name = 'HL'; break;
-		            	case 0x03: reg_name = 'SP'; break;
-		            }
-
-		            if (to_reg) {
-		            	result.mn = 'LD ' + reg_name + ', (addr)';
-		            }
-		            else { // to_mem
-		            	result.mn = 'LD (addr), ' + reg_name;
-		            }
-
-		            result.addr = read_memory_word(bus, result.next);
-		            result.next += 2;
-		            result.bytes.push(result.addr & 0xff);
-		            result.bytes.push(result.addr >> 8);
-
-		            return result;
-		        }
-
-		        // 101xx000
-		        if ( (opcode & 0xe7 ) == 0xa0 ) {
-		            // LDI
-		            // LDIR
-		            // LDD
-		            // LDDR
-
-		            var increment = !(opcode & 0x08);
-		            var repeat = !!(opcode & 0x10);
-
-		            result.mn = 'LD' + ( increment ? 'I' : 'D' ) + ( repeat ? 'R' : '' );
-		            return result;
-		        }
-
-		        // 101xx001
-		        if ( (opcode & 0xe7 ) == 0xa1 ) {
-		            // CPI
-		            // CPIR
-		            // CPD
-		            // CPDR
-
-		            var increment = !(opcode & 0x08);
-		            var repeat = !!(opcode & 0x10);
-
-		            result.mn = 'CP' + ( increment ? 'I' : 'D' ) + ( repeat ? 'R' : '' );
-		            return result;
-		        }
-
-		        // 01xxx100
-		        if (( opcode & 0xc7 ) == 0x44 ) {
-		            // NEG
-		            // * включая все недокументированные варианты опкодов
-
-		            result.mn = 'NEG';
-		            return result;
-		        }
-
-		        // 01xxx110
-		        if ( ( opcode & 0xc7 ) == 0x46 ) {
-		            // IM 0
-		            // IM 1
-		            // IM 2
-		            // * включая все недокументированные варианты опкодов
-
-		            switch (( opcode >> 3 ) & 0x03 ) {
-		            	case 0x00: result.mn = 'IM 0'; break;
-		                case 0x01: result.mn = 'IM 0'; break;
-		            	case 0x02: result.mn = 'IM 1'; break;
-		            	case 0x03: result.mn = 'IM 2'; break;
-		            }
-
-		            return result;
-		        }
-
-		        // 01xxx010
-		        if ( (opcode & 0xc7 ) == 0x42 ) {
-		            // ADC HL, ss
-		            // SBC HL, ss
-
-		            var addition = !!(opcode & 0x08);
-		            var ss = (opcode >> 4) & 0x03;
-
-		            var reg_name;
-		            switch (ss) {
-		            	case 0x00: reg_name = 'BC'; break;
-		            	case 0x01: reg_name = 'DE'; break;
-		            	case 0x02: reg_name = 'HL'; break;
-		            	case 0x03: reg_name = 'SP'; break;
-		            }
-
-		            result.mn = ( addition ? 'ADC HL, ' : 'SBC HL, ') + reg_name;
-		            return result;
-		        }
-
-		        // 0110x111
-		        if ( (opcode & 0xf7 ) == 0x67 ) {
-		            // RLD
-		            // RRD
-
-		            var left = !!(opcode & 0x08);
-
-		            result.mn = left ? 'RLD' : 'RRD';
-		            return result;
-		        }
-
-		        // 01xxx101
-		        if ( (opcode & 0xc7 ) == 0x45 ) {
-		            // RETI
-		            // RETN
-		            // * включая все недокументированные варианты опкодов
-
-		            result.mn = 'RET' + (( opcode & 0x80 ) ? 'I' : 'N' );
-		            return result;
-		        }
-
-		        // 01xxx00x
-		        if ( ( opcode & 0xc6 ) == 0x40 ) {
-		            // IN r, (C)
-		            // OUT (C), r
-                	// * IN 0, (C)
-                	// * OUT (C), 0
-
-		            var r1 = (opcode >> 3) & 0x07;
-		            var cmd_in = !(opcode & 0x01);
-
-		            var reg_name;
-		            switch (r1) {
-		            	case 0x00: reg_name = 'B'; break;
-		            	case 0x01: reg_name = 'C'; break;
-		            	case 0x02: reg_name = 'D'; break;
-		            	case 0x03: reg_name = 'E'; break;
-		            	case 0x04: reg_name = 'H'; break;
-		            	case 0x05: reg_name = 'L'; break;
-		            	case 0x06: reg_name = '0'; break;
-		            	case 0x07: reg_name = 'A'; break;
-		            }
-
-		            if (cmd_in) {
-		            	result.mn = 'IN ' + reg_name + ', (C)';
-		            }
-		            else {
-		            	result.mn = 'OUT (C), ' + reg_name;
-		            }
-
-		            return result;
-		        }
-
-		        // 101xx01x
-		        if ( (opcode & 0xe6 ) == 0xa2 ) {
-		            // INI
-		            // INIR
-		            // IND
-		            // INDR
-		            // OUTI
-		            // OTIR
-		            // OUTD
-		            // OTDR
-
-		            var repeat = !!(opcode & 0x10);
-		            var increment = !(opcode & 0x08);
-		            var cmd_in = !(opcode & 0x01);
-
-		            if (cmd_in) {
-		            	result.mn = 'IN' + ( increment ? 'I' : 'D' ) + ( repeat ? 'R' : '' );
-		            }
-		            else {
-		            	result.mn = ( repeat ? 'OT' : 'OUT' ) + ( increment ? 'I' : 'D' ) + ( repeat ? 'R' : '' );
-		            }
-
-		            return result;
-		        }
-
-		        result.mn = 'NOP';
-		        return result;
-			}
-
-			if ( prefix_cb ) {
-				opcode = read_opcode_byte(bus, result.next++);
-		        result.bytes.push(opcode);
-
-		        // 00xxxxxx
-		        if ( (opcode & 0xc0 ) == 0x00 ) {
-		            // RLC r
-		            // RLC (HL)
-		            // RLC (IX + d)
-		            // RLC (IY + d)
-		            // * RLC (IY + d), r
-		            // RL r
-		            // RL (HL)
-		            // RL (IX + d)
-		            // RL (IY + d)
-		            // * RL (IY + d), r
-		            // RRC r
-		            // RRC (HL)
-		            // RRC (IX + d)
-		            // RRC (IY + d)
-		            // * RRC (IY + d), r
-		            // RR r
-		            // RR (HL)
-		            // RR (IX + d)
-		            // RR (IY + d)
-		            // * RR (IY + d), r
-		            // SLA r
-		            // SLA (HL)
-		            // SLA (IX + d)
-		            // SLA (IY + d)
-		            // * SLA (IY + d), r
-		            // * SLL r
-		            // * SLL (HL)
-		            // * SLL (IX + d)
-		            // * SLL (IY + d)                
-		            // * SLL (IY + d), r
-		            // SRA r
-		            // SRA (HL)
-		            // SRA (IX + d)
-		            // SRA (IY + d)
-		            // * SRA (IY + d), r
-		            // SRL r
-		            // SRL (HL)
-		            // SRL (IX + d)
-		            // SRL (IY + d)
-		            // * SRL (IY + d), r
-
-		            var cmd_shift = !!(opcode & 0x20);
-		            var left = !(opcode & 0x08);
-		            var carry = !(opcode & 0x10);
-		            var r1 = opcode & 0x07;
-
-		            var reg_name;
-		            switch (r1) {
-		            	case 0x00: reg_name = 'B'; break;
-		            	case 0x01: reg_name = 'C'; break;
-		            	case 0x02: reg_name = 'D'; break;
-		            	case 0x03: reg_name = 'E'; break;
-		            	case 0x04: reg_name = 'H'; break;
-		            	case 0x05: reg_name = 'L'; break;
-		            	case 0x06: reg_name = '(HL)'; break;
-		            	case 0x07: reg_name = 'A'; break;
-		            }
-
-		            result.mn = ( cmd_shift ? 'S' : 'R' ) + ( left ? 'L' : 'R' );
-		            if ( !cmd_shift & carry ) {
-		            	result.mn  += 'C';
-		            }
-
-		            if ( cmd_shift ) {
-		            	result.mn  += ( carry ? 'A' : 'L' );
-		            }
-
-		            result.mn += ' ';
-
-		            if ( prefix_ix ) {
-		            	result.mn  += '(IX + offs)';
-		            	result.offs = offset;
-		            }
-		            else if ( prefix_iy ) {
-		            	result.mn  += '(IY + offs)';
-		            	result.offs = offset;
-		            }
-		            else {
-		            	result.mn  += reg_name;
-		            }
-
-		            if (( prefix_ix || prefix_iy ) && r1 != 0x06 ) {
-		            	result.mn  += ', ' + reg_name;
-		            }
-
-		            return result;
-		        }
-
-		        // 01xxxxxx
-		        if ( (opcode & 0xc0 ) == 0x40 ) {
-		            // BIT b, r
-		            // BIT b, (HL)
-		            // BIT b, (IX + d)
-		            // BIT b, (IY + d)
-
-		            var r_dst = opcode & 0x07;
-		            var bit = (opcode >> 3) & 0x07;
-
-		            var reg_name;
-		            switch (r_dst) {
-		            	case 0x00: reg_name = 'B'; break;
-		            	case 0x01: reg_name = 'C'; break;
-		            	case 0x02: reg_name = 'D'; break;
-		            	case 0x03: reg_name = 'E'; break;
-		            	case 0x04: reg_name = 'H'; break;
-		            	case 0x05: reg_name = 'L'; break;
-		            	case 0x06: reg_name = '(HL)'; break;
-		            	case 0x07: reg_name = 'A'; break;
-		            }
-
-		            result.mn = 'BIT ' + bit + ', ';
-
-		            if (prefix_ix) {
-		            	result.mn += '(IX + offs)';
-		            	result.offs = offset;
-		            }
-		            else if (prefix_iy) {
-		            	result.mn += '(IY + offs)';
-		            	result.offs = offset;
-		            }
-		            else {
-		            	result.mn += reg_name;
-		            }
-
-		            if (( prefix_ix || prefix_iy ) && r_dst != 0x06 ) {
-		            	result.mn  += ', ' + reg_name;
-		            }
-
-		            return result;
-		        }
-
-		        // 1xxxxxxx
-		        if ( (opcode & 0x80 ) == 0x80 ) {
-		            // SET b, r
-		            // SET b, (HL)
-		            // SET b, (IX + d)
-		            // SET b, (IY + d)
-		            // * SET b, (IX + d), r
-		            // * SET b, (IY + d), r
-		            // RES b, r
-		            // RES b, (HL)
-		            // RES b, (IX + d)
-		            // RES b, (IY + d)
-		            // * RES b, (IX + d), r
-		            // * RES b, (IY + d), r
-
-		            var r_dst = opcode & 0x07;
-					var bit = (opcode >> 3) & 0x07;
-					var cmd_set = !!(opcode & 0x40);
-
-		            var reg_name;
-		            switch (r_dst) {
-		            	case 0x00: reg_name = 'B'; break;
-		            	case 0x01: reg_name = 'C'; break;
-		            	case 0x02: reg_name = 'D'; break;
-		            	case 0x03: reg_name = 'E'; break;
-		            	case 0x04: reg_name = 'H'; break;
-		            	case 0x05: reg_name = 'L'; break;
-		            	case 0x06: reg_name = '(HL)'; break;
-		            	case 0x07: reg_name = 'A'; break;
-		            }
-
-		            result.mn = ( cmd_set ? 'SET ' : 'RES ' ) + bit + ', ';
-
-		            if (prefix_ix) {
-		            	result.mn += '(IX + offs)';
-		            	result.offs = offset;
-		            }
-		            else if (prefix_iy) {
-		            	result.mn += '(IY + offs)';
-		            	result.offs = offset;
-		            }
-		            else {
-		            	result.mn += reg_name;
-		            }
-
-		            if (( prefix_ix || prefix_iy ) && r_dst != 0x06 ) {
-		            	result.mn  += ', ' + reg_name;
-		            }
-
-		            return result;
-		        }
-
-		        result.mn = 'NOP';
-		        return result;
-			}
-
-		    if ( opcode == 0x00 ) {
-		        result.mn = 'NOP';
-		        return result;
-		    }
-
-		    // 01xxxxxx
-		    if ( ( opcode & 0xc0 ) == 0x40 ) {
-		        // LD r, r'
-		        // LD r, (HL)
-		        // LD (HL), r
-		        // LD r, (IX + d)
-		        // LD r, (IY + d)
-		        // LD (IX + d), r
-		        // LD (IY + d), r
-		        // HALT
-		        // + недокументированные
-
-		        var r_dst = (opcode >> 3) & 0x07;
-		        var r_src = opcode & 0x07;    
-
-		        if (r_src == 0x06 && r_dst == 0x06) {
-		            // HALT
-		            result.mn = 'HALT';
-		            return result;
-		        }
-
-		        var r_src_name;
-		        switch (r_src) {
-		            case 0x00: r_src_name = 'B'; break;
-		            case 0x01: r_src_name = 'C'; break;
-		            case 0x02: r_src_name = 'D'; break;
-		            case 0x03: r_src_name = 'E'; break;
-		            case 0x04: 
-		                if (prefix_ix && r_dst != 0x06) {
-		                    r_src_name = 'IX&h';
-		                }
-		                else if (prefix_iy && r_dst != 0x06) {
-		                    r_src_name = 'IY&h';
-		                }
-		                else {
-		                    r_src_name = 'H'; 
-		                }
-		                break;
-
-		            case 0x05: 
-		                if (prefix_ix && r_dst != 0x06) {
-		                    r_src_name = 'IX&l';
-		                }
-		                else if (prefix_iy && r_dst != 0x06) {
-		                    r_src_name = 'IY&l';
-		                }
-		                else {
-		                    r_src_name = 'L'; 
-		                }
-		                break;
-
-		            case 0x06:
-		                var addr;
-		                if (prefix_ix) {
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    r_src_name = '(IX + offs)';
-		                }
-		                else if (prefix_iy) {
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    r_src_name = '(IY + offs)';
-		                }
-		                else {
-		                    r_src_name = '(HL)';
-		                }
-		                break;
-
-		            case 0x07: r_src_name = 'A'; break;
-		        }
-
-		        var r_dst_name;
-		        switch (r_dst) {
-		            case 0x00: r_dst_name = 'B'; break;
-		            case 0x01: r_dst_name = 'C'; break;
-		            case 0x02: r_dst_name = 'D'; break;
-		            case 0x03: r_dst_name = 'E'; break;
-		            case 0x04: 
-		                if (prefix_ix && r_src != 0x06) {
-		                    r_dst_name = 'IX&h';
-		                }
-		                else if (prefix_iy && r_src != 0x06) {
-		                    r_dst_name = 'IY&h';
-		                }
-		                else {
-		                    r_dst_name = 'H'; 
-		                }
-		                break;
-
-		            case 0x05: 
-		                if (prefix_ix && r_src != 0x06) {
-		                    r_dst_name = 'IX&l';
-		                }
-		                else if (prefix_iy && r_src != 0x06) {
-		                    r_dst_name = 'IY&l';
-		                }
-		                else {
-		                    r_dst_name = 'L'; 
-		                }
-		                break;
-
-		            case 0x06: 
-		                var addr;
-		                if (prefix_ix) {
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    r_dst_name = '(IX + offs)';
-		                }
-		                else if (prefix_iy) {
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    r_dst_name = '(IY + offs)';
-		                }
-		                else {
-		                    r_dst_name = '(HL)';
-		                }
-		                break;
-
-		            case 0x07: r_dst_name = 'A'; break;
-		        }            
-
-		        result.mn = 'LD ' + r_dst_name + ', ' + r_src_name;
-
-		        return result;
-		    }
-
-		    // 00xxx110
-		    if ( ( opcode & 0xc7 ) == 0x06 ) {
-		        // LD r, n
-		        // LD (HL), n
-		        // LD (IX + d), n
-		        // LD (IY + d), n
-		        // + недокументированные
-
-		        var r_dst = (opcode >> 3) & 0x07;
-		        var r_dst_name;
-		        switch (r_dst) {
-		            case 0x00: r_dst_name = 'B'; break;
-		            case 0x01: r_dst_name = 'C'; break;
-		            case 0x02: r_dst_name = 'D'; break;
-		            case 0x03: r_dst_name = 'E'; break;
-		            case 0x04: 
-		                if (prefix_ix) {
-		                    r_dst_name = 'IX&h';
-		                }
-		                else if (prefix_iy) {
-		                    r_dst_name = 'IY&h';
-		                }
-		                else {
-		                    r_dst_name = 'H';
-		                }
-		                break;
-
-		            case 0x05: 
-		                if (prefix_ix) {
-		                    r_dst_name = 'IX&l';
-		                }
-		                else if (prefix_iy) {
-		                    r_dst_name = 'IY&l';
-		                }
-		                else {
-		                    r_dst_name = 'L';
-		                }
-		                break;
-
-		            case 0x06: 
-		                var addr;
-		                if (prefix_ix) {
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    r_dst_name = '(IX + offs)';
-		                }
-		                else if (prefix_iy) {
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    r_dst_name = '(IY + offs)';
-		                }
-		                else {
-		                    r_dst_name = '(HL)';
-		                }                    
-		                break;
-
-		            case 0x07: r_dst_name = 'A'; break;
-		        }
-
-		        result.val8 = read_memory_byte(bus, result.next++);
-		        result.bytes.push(result.val8);
-		        result.mn = 'LD ' + r_dst_name + ', val8';
-
-		        return result;
-		    }
-
-		    // 00xxx010
-		    if ( (opcode & 0xc7 ) == 0x02 ) {
-		        // LD A, (BC)
-		        // LD A, (DE)
-		        // LD A, (nn)
-		        // LD HL, (nn)
-		        // LD IX, (nn)
-		        // LD IY, (nn)
-
-		        // LD (BC), A
-		        // LD (DE), A
-		        // LD (nn), A
-		        // LD (nn), HL
-		        // LD (nn), IX
-		        // LD (nn), IY
-
-		        var to_reg = !!(opcode & 0x08);
-		        var r_code = (opcode >> 4) & 0x03;
-
-		        if (to_reg) {
-		            switch (r_code) {
-		                case 0x00: result.mn = 'LD A, (BC)'; break;
-		                case 0x01: result.mn = 'LD A, (DE)'; break;
-		                case 0x02: 
-		                    // HL, (nn)
-		                    var addr = read_memory_word(bus, result.next);
-		                    result.next += 2;
-		                    result.bytes.push(addr & 0xff);
-		                    result.bytes.push(addr >> 8);
-
-		                    if (prefix_ix) {
-		                        result.mn = 'LD IX, (addr)';
-		                    }
-		                    else if (prefix_iy) {
-		                        result.mn = 'LD IY, (addr)';
-		                    }
-		                    else {
-		                        result.mn = 'LD HL, (addr)';
-		                    }
-
-		                    result.addr = addr;
-		                    break;
-
-		                case 0x03:
-		                    // A, (nn)
-		                    var addr = read_memory_word(bus, result.next);
-		                    result.next += 2;
-		                    result.bytes.push(addr & 0xff);
-		                    result.bytes.push(addr >> 8);
-		                    result.mn = 'LD A, (addr)';
-		                    result.addr = addr;
-		                    break;
-		            }
-		        }
-		        else {
-		            switch (r_code) {
-		                case 0x00: result.mn = 'LD (BC), A'; break;
-		                case 0x01: result.mn = 'LD (DE), A'; break;
-		                case 0x02:
-		                    // (nn), HL
-		                    var addr = read_memory_word(bus, result.next);
-		                    result.next += 2;
-		                    result.bytes.push(addr & 0xff);
-		                    result.bytes.push(addr >> 8);
-
-		                    if (prefix_ix) {
-		                        result.mn = 'LD (addr), IX'
-		                    }
-		                    else if (prefix_iy) {
-		                        result.mn = 'LD (addr), IY'
-		                    }
-		                    else {
-		                        result.mn = 'LD (addr), HL'
-		                    }
-
-		                    result.addr = addr;
-		                    break;
-
-		                case 0x03:
-		                    // (nn), A
-		                    var addr = read_memory_word(bus, result.next);
-		                    result.next += 2;
-		                    result.bytes.push(addr & 0xff);
-		                    result.bytes.push(addr >> 8);
-
-		                    result.mn = 'LD (addr), A';
-		                    result.addr = addr;
-		                    break;
-		            }
-		        }
-
-		        return result;
-		    }
-
-		    // 00xx0001
-		    if ( ( opcode & 0xcf ) == 0x01 ) {
-		        // LD dd, nn
-		        // LD IX, nn
-		        // LD IY, nn
-
-                var value = read_memory_word(bus, result.next);
-                result.next += 2;
-                result.bytes.push(value & 0xff);
-                result.bytes.push(value >> 8);
-
-		        var dd = (opcode >> 4) & 0x03;
-
-		        var reg_name;
-		        switch (dd) {
-		            case 0x00: reg_name = 'BC'; break;
-		            case 0x01: reg_name = 'DE'; break;
-		            case 0x02: 
-		                if (prefix_ix) {
-		                    reg_name = 'IX';
-		                }
-		                else if (prefix_iy) {
-		                    reg_name = 'IY'
-		                }
-		                else {
-		                    reg_name = 'HL'
-		                }
-		                break;
-
-		            case 0x03: reg_name = 'SP'; break;
-		        }
-
-		        result.mn = 'LD ' + reg_name + ', val16';
-		        result.val16 = value;
-		        return result;
-		    }
-
-		    // 11xx0x01
-		    if ( (opcode & 0xcb) == 0xc1 ) {
-		        // PUSH qq
-		        // PUSH IX
-		        // PUSH IY
-		        // POP qq
-		        // POP IX
-		        // POP IY
-
-		        var to_reg = !(opcode & 0x04);
-		        var qq = (opcode >> 4) & 0x03;
-
-		        var reg_name;
-		        switch (qq) {
-		            case 0x00: reg_name = 'BC'; break;
-		            case 0x01: reg_name = 'DE'; break;
-		            case 0x02:
-		                if (prefix_ix) {
-		                    reg_name = 'IX';
-		                }
-		                else if (prefix_iy) {
-		                    reg_name = 'IY';
-		                }
-		                else {
-		                    reg_name = 'HL';
-		                }
-		                break;
-
-		            case 0x03: reg_name = 'AF'; break;
-		        }
-
-		        result.mn = ( to_reg ? 'POP ' : 'PUSH ' ) + reg_name;
-		        return result;
-		    }
-
-		    // 11111001
-		    if ( opcode == 0xf9 ) {
-		        // LD SP, HL
-		        // LD SP, IX
-		        // LD SP, IY
-
-		        if (prefix_ix) {
-		            result.mn = 'LD SP, IX';
-		        }
-		        else if (prefix_iy) {
-		            result.mn = 'LD SP, IY';
-		        }
-		        else {
-		            result.mn = 'LD SP, HL';
-		        }
-
-		        return result;
-		    }
-
-		    if ( opcode == 0xeb ) {
-		        // EX DE, HL
-		        result.mn = 'EX DE, HL';
-		        return result;
-		    }
-
-		    if ( opcode == 0x08 ) {
-		        // EX AF, AF'
-		        result.mn = 'EX AF, AF\'';
-		        return result;
-		    }
-
-		    if ( opcode == 0xd9 ) {
-		        // EXX
-		        result.mn = 'EXX';
-		        return result;
-		    }
-
-		    if ( opcode == 0xe3 ) {
-		        // EX (SP), HL
-		        // EX (SP), IX
-		        // EX (SP), IY
-
-		        if (prefix_ix) {
-		            result.mn = 'EX (SP), IX';
-		        }
-		        else if (prefix_iy) {
-		            result.mn = 'EX (SP), IY';
-		        }
-		        else {
-		            result.mn = 'EX (SP), HL';
-		        }
-
-		        return result;
-		    }
-
-		    // 10xxxxxx and 11xxx110
-		    if ( ( opcode & 0xc0 ) == 0x80 || ( opcode & 0xc7 ) == 0xc6 ) {
-		        // ADD A, r
-		        // ADD A, n
-		        // ADD A, (HL)
-		        // ADD A, (IX + d)
-		        // ADD A, (IY + d)
-		        // ADC A, r
-		        // ADC A, n
-		        // ADC A, (HL)
-		        // ADC A, (IX + d)
-		        // ADC A, (IY + d)
-		        // SUB r
-		        // SUB n
-		        // SUB (HL)
-		        // SUB (IX + d)
-		        // SUB (IY + d)
-		        // SBC A, r
-		        // SBC A, n
-		        // SBC A, (HL)
-		        // SBC A, (IX + d)
-		        // SBC A, (IY + d)
-		        // AND r
-		        // AND n
-		        // AND (HL)
-		        // AND (IX + d)
-		        // AND (IY + d)
-		        // OR r
-		        // OR n
-		        // OR (HL)
-		        // OR (IX + d)
-		        // OR (IY + d)
-		        // XOR r
-		        // XOR n
-		        // XOR (HL)
-		        // XOR (IX + d)
-		        // XOR (IY + d)                
-		        // CP r
-		        // CP n
-		        // CP (HL)
-		        // CP (IX + d)
-		        // CP (IY + d)
-		        // + недокументированные
-
-		        var operand;
-		        var explicit_operand = !!(opcode & 0x40);
-		        if (explicit_operand) {
-		            operand = 'val8';
-		            result.val8 = read_memory_byte(bus, result.next++); // n
-		            result.bytes.push(result.val8);
-		        }
-		        else {
-		            var r1 = opcode & 0x07;
-		            switch (r1) {
-		                case 0x00: operand = 'B'; break; // B
-		                case 0x01: operand = 'C'; break; // C
-		                case 0x02: operand = 'D'; break; // D
-		                case 0x03: operand = 'E'; break; // E
-		                case 0x04: 
-		                    if (prefix_ix) {
-		                        operand = 'IX&h'; // IXh
-		                    }
-		                    else if (prefix_iy) {
-		                        operand = 'IY&h'; // IYh
-		                    }
-		                    else {
-		                        operand = 'H'; // H
-		                    }
-		                    break;
-
-		                case 0x05: 
-		                    if (prefix_ix) {    
-		                        operand = 'IX&l'; // IXl
-		                    }
-		                    else if (prefix_iy) {
-		                        operand = 'IY&l'; // IYl
-		                    }
-		                    else {
-		                        operand = 'L'; // L
-		                    }
-		                    break;
-
-		                case 0x06:
-		                    if (prefix_ix) {
-		                        operand = '(IX + offs)'; // (IX + d)
-		                        result.offs = read_memory_byte(bus, result.next++);
-		                        result.bytes.push(result.offs);
-		                    }
-		                    else if (prefix_iy) {
-		                        operand = '(IY + offs)'; // (IY + d)
-		                        result.offs = read_memory_byte(bus, result.next++);
-		                        result.bytes.push(result.offs);
-		                    }
-		                    else {
-		                        operand = operand = '(HL)'; // (HL)
-		                    }
-		                    break;
-
-		                case 0x07: operand = 'A'; break; // A
-		            }
-		        }
-
-		        var logic = !!(opcode & 0x20);
-		        if (logic) { // logic
-		            var subcode = (opcode >> 3) & 0x03;
-
-		            switch (subcode) {
-		                case 0x00: result.mn = 'AND ' + operand; break;
-		                case 0x01: result.mn = 'XOR ' + operand; break;
-		                case 0x02: result.mn = 'OR ' + operand; break;
-		                case 0x03: result.mn = 'CP ' + operand; break;
-		            }
-		        }
-		        else { // arithmetic
-		            var care_case = !!(opcode & 0x08);
-		            var addition = !(opcode & 0x10);
-
-		            if (addition) {
-		                result.mn = ( care_case ? 'ADC A, ' : 'ADD A, ' ) + operand;
-		            }
-		            else {
-		                result.mn = ( care_case ? 'SBC A, ' : 'SUB ' ) + operand;
-		            }
-		        }
-
-		        return result;
-		    }
-
-		    // 00xxx10x
-		    if ( (opcode & 0xc6 ) == 0x04 ) {
-		        // INC r
-		        // INC (HL)
-		        // INC (IX + d)
-		        // INC (IY + d)
-		        // DEC r
-		        // DEC (HL)
-		        // DEC (IX + d)
-		        // DEC (IY + d)
-		        // + недокументированные
-
-
-		        var r1 = (opcode >> 3) & 0x07;
-		        var cmd_inc = !(opcode & 0x01);
-
-		        var reg_name;
-		        switch (r1) {
-		            case 0x00: reg_name = 'B'; break;
-		            case 0x01: reg_name = 'C'; break;
-		            case 0x02: reg_name = 'D'; break;
-		            case 0x03: reg_name = 'E'; break;
-		            case 0x04:
-		                if (prefix_ix) {
-		                    reg_name = 'IX&h';
-		                }
-		                else if (prefix_iy) {
-		                    reg_name = 'IY&h';
-		                }
-		                else {
-		                    reg_name = 'H';
-		                }
-		                break;
-
-		            case 0x05:
-		                if (prefix_ix) {
-		                    reg_name = 'IX&l';
-		                }
-		                else if (prefix_iy) {
-		                    reg_name = 'IY&l';
-		                }
-		                else {
-		                    reg_name = 'L';
-		                }
-		                break;   
-
-		            case 0x06:
-		                if (prefix_ix) {
-		                    // (IX + d)
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    reg_name = '(IX + offs)';
-		                }
-		                else if (prefix_iy) {
-		                    // (IY + d)
-		                    result.offs = read_memory_byte(bus, result.next++);
-		                    result.bytes.push(result.offs);
-		                    reg_name = '(IY + offs)';
-		                }
-		                else {
-		                    // (HL)
-		                    reg_name = '(HL)';
-		                }
-		                break;
-
-		            case 0x07: reg_name = 'A'; break;
-		        }
-
-		        result.mn = ( cmd_inc ? 'INC ' : 'DEC ' ) + reg_name;
-		        return result;
-		    }
-
-		    // 1111x011
-		    if ( (opcode & 0xf7 ) == 0xf3 ) {
-		        // DI
-		        // EI
-
-		        var allow_int = !!(opcode & 0x08);
-		        result.mn = allow_int ? 'EI' : 'DI';
-		        return result;
-		    }
-
-		    // 00100111
-		    if ( opcode == 0x27 ) {
-		        // DAA
-		        result.mn = 'DAA';
-		        return result;
-		    }
-
-		    // 00101111
-		    if ( opcode == 0x2f ) {
-		        // CPL
-
-		        result.mn = 'CPL';
-		        return result;
-		    }
-
-		    // 00111111
-		    if ( opcode == 0x3f ) {
-		        // CCF
-
-		        result.mn = 'CCF';
-		        return result;
-		    }
-
-		    // 00110111
-		    if ( opcode == 0x37 ) {
-		        // SCF
-
-		        result.mn = 'SCF';
-		        return result;
-		    }
-
-		    // 00xx1001
-		    if ( ( opcode & 0xcf ) == 0x09 ) {
-		        // ADD HL, ss
-		        // ADD IX, pp
-		        // ADD IY, rr
-
-		        var ss = (opcode >> 4) & 0x03;
-		        var operand;
-		        switch (ss) {
-		            case 0x00: operand = 'BC'; break; // BC
-		            case 0x01: operand = 'DE'; break; // DE
-		            case 0x02:
-		                if (prefix_ix) {
-		                    operand = 'IX'; // IX
-		                }
-		                else if (prefix_iy) {
-		                    operand = 'IY'; // IY
-		                }
-		                else {
-		                    operand = 'HL'; // HL
-		                }
-		                break;
-
-		            case 0x03: operand = 'SP'; break; // SP
-		        }
-
-		        if (prefix_ix) {
-		            result.mn = 'ADD IX, ' + operand;
-		        }
-		        else if (prefix_iy) {
-		            result.mn = 'ADD IY, ' + operand;
-		        }
-		        else {
-		            result.mn = 'ADD HL, ' + operand;
-		        }
-
-		        return result;
-		    }
-
-		    // 00xxx011
-		    if ( (opcode & 0xc7 ) == 0x03 ) {
-		        // INC ss
-		        // INC IX
-		        // INC IY
-		        // DEC ss
-		        // DEC IX
-		        // DEC IY
-
-		        var cmd_inc = !(opcode & 0x08);
-		        var ss = (opcode >> 4) & 0x03;
-
-		        var reg_name;
-		        switch (ss) {
-		            case 0x00: reg_name = 'BC'; break; // BC
-		            case 0x01: reg_name = 'DE'; break; // DE
-		            case 0x02:
-		                if (prefix_ix) {
-		                    reg_name = 'IX'; // IX
-		                }
-		                else if (prefix_iy) {
-		                    reg_name = 'IY'; // IY
-		                }
-		                else {
-		                    reg_name = 'HL'; // HL
-		                }
-		                break;
-
-		            case 0x03: reg_name = 'SP'; break; // SP
-		        }
-
-		        result.mn = ( cmd_inc ? 'INC ' : 'DEC ' ) + reg_name;
-		        return result;
-		    }
-
-		    // 000xx111
-		    if ( (opcode & 0xe7 ) == 0x07 ) {
-		        // RLCA
-		        // RLA
-		        // RRCA
-		        // RRA
-
-		        var left = !(opcode & 0x08);
-		        var carry = !(opcode & 0x10);
-
-		        result.mn = 'R' + ( left ? 'L' : 'R' ) + ( carry ? 'C' : '' ) + 'A';
-		        return result;
-		    }
-
-		    // 11000011
-		    if ( opcode == 0xc3 ) {
-		        // JP nn
-
-                result.addr = read_memory_word(bus, result.next);
-                result.next += 2;
-                result.bytes.push(result.addr & 0xff);
-                result.bytes.push(result.addr >> 8);
-		        result.mn = 'JP addr';
-		        return result;
-		    }
-
-		    // 11xxx010
-		    if ( (opcode & 0xc7 ) == 0xc2 ) {
-		        // JP cc, nn
-
-		        var condition_code = (opcode >> 3) & 0x07;
-
-		        var condition;
-		        switch (condition_code) {
-		            case 0x00: condition = 'NZ'; break; // NZ
-		            case 0x01: condition = 'Z'; break; // Z
-		            case 0x02: condition = 'NC'; break; // NC
-		            case 0x03: condition = 'C'; break; // C
-		            case 0x04: condition = 'PO'; break; // PO
-		            case 0x05: condition = 'PE'; break; // PE
-		            case 0x06: condition = 'P'; break; // P
-		            case 0x07: condition = 'M'; break; // M
-		        }
-
-                result.addr = read_memory_word(bus, result.next);
-                result.next += 2;
-                result.bytes.push(result.addr & 0xff);
-                result.bytes.push(result.addr >> 8);
-		        result.mn = 'JP ' + condition + ', addr';
-		        return result;
-		    }
-
-		    // 00xxx000 where xxx >= 010
-		    if ( ( opcode & 0xc7 ) == 0x00 && ( opcode & 0x38 ) >= 0x10 ) {
-		        // JR e
-		        // JR C, e
-		        // JR NC, e
-		        // JR Z, e
-		        // JR NZ, e
-		        // DJNZ e
-
-		        var condition_code = (opcode >> 3) & 0x07;
-
-		        var condition;
-		        switch (condition_code) {
-		            case 0x02: result.mn = 'DJNZ addr'; break;
-		            case 0x03: result.mn = 'JR addr'; break; // JR e
-		            case 0x04: result.mn = 'JR NZ, addr'; break; // JR NZ, e
-		            case 0x05: result.mn = 'JR Z, addr'; break; // JR Z, e
-		            case 0x06: result.mn = 'JR NC, addr'; break; // JR NC, e
-		            case 0x07: result.mn = 'JR C, addr'; break; // JR C, e
-		        }
-
-		        var offset = read_memory_byte(bus, result.next++);
-		        result.bytes.push(offset);
-
-		        result.addr = result.next;
-		        if ( offset & 0x80 ) {
-		            result.addr -= ((offset ^ 0xff) + 1);
-		        }
-		        else {
-		            result.addr += offset;
-		        }
-
-		        return result;
-		    }
-
-		    // 11101001
-		    if ( opcode == 0xe9 ) {
-		        // JP (HL)
-		        // JP (IX)
-		        // JP (IY)
-		        // * это не косвенная адресация, читать мнемонику без скобок!
-
-		        if (prefix_ix) {
-		            result.mn = 'JP (IX)';
-		        }
-		        else if (prefix_iy) {
-		            result.mn = 'JP (IY)';
-		        }
-		        else {
-		            result.mn = 'JP (HL)';
-		        }
-
-		        return result;
-		    }
-
-		    // 11001101
-		    if ( opcode == 0xcd ) {
-		        // CALL nn
-
-                result.addr = read_memory_word(bus, result.next);
-                result.next += 2;
-                result.bytes.push(result.addr & 0xff);
-                result.bytes.push(result.addr >> 8);
-		        result.mn = 'CALL addr';
-		        return result;
-		    }
-
-		    // 11xxx100
-		    if ( ( opcode & 0xc7 ) == 0xc4 ) {
-		        // CALL cc, nn
-
-		        var condition_code = (opcode >> 3) & 0x07;
-
-		        var condition;
-		        switch (condition_code) {
-		            case 0x00: condition = 'NZ'; break; // NZ
-		            case 0x01: condition = 'Z'; break; // Z
-		            case 0x02: condition = 'NC'; break; // NC
-		            case 0x03: condition = 'C'; break; // C
-		            case 0x04: condition = 'PO'; break; // PO
-		            case 0x05: condition = 'PE'; break; // PE
-		            case 0x06: condition = 'P'; break; // P
-		            case 0x07: condition = 'M'; break; // M
-		        }
-
-                result.addr = read_memory_word(bus, result.next);
-                result.next += 2;
-                result.bytes.push(result.addr & 0xff);
-                result.bytes.push(result.addr >> 8);
-		        result.mn = 'CALL ' + condition + ', addr';
-		        return result;
-		    }
-
-		    // 11001001
-		    if ( opcode == 0xc9 ) {
-		        // RET
-
-		        result.mn = 'RET';
-		        return result;
-		    }
-
-		    // 11xxx000
-		    if ( ( opcode & 0xc7 ) == 0xc0 ) {
-		        // RET cc
-
-		        var condition_code = (opcode >> 3) & 0x07;
-
-		        var condition;
-		        switch (condition_code) {
-		            case 0x00: condition = 'NZ'; break; // NZ
-		            case 0x01: condition = 'Z'; break; // Z
-		            case 0x02: condition = 'NC'; break; // NC
-		            case 0x03: condition = 'C'; break; // C
-		            case 0x04: condition = 'PO'; break; // PO
-		            case 0x05: condition = 'PE'; break; // PE
-		            case 0x06: condition = 'P'; break; // P
-		            case 0x07: condition = 'M'; break; // M
-		        }
-
-		        result.mn = 'RET ' + condition;
-		        return result;
-		    }
-
-		    // 11xxx111
-		    if ( (opcode & 0xc7 ) == 0xc7 ) {
-		        // RST p
-
-		        var rst_code = (opcode >> 3) & 0x07;
-		        var addr = rst_code << 3; // code * 8
-
-		        result.mn = 'RST addr';
-		        result.addr = addr;
-		        return result;
-		    }
-
-		    // 1101x011
-		    if ( ( opcode & 0xf7 ) == 0xd3 ) {
-		        // IN A, (n)
-		        // OUT (n), A
-
-		        var port_low = read_memory_byte(bus, result.next++);
-
-		        result.bytes.push(port_low);
-		        result.port = port_low;
-
-		        var cmd_in = !!(opcode & 0x08);
-		        if (cmd_in) {
-		            // IN
-		            result.mn = 'IN A, (port)'
-		        }
-		        else {
-		            // OUT
-		            result.mn = 'OUT (port), A'
-		        }
-
-		        return result;
-		    } 
-
-		    result.mn = 'UNKNOWN';
-		    return result;
-		}		
-	})();
+			return chunks.join('\t');
+		}
+	}
 </script>

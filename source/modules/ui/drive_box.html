@@ -38,22 +38,37 @@
 	}
 
 	.drive-box .status {
-		display: none;
+		display: inline-block;
 		width: 16px;
 		height: 24px;
 		background-color: transparent;
 		background-position: center center;
 		background-repeat: no-repeat;
-		vertical-align: middle;
-		display: inline-block;
+		vertical-align: top;
+		color: black;
+		border-top: 1px solid transparent;
+		border-bottom: 1px solid transparent;
+		font: 14px/22px Arial;
+		text-align: center;
 	}
-	.drive-box .error {
-		display: inline-block;
-		background-image: url('../img/error.png');
+	.drive-box .status.-motor {
+		color: #7FFF7F;
 	}
-	.drive-box .loading {
+	.drive-box .status.-motor.-head_0 {
+		border-top-color: #7FFF7F;
+	}
+	.drive-box .status.-motor.-head_1 {
+		border-bottom-color: #7FFF7F;
+	}
+	.drive-box .status.error {
 		display: inline-block;
-		background-image: url('../img/process.gif');
+		background-image: url('../images/error.png');
+		color: transparent;
+	}
+	.drive-box .status.loading {
+		display: inline-block;
+		background-image: url('../images/process.gif');
+		color: transparent;
 	}
 
 	.drive-box .action-list {
@@ -124,6 +139,9 @@
 		this.removeAction = removeAction;
 		this.beginInit = beginInit;
 		this.endInit = endInit;
+		this.set_cyl = set_cyl;
+		this.set_head = set_head;
+		this.set_motor = set_motor;
 
 		/////////////
 		// private //
@@ -159,6 +177,19 @@
 
 		function get_status(value) {
 			return status;
+		}
+
+		function set_cyl(value) {
+			$status.text(value);
+		}
+
+		function set_head(value) {
+			$status.toggleClass('-head_0', !value);
+			$status.toggleClass('-head_1', !!value);
+		}
+
+		function set_motor(value) {
+			$status.toggleClass('-motor', !!value);
 		}
 
 		function addAction(command, title) {

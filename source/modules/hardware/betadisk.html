@@ -1,0 +1,163 @@
+<include includeType="embed" source="floppy.js" />
+<include includeType="embed" source="vg93.js" />
+
+<script type="text/javascript">
+function ZX_BetaDisk() {
+	this.connect = connect;
+	this.get_state = get_state;
+
+	if (ZXContext.debugMode) {
+		this.startLogging = startLogging;
+		this.stopLogging = stopLogging;
+	}
+
+	var _bus;
+	var _clock;
+	var _drives = [];
+	var _rom_trdos = false;
+
+	var _drive = 0;
+	var _head = 0; // 0 - нижняя головка, 1 - верхняя
+	var _vg93;
+	var _headReady = 0;
+	var _doubleDensity = 0;
+	var _debugLog = null;
+	var _intervalsDependOnFrequency = true;
+	var _tstatesPerIntrq = 71680;
+	var _intrqPeriod = 20.48;
+
+	function connect(bus, clock, drives) {
+		_bus = bus;
+		_clock = clock;
+		_drives.push.apply(_drives, drives);
+		if (ZXContext.debugMode) {
+			_bus.on_io_read(debug_io_read);
+			_bus.on_io_write(debug_io_write);
+		}
+		else {
+			_bus.on_io_read(io_read);
+			_bus.on_io_write(io_write);
+		}
+		_bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
+		_bus.on_opt(function (name, value) {
+			_tstatesPerIntrq = value;
+			updateTimeFactor();
+		}, OPT_TSTATES_PER_INTRQ);
+		_bus.on_opt(function (name, value) {
+			_intrqPeriod = value;
+			updateTimeFactor();
+		}, OPT_INTRQ_PERIOD);
+		_vg93 = new VG93(clock);
+		_vg93.set_floppy(_drives[0]);
+		_vg93.masterReset();
+	}
+
+	function get_state() {
+		var state = {
+			vg93: _vg93.get_state(),
+			drive: _drive,
+			head: _head,
+			headReady: _headReady,
+			doubleDensity: _doubleDensity
+		};
+		return state;
+	}
+
+	function write_ff(value) {
+		var drive = value & 0x03;
+		if (_drive != drive) {
+			_drive = drive;
+			_vg93.set_floppy(_drives[drive]);
+		}
+		_headReady = +!!(value & 0x08);
+		_vg93.set_headReady(_headReady);
+		_doubleDensity = !(value & 0x40);
+		_vg93.set_doubleDensity(_doubleDensity);
+		var head = +!(value & 0x10);
+		if (_head != head) {
+			_head = head;
+			for (var i = 0; i < _drives.length; i++) {
+				_drives[i].set_head(head);
+			}
+		}
+		
+		if (!(value & 0x04)) {
+			_vg93.masterReset();
+		}
+	}
+
+	function read_ff() {
+		return (_vg93.get_intrq() << 7)
+			| (_vg93.get_drq() << 6)
+			| 0x00;
+	}
+
+	function io_write(address, value) {
+		if (_rom_trdos) {
+			if ((address & 0x9F) == 0x1F) {
+				_vg93.write((address >> 5) & 0x03, value);
+			}
+			else if ((address & 0xFF) == 0xFF) {
+				write_ff(value);
+			}
+		}
+	}
+
+	function io_read(address) {
+		if (_rom_trdos) {
+			if ((address & 0x9F) == 0x1F)
+				return _vg93.read((address >> 5) & 0x03);
+			if ((address & 0xFF) == 0xFF)
+				return read_ff();
+		}
+	}
+
+	function startLogging() {
+		if (!_debugLog) {
+			_debugLog = [];
+		}
+	}
+
+	function stopLogging() {
+		var log = _debugLog;
+		_debugLog = null;
+		return log;
+	}
+
+	function debug_io_write(address, value) {
+		if (_rom_trdos && _debugLog) {
+			_debugLog.push({ 
+				ts: _clock.get_ms(),
+				op: 'o',
+				port: address & 0xFF,
+				value: value
+			});
+		}
+		io_write(address, value);
+	}
+
+	function debug_io_read(address) {
+		var result = io_read(address);
+		if (_rom_trdos && _debugLog) {
+			_debugLog.push({
+				ts: _clock.get_ms(),
+				op: 'i',
+				port: address & 0xFF,
+				value: result
+			});
+		}
+		return result;
+	}
+
+	function var_write_rom_trdos(name, value) {
+		_rom_trdos = value;
+	}
+
+	function updateTimeFactor() {
+		var timeFactor = _intervalsDependOnFrequency
+			? (3500 * _intrqPeriod / _tstatesPerIntrq)
+			: 1;
+			_vg93.set_timeFactor(timeFactor);
+	}
+}
+</script>

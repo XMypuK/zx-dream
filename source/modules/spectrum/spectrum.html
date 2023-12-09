@@ -1,6 +1,5 @@
 <include includeType="embed" source="common.js" />
 <include includeType="embed" source="settings.js" />
-<include includeType="embed" source="diskimage.js" />
 <include includeType="embed" source="snapshot.js" />
 
 <include includeType="embed" source="../hardware/hardware.html" />
@@ -13,7 +12,8 @@ $(window).load(function() {
 	window.ZXContext = {
 		settings: new ZX_Settings(),
 		hw: {},
-		ui: {}
+		ui: {},
+		debugMode: (/(\&|\?)debug=?/).test(window.location.search)
 	};
 
 	ZXContext.ui.workspace = new ZX_Workspace();
@@ -28,7 +28,15 @@ $(window).load(function() {
 	ZXContext.hw.port_7ffd = new ZX_Port7FFD();
 	ZXContext.hw.keyboard = new ZX_Keyboard();
 	ZXContext.hw.mouse = new ZX_Mouse();
+	ZXContext.hw.drives = [
+		new ZX_Floppy(),
+		new ZX_Floppy(),
+		new ZX_Floppy(),
+		new ZX_Floppy()
+	];
 	ZXContext.hw.betadisk = new ZX_BetaDisk();
+	ZXContext.hw.joystick = new ZX_Joystick();
+	ZXContext.hw.dummyGS = new ZX_DummyGS();
 
 	ZXContext.hw.cpu.connect(ZXContext.hw.bus);
 	ZXContext.hw.clock.connect(ZXContext.hw.bus, ZXContext.hw.cpu);
@@ -39,7 +47,9 @@ $(window).load(function() {
 	ZXContext.hw.port_7ffd.connect(ZXContext.hw.bus);
 	ZXContext.hw.keyboard.connect(ZXContext.hw.bus);
 	ZXContext.hw.mouse.connect(ZXContext.hw.bus);
-	ZXContext.hw.betadisk.connect(ZXContext.hw.bus);
+	ZXContext.hw.betadisk.connect(ZXContext.hw.bus, ZXContext.hw.clock,	ZXContext.hw.drives);
+	ZXContext.hw.joystick.connect(ZXContext.hw.bus);
+	ZXContext.hw.dummyGS.connect(ZXContext.hw.bus);
 
 	ZXContext.ui.workspace.init();
 	
@@ -53,9 +63,10 @@ $(window).load(function() {
 	var debugMode = (/(\&|\?)debug=?/).test(window.location.search);
 
 	function start() {
-		if ( debugMode ) {
+		if ( ZXContext.debugMode ) {
+			var $debug = $(ZXContext.ui.workspace.get_debug());
 			$debug.show();
-			zxdebug.debug($debug[0], ZXContext.hw.cpu, ZXContext.hw.bus, ZXContext.hw.display, ZXContext.settings);
+			ZXContext.ui.debug = new ZX_Debug($debug[0]);
 			ZXContext.ui.workspace.adjustWorkspaceLayout();
 		}
 		else {

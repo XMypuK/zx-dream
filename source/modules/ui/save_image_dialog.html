@@ -31,6 +31,7 @@
 			if (!openResult$) {
 				openResult$ = $.Deferred();
 				formats = compatible_formats;
+				formats.sort();
 				init();
 			}
 			return openResult$;
@@ -63,20 +64,17 @@
 			$dlg.on('keydown', function(e) { e.stopPropagation(); });
 			$dlg.on('keyup', function(e) { e.stopPropagation(); });
 
-			$dlg.find('[name=format][value=trd]')
-				.prop('disabled', !$.grep(formats, function(e, i) { return (e == 'TRD') }).length);
-
-			$dlg.find('[name=format][value=fdi]')
-				.prop('disabled', !$.grep(formats, function(e, i) { return (e == 'FDI') }).length);
-
-			$dlg.find('[name=format][value=scl]')
-				.prop('disabled', !$.grep(formats, function(e, i) { return (e == 'SCL') }).length);
+			var $data = $dlg.find('.data');
+			$data.empty();
+			for (var i = 0; i < formats.length; i++) {
+				$data.append('<label><input type="radio" name="format" value="' + formats[i] + '" />&nbsp;' + formats[i] + '</label>');
+			}
 		}
 
 		function save() {
 			var $format = $dlg.find('[name=format]:checked');
 			if (!$format.length) {
-				alert('You have to choice image format.')
+				alert('You have to choice an image format.')
 				return;
 			}
 

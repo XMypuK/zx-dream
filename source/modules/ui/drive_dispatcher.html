@@ -1,0 +1,309 @@
+<include source="drive_box.html" includeType="embed" />
+
+<script type="text/javascript">
+
+var DiskImageFormat = {
+	FDI: 'FDI',
+	TRD: 'TRD',
+	SCL: 'SCL',
+	TD0: 'TD0',
+	UDI: 'UDI',
+	DSK: 'DSK',
+
+	getFromFileName: function(filename) {
+		var match = (/^[^\\\/]*\.(TRD|FDI|SCL|TD0|UDI|DSK)$/i).exec(filename);
+		if (!match)
+			throw new Error('Неподдерживаемый формат образа.');
+		return match[1].toUpperCase();
+	}
+}
+
+function ZX_DriveDispatcher(toolbar) {
+    var DB_COMMAND_OPEN = 'open';
+    var DB_COMMAND_OPEN_LOCAL = 'open-local';
+    var DB_COMMAND_SAVE_LOCAL = 'save-local';
+    var DB_COMMAND_CREATE = 'create';
+    var DB_COMMAND_EJECT = 'eject';
+
+    var driveBoxes = [];
+
+    this.addDriveBoxes = function () {
+        addDriveBox(toolbar, 0, doDriveBoxAction);
+        addDriveBox(toolbar, 1, doDriveBoxAction);
+        addDriveBox(toolbar, 2, doDriveBoxAction);
+        addDriveBox(toolbar, 3, doDriveBoxAction);
+    }
+
+    this.preloadImages = function () {
+        preload(0);
+        preload(1);
+        preload(2);
+        preload(3);
+    }
+
+    function addDriveBox(toolbar, index, handler) {
+        var fragment = document.createDocumentFragment();
+        var driveBox = new DriveBox(fragment, index, handler);
+        driveBox.beginInit();
+        driveBox.addAction(DB_COMMAND_OPEN, 'открыть с сервера...');
+        driveBox.addAction(DB_COMMAND_OPEN_LOCAL, 'открыть с дикска...');
+        driveBox.addAction(DB_COMMAND_SAVE_LOCAL, 'сохранить на диск...');
+        driveBox.addAction(DB_COMMAND_CREATE, 'создать...');
+        driveBox.addAction(DB_COMMAND_EJECT, 'извлечь');
+        driveBox.endInit();
+        $(toolbar).append(fragment);
+        driveBoxes.push(driveBox);
+        ZXContext.hw.drives[index].subscribe(function (eventName, eventArgs) {
+            onDriveEvent(index, eventName, eventArgs);
+        });
+    }
+
+    function doDriveBoxAction(command, driveIndex, driveBox) {
+        switch (command) {
+            case DB_COMMAND_OPEN: open(driveIndex, driveBox); break;
+            case DB_COMMAND_OPEN_LOCAL: openLocal(driveIndex, driveBox); break;
+            case DB_COMMAND_SAVE_LOCAL: saveLocal(driveIndex, driveBox); break;
+            case DB_COMMAND_CREATE: create(driveIndex, driveBox); break;
+            case DB_COMMAND_EJECT: eject(driveIndex, driveBox); break;
+        }
+    }
+
+    function onDriveEvent(index, eventName, eventArgs) {
+        switch (eventName) {
+            case 'SET_CYL': driveBoxes[index].set_cyl(eventArgs); break;
+            case 'SET_HEAD': driveBoxes[index].set_head(eventArgs); break;
+            case 'SET_MOTOR': driveBoxes[index].set_motor(eventArgs); break;
+        }
+    }
+
+    function open(driveIndex, driveBox) {
+        var browser = new ServerBrowser();
+        browser.open()
+            .then(function (filename) {
+                driveBox.set_status(DriveBoxStatus.loading);
+                return loadServerFile(filename).then(function (data) {
+                    try {
+                        var format = DiskImageFormat.getFromFileName(filename);
+                        switch (format) {
+                            case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
+                            case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
+                            case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
+                            case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
+                            case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
+                            case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
+                        }
+                        driveBox.set_status(DriveBoxStatus.loaded);
+                        driveBox.set_title(filename);
+                        ZXContext.settings.set_drive(driveIndex, 'server:' + filename);
+                        clearImageCache(driveIndex);
+                    }
+                    catch (error) {
+                        return $.Deferred().reject(error);
+                    }
+                });
+            })
+            .fail(function (errorMessage) {
+                if (errorMessage) {
+                    driveBox.set_status(DriveBoxStatus.error);
+                    alert(errorMessage);
+                }
+            });
+    }
+
+    function openLocal(driveIndex, driveBox) {
+        var $input = $('<input type="file" accept=".trd,.scl,.fdi,.td0,.udi,.dsk" style="visibility: hidden;" />').appendTo(document.body);
+        $input.on('change', function (e) {
+            var filename = ($input.val() || '').replace(/^.*[\\\/]/, '');
+            if (!filename)
+                return;
+            $.when()
+            .then(function () {
+                var format;
+                try { 
+                    format = DiskImageFormat.getFromFileName(filename); 
+                }
+                catch (error) { 
+                    return $.Deferred().reject(error); 
+                }
+                driveBox.set_status(DriveBoxStatus.loading);
+                return loadLocalFile($input[0]).then(function (data) {
+                    try {
+                        switch (format) {
+                            case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
+                            case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
+                            case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
+                            case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;                        
+                            case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
+                            case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
+                        }
+                        driveBox.set_status(DriveBoxStatus.loaded);
+                        driveBox.set_title(filename);
+                        ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
+                        createImageCache(driveIndex, filename, data);
+                    }
+                    catch (error) {
+                        return $.Deferred().reject(error);
+                    }
+                });
+            })
+            .then(function () {
+                $input.remove();
+            })
+            .fail(function (errorMessage) {
+                if (errorMessage) {
+                    driveBox.set_status(DriveBoxStatus.error);
+                    alert(errorMessage);
+                }
+                $input.remove();
+            });
+        });
+        $input.click();
+    }
+
+    function saveLocal(driveIndex, driveBox) {
+        var floppy = ZXContext.hw.drives[driveIndex];
+        if (!floppy.get_isReady()) {
+            alert('В приводе отсутствует диск.')
+            return;
+        }
+
+		var formats = floppy.getCompatibleFormats();
+		var dlg = new SaveImageDialog();
+		dlg.open(formats)
+            .then(function (format) {
+                try {
+                    var data;
+                    switch (format) {
+                        case 'TRD': data = floppy.saveToTRD(); break;
+                        case 'FDI': data = floppy.saveToFDI(); break;
+                        case 'SCL': data = floppy.saveToSCL(); break;
+                        case 'TD0': data = floppy.saveToTD0(); break;
+                        case 'UDI': data = floppy.saveToUDI();break;
+                        case 'DSK': throw new Error('Not implemented.'); break;
+                    }
+                    downloadBinaryData(data, 'custom_image.' + format);
+                }
+                catch (error) {
+                    return $.Deferred().reject(error);
+                }
+            })
+            .fail(function (errorMessage) {
+                if (errorMessage) {
+                    alert(errorMessage);
+                }
+            });
+    }
+
+    function create(driveIndex, driveBox) {
+        var dlg = new CreateImageDialog();
+		dlg.open()
+            .then(function (imageParams) {
+                ZXContext.hw.drives[driveIndex].create(
+                    imageParams.cyl_count,
+                    imageParams.head_count, 
+                    imageParams.trdos_format);
+                driveBox.set_status(DriveBoxStatus.loaded);
+                driveBox.set_title('custom_image.fdi');
+                ZXContext.settings.set_drive(driveIndex, 'local:custom_image.fdi');
+                createImageCache(driveIndex, 'custom_image.fdi', ZXContext.hw.drives[driveIndex].saveToFDI());
+            })
+            .fail(function (errorMessage) {
+                if (errorMessage) {
+                    alert(errorMessage);
+                }
+            });
+    }
+
+    function eject(driveIndex, driveBox) {
+        ZXContext.hw.drives[driveIndex].eject();
+        driveBox.set_status(DriveBoxStatus.empty);
+		driveBox.set_title('');
+        ZXContext.settings.set_drive(driveIndex, '');
+		clearImageCache(driveIndex);
+    }
+
+    function preload(driveIndex) {
+		var prefixAndFilename = ZXContext.settings.get_drive(driveIndex);
+		if (!prefixAndFilename)
+			return;
+        var driveBox = driveBoxes[driveIndex];
+        driveBox.set_status(DriveBoxStatus.loading);
+		$.when()
+            .then(function () {
+                var semicolonIndex = prefixAndFilename.indexOf(':');
+                var prefix = (semicolonIndex > 0) ? prefixAndFilename.substr(0, semicolonIndex) : '';
+                var filename = (semicolonIndex >= 0) ? prefixAndFilename.substr(semicolonIndex + 1) : prefixAndFilename;
+                var load = (prefix === 'local')
+                    ? loadImageCache(driveIndex).then(function (imageInfo) { return imageInfo.data; })
+                    : loadServerFile(filename);
+                return load.then(function (data) {
+                    try {
+                        var format = DiskImageFormat.getFromFileName(filename);
+                        switch (format) {
+                            case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
+                            case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
+                            case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
+                            case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
+                            case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
+                            case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
+                        }                    
+                        driveBox.set_status(DriveBoxStatus.loaded);
+                        driveBox.set_title(filename);
+                    }
+                    catch (error) {
+                        return $.Deferred().reject(error);
+                    }
+                })
+            })
+            .fail(function (errorMessage) {
+                if (errorMessage) {
+                    driveBox.set_status(DriveBoxStatus.error);
+                    alert(errorMessage);
+                }
+            });
+	}
+
+    function loadImageCache(driveIndex) {
+		if (!localStorage)
+			return;
+
+		var promise$ = $.Deferred();
+		try {
+			var cacheKey = 'drive' + driveIndex + "_cache";
+			var cacheData = localStorage[cacheKey];
+			if (!cacheData) 
+				throw new Error('Кэш не содержит образа.');
+			var dataSeparator = cacheData.indexOf(':');
+			if (dataSeparator <= 0 || dataSeparator == cacheData.length - 1)
+				throw new Error('Кэш содержит некорректные данные образа.');
+			var filename = cacheData.substr(0, dataSeparator);
+			var base64Data = cacheData.substr(dataSeparator + 1);
+			var data = base64Decode(base64Data);
+			promise$.resolve({
+				filename: filename,
+				data: data
+			});
+		}
+		catch (error) {
+			promise$.reject(error);
+		}
+		return promise$;
+	}
+
+    function createImageCache(driveIndex, filename, data) {
+		if (localStorage) {
+            var cacheKey = 'drive' + driveIndex + "_cache";
+            var cacheData = filename + ":" + base64Encode(data);
+            localStorage[cacheKey] = cacheData;
+        }
+    }
+
+    function clearImageCache(driveIndex) {
+		if (localStorage) {
+            var cacheKey = 'drive' + driveIndex + "_cache";
+            delete localStorage[cacheKey];
+        }
+    }
+}
+
+</script>
