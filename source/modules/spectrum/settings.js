@@ -60,6 +60,20 @@ function ZX_Settings() {
 		}
 	}
 
+	this.reset = function () {
+		this.set_tstatesPerIntrq(defaultValues.tstatesPerIntrq);
+		this.set_tstatesPerIntrqTurbo(defaultSettings.tstatesPerIntrqTurbo);
+		this.set_intrqPeriod(defaultSettings.intrqPeriod);
+		this.set_turboMode(defaultSettings.turboMode);
+		this.set_extendedMemory(defaultSettings.extendedMemory);
+		this.set_semicolors(defaultSettings.semicolors);
+		this.set_rendererType(defaultSettings.rendererType);
+		this.set_scaleType(defaultSettings.scaleType);
+		this.set_scaleValue(defaultSettings.scaleValue);
+		this.set_renderOnAnimationFrame(defaultSettings.renderOnAnimationFrame);
+		this.set_useTypedArrays(defaultSettings.useTypedArrays);
+	}
+	
 	this.get_defaultValues = function() {
 		return $.extend({}, defaultValues);
 	}
