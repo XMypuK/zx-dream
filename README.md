@@ -17,11 +17,13 @@
 - дисплей с возможностью переключения отображения из 5 или 7 страницы памяти (через порт #7FFD)
 - 40-клавишная клавиатура
 - Kempston-мышка (с виртуальным управлением)
+- Музыкальный сопроцессор AY-3-891x/YM2149 (нужна производительная система, и Edge тут, вероятно, не самый плохой вариант.)
 
 Другие возможности:
 
-- открытие и сохранение образов в форматах TRD, FDI, SCL
-- открытие и сохранение снимков SNA
+- открытие и сохранение образов в форматах TRD, FDI, SCL, TD0, UDI
+- открытие снимков SNA, Z80
+- сохранение снимков SNA
 - выбор способа отрисовки ( *putImageData*, *drawImage*, *WebGL* ) и масштабирования
 
 Вы можете взглянуть на эмулятор здесь: [ZX Spectrum online emulator](http://zx.researcher.su/)
@@ -54,11 +56,13 @@ The next hardware emulation was implemented:
 - display with the capability to switch the source memory page: 5 or 7 (via the port #7FFD)
 - 40-key keyboard
 - Kempston-mouse (virtual control)
+- PSG AY-3-891x/YM2149 (requires a high-performance system, and Edge is probably not the worst option here.)
 
 Other capabilities:
 
 - open and save images in TRD, FDI, SCL formats
-- open and save SNA snapshots
+- open SNA, Z80 snapshots
+- save SNA snapshots
 - select the rendering method ( *putImageData*, *drawImage*, *WebGL* ) and the scaling method
 
 You can take a look at the emulator here: [ZX Spectrum online emulator](http://zx.researcher.su/)
@@ -80,3 +84,11 @@ file that is placed at the top directory. (Probably also the next command must b
 ## License
 
 This project is under [MIT License](LICENSE)
+
+## Third party projects
+
+<table>
+    <tr><th><a href='https://github.com/alexanderk23/ayumi-js'>ayumi-js</a></th><td>Author: Peter Sovietov<br />Javascript version: Alexander Kovalenko</td><td><a href='https://raw.githubusercontent.com/alexanderk23/ayumi-js/master/LICENSE'>MIT license</a></td></tr>
+    <tr><th><a href='https://knockoutjs.com/'>Knockout</a></th><td>Copyright (c) 2010 Steven Sanderson, the Knockout.js team, and other contributors</td><td><a href='https://raw.githubusercontent.com/knockout/knockout/master/LICENSE'>MIT license</a></td></tr>
+    <tr><th><a href='https://jquery.com/'>jQuery</a></th><td>Copyright OpenJS Foundation and other contributors</td><td><a href='https://raw.githubusercontent.com/jquery/jquery/main/LICENSE.txt'>MIT license</a></td></tr>
+</table>
