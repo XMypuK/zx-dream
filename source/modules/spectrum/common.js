@@ -21,6 +21,10 @@ var VAL_RENDERER_PUT_IMAGE_DATA = 1;
 var VAL_RENDERER_DRAW_IMAGE = 2;
 var VAL_RENDERER_WEB_GL = 3;
 
+var VAL_PSG_OFF = 0;
+var VAL_PSG_AY_3_891X = 1;
+var VAL_PSG_YM_2149 = 2;
+
 function stringToBytes( str ) {
   	var ch;
   	var stack;
@@ -229,6 +233,10 @@ function isWebGLSupported() {
 
 function isTypedArraysSupported() {
 	return ('ArrayBuffer' in window);
+}
+
+function isAudioContextSupported() {
+	return !!(window.AudioContext || window.webkitAudioContext || window.audioContext);
 }
 
 function CRC16GEN(poly, init) {

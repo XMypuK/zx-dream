@@ -97,6 +97,22 @@
 					</tr>
 				</table>
 			</div>
+			<div class="settings__section settings-section" data-bind="css: { '-active': activeSection() == 'audio' }">
+				<table>
+					<tr>
+						<th>Музыкальный сопроцессор</th>
+						<td><select data-bind="options: psgOptions, optionsValue: 'value', optionsText: 'text', value: psg"></select></td>
+					</tr>
+					<tr>
+						<th>Тактовая частота муз.сопроцессора</th>
+						<td><select data-bind="options: psgClockOptions, optionsValue: 'value', optionsText: 'text', value: psgClock"></select></td>
+					</tr>
+					<tr>
+						<th>Размер выходного буфера</th>
+						<td><select data-bind="options: psgBufferSizeOptions, optionsValue: 'value', optionsText: 'text', value: psgBufferSize"></select></td>
+					</tr>
+				</table>
+			</div>
 			<div class="settings__section settings-section" data-bind="css: { '-active': activeSection() == 'misc' }">
 				<table>
 					<tr>
@@ -159,6 +175,30 @@
 			{ value: VAL_EXTENDED_MEMORY_PENTAGON, text: 'Pentagon 512 КБ' }
 		]);
 		this.extendedMemory = ko.observable(ZXContext.settings.get_extendedMemory());
+		this.psgOptions = ko.observableArray([
+			{ value: VAL_PSG_OFF, text: 'выключен' },
+			{ value: VAL_PSG_AY_3_891X, text: 'AY-3-891x' },
+			{ value: VAL_PSG_YM_2149, text: 'YM2149' }
+		]);
+		this.psg = ko.observable(ZXContext.settings.get_psg());
+		this.psgClockOptions = ko.observableArray([
+			{ value: 1773400, text: '1.7734 МГц (ZX-Spectrum 128K)' },
+			{ value: 1750000, text: '1.75 МГц (Pentagon)' },
+			{ value: 1764000, text: '1.764 МГц (TS 2068)' },
+			{ value: 1638190, text: '1.63819 МГц (Fuller Box)' }
+		]);
+		this.psgClock = ko.observable(ZXContext.settings.get_psgClock());
+		this.psgBufferSizeOptions = ko.observableArray([
+			{ value: 0, text: 'автоматически' },
+			{ value: 256, text: '256 байт' },
+			{ value: 512, text: '512 байт' },
+			{ value: 1024, text: '1 КБ' },
+			{ value: 2048, text: '2 КБ' },
+			{ value: 4096, text: '4 КБ' },
+			{ value: 8192, text: '8 КБ' },
+			{ value: 16384, text: '16 КБ' }
+		]);
+		this.psgBufferSize = ko.observable(ZXContext.settings.get_psgBufferSize());
 		this.useTypedArrays = ko.observable(ZXContext.settings.get_useTypedArrays());
 		this.renderOnAnimationFrame = ko.observable(ZXContext.settings.get_renderOnAnimationFrame());
 
@@ -178,6 +218,7 @@
 			{ value: 'bus', text: 'Шина' },
 			{ value: 'memory', text: 'Память' },
 			{ value: 'display', text: 'Дисплей' },
+			{ value: 'audio', text: 'Звук' },
 			{ value: 'misc', text: 'Другое' }
 		]);
 		this.activeSection = ko.observable('bus');
@@ -243,6 +284,9 @@
 			ZXContext.settings.set_scaleType(+model.scaleType() || defaultSettings.scaleType);
 			ZXContext.settings.set_scaleValue(+model.scaleValue() || defaultSettings.scaleValue);
 			ZXContext.settings.set_renderOnAnimationFrame(model.renderOnAnimationFrame());
+			ZXContext.settings.set_psg(+model.psg());
+			ZXContext.settings.set_psgClock(+model.psgClock() || defaultSettings.psgClock);
+			ZXContext.settings.set_psgBufferSize(+model.psgBufferSize());
 			ZXContext.settings.set_useTypedArrays(model.useTypedArrays());
 
 			if (openResult$) {

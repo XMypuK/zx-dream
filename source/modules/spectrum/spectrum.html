@@ -37,6 +37,7 @@ $(window).load(function() {
 	ZXContext.hw.betadisk = new ZX_BetaDisk();
 	ZXContext.hw.joystick = new ZX_Joystick();
 	ZXContext.hw.dummyGS = new ZX_DummyGS();
+	ZXContext.hw.psg = new ZX_PSG();
 
 	ZXContext.hw.cpu.connect(ZXContext.hw.bus);
 	ZXContext.hw.clock.connect(ZXContext.hw.bus, ZXContext.hw.cpu);
@@ -50,29 +51,33 @@ $(window).load(function() {
 	ZXContext.hw.betadisk.connect(ZXContext.hw.bus, ZXContext.hw.clock,	ZXContext.hw.drives);
 	ZXContext.hw.joystick.connect(ZXContext.hw.bus);
 	ZXContext.hw.dummyGS.connect(ZXContext.hw.bus);
+	ZXContext.hw.psg.subscribeOnStateChange(function (state) {
+		$(document.body).toggleClass('-sound_on', state == 'running');
+	});
+	ZXContext.hw.psg.connect(ZXContext.hw.bus, ZXContext.hw.clock);
 
 	ZXContext.ui.workspace.init();
 	
-	// ждем загрузки ПЗУ и диска
-	ZXContext.hw.rom.get_ready$().then(function () {
+	// ждем загрузки ПЗУ и инициализации аудио
+	$.when(
+		ZXContext.hw.rom.get_ready$().fail(function (error) {
+			alert('Не удалось загрузить ПЗУ: ' + error);
+		}),
+		ZXContext.hw.psg.get_ready$()
+	).then(function () {
 		start();
-	}).fail(function (error) {
-		alert('Не удалось загрузить ПЗУ: ' + error);
 	});
-
-	var debugMode = (/(\&|\?)debug=?/).test(window.location.search);
 
 	function start() {
 		if ( ZXContext.debugMode ) {
 			var $debug = $(ZXContext.ui.workspace.get_debug());
 			$debug.show();
 			ZXContext.ui.debug = new ZX_Debug($debug[0]);
-			ZXContext.ui.workspace.adjustWorkspaceLayout();
 		}
 		else {
 			ZXContext.hw.clock.run();
-			ZXContext.ui.workspace.adjustWorkspaceLayout();
 		}
+		ZXContext.ui.workspace.adjustWorkspaceLayout();
 	}
 });
 

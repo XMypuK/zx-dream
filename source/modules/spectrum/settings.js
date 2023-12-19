@@ -15,8 +15,11 @@ function ZX_Settings() {
 		drive0: 'Deja Vu #A.trd',
 		drive1: '',
 		drive2: '',
-		drive3: ''
-	};
+		drive3: '',
+		psg: 0,
+		psgClock: 1773400,
+		psgBufferSize: 0
+};
 	var values = {
 		semicolors: readFromStorage('semicolors'),
 		rendererType: readFromStorage('rendererType'),
@@ -32,7 +35,10 @@ function ZX_Settings() {
 		drive0: readFromStorage('drive0'),
 		drive1: readFromStorage('drive1'),
 		drive2: readFromStorage('drive2'),
-		drive3: readFromStorage('drive3')
+		drive3: readFromStorage('drive3'),
+		psg: readFromStorage('psg'),
+		psgClock: readFromStorage('psgClock'),
+		psgBufferSize: readFromStorage('psgBufferSize')
 	};
 
 	function readFromStorage(name) {
@@ -72,6 +78,9 @@ function ZX_Settings() {
 		this.set_scaleValue(defaultSettings.scaleValue);
 		this.set_renderOnAnimationFrame(defaultSettings.renderOnAnimationFrame);
 		this.set_useTypedArrays(defaultSettings.useTypedArrays);
+		this.set_psg(defaultSettings.psg);
+		this.set_psgClock(defaultSettings.psgClock);
+		this.set_psgBufferSize(defaultSettings.psgBufferSize);
 	}
 	
 	this.get_defaultValues = function() {
@@ -180,5 +189,29 @@ function ZX_Settings() {
 			return;
 		values['drive' + index] = value;
 		writeToStorage('drive' + index, value);
+	}
+	// Музыкальный сорпроцессор
+	this.get_psg = function() {
+		return values.psg;
+	}
+	this.set_psg = function(value) {
+		values.psg = value;
+		writeToStorage('psg', value);
+	}
+	// Частота музыкального сопроцессора
+	this.get_psgClock = function() {
+		return values.psgClock;
+	}
+	this.set_psgClock = function(value) {
+		values.psgClock = value;
+		writeToStorage('psgClock', value);
+	}
+	// Размер выходного буфера воспроизведения аудио
+	this.get_psgBufferSize = function() {
+		return values.psgBufferSize;
+	}
+	this.set_psgBufferSize = function(value) {
+		values.psgBufferSize = value;
+		writeToStorage('psgBufferSize', value);
 	}
 }

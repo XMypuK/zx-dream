@@ -264,6 +264,11 @@
             ZXContext.hw.bus.opt(OPT_SCALE, s.get_scaleValue());
             ZXContext.hw.bus.opt(OPT_USE_TYPED_ARRAYS, s.get_useTypedArrays());
             ZXContext.hw.bus.opt(OPT_RENDER_ON_ANIMATION_FRAME, s.get_renderOnAnimationFrame());
+            ZXContext.hw.psg.applySettings(
+                s.get_psg(),
+                s.get_psgClock(),
+                s.get_psgBufferSize()
+            );
         }
     }
 </script>
