@@ -31,12 +31,16 @@ function ZX_BetaDisk() {
 		_clock = clock;
 		_drives.push.apply(_drives, drives);
 		if (ZXContext.debugMode) {
-			_bus.on_io_read(debug_io_read);
-			_bus.on_io_write(debug_io_write);
+			_bus.on_io_read(dbg_io_read_vg93, { mask: 0x9F, value: 0x1F });
+			_bus.on_io_read(dbg_io_read_ff, { mask: 0xFF, value: 0xFF });
+			_bus.on_io_write(dbg_io_write_vg93, { mask: 0x9F, value: 0x1F });
+			_bus.on_io_write(dbg_io_write_ff, { mask: 0xFF, value: 0xFF });
 		}
 		else {
-			_bus.on_io_read(io_read);
-			_bus.on_io_write(io_write);
+			_bus.on_io_read(io_read_vg93, { mask: 0x9F, value: 0x1F });
+			_bus.on_io_read(io_read_ff, { mask: 0xFF, value: 0xFF });
+			_bus.on_io_write(io_write_vg93, { mask: 0x9F, value: 0x1F });
+			_bus.on_io_write(io_write_ff, { mask: 0xFF, value: 0xFF });
 		}
 		_bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
 		_bus.on_opt(function (name, value) {
@@ -63,52 +67,48 @@ function ZX_BetaDisk() {
 		return state;
 	}
 
-	function write_ff(value) {
-		var drive = value & 0x03;
-		if (_drive != drive) {
-			_drive = drive;
-			_vg93.set_floppy(_drives[drive]);
-		}
-		_headReady = +!!(value & 0x08);
-		_vg93.set_headReady(_headReady);
-		_doubleDensity = !(value & 0x40);
-		_vg93.set_doubleDensity(_doubleDensity);
-		var head = +!(value & 0x10);
-		if (_head != head) {
-			_head = head;
-			for (var i = 0; i < _drives.length; i++) {
-				_drives[i].set_head(head);
-			}
-		}
-		
-		if (!(value & 0x04)) {
-			_vg93.masterReset();
-		}
-	}
-
-	function read_ff() {
-		return (_vg93.get_intrq() << 7)
-			| (_vg93.get_drq() << 6)
-			| 0x00;
-	}
-
-	function io_write(address, value) {
+	function io_write_vg93(address, value) {
 		if (_rom_trdos) {
-			if ((address & 0x9F) == 0x1F) {
-				_vg93.write((address >> 5) & 0x03, value);
+			_vg93.write((address >> 5) & 0x03, value);
+		}
+	}
+
+	function io_write_ff(address, value) {
+		if (_rom_trdos) {
+			var drive = value & 0x03;
+			if (_drive != drive) {
+				_drive = drive;
+				_vg93.set_floppy(_drives[drive]);
 			}
-			else if ((address & 0xFF) == 0xFF) {
-				write_ff(value);
+			_headReady = +!!(value & 0x08);
+			_vg93.set_headReady(_headReady);
+			_doubleDensity = !(value & 0x40);
+			_vg93.set_doubleDensity(_doubleDensity);
+			var head = +!(value & 0x10);
+			if (_head != head) {
+				_head = head;
+				for (var i = 0; i < _drives.length; i++) {
+					_drives[i].set_head(head);
+				}
+			}
+			
+			if (!(value & 0x04)) {
+				_vg93.masterReset();
 			}
 		}
 	}
 
-	function io_read(address) {
+	function io_read_vg93(address) {
 		if (_rom_trdos) {
-			if ((address & 0x9F) == 0x1F)
-				return _vg93.read((address >> 5) & 0x03);
-			if ((address & 0xFF) == 0xFF)
-				return read_ff();
+			return _vg93.read((address >> 5) & 0x03);
+		}
+	}
+
+	function io_read_ff(address) {
+		if (_rom_trdos) {
+			return (_vg93.get_intrq() << 7)
+				| (_vg93.get_drq() << 6)
+				| 0x00;
 		}
 	}
 
@@ -124,7 +124,7 @@ function ZX_BetaDisk() {
 		return log;
 	}
 
-	function debug_io_write(address, value) {
+	function dbg_io_write_vg93(address, value) {
 		if (_rom_trdos && _debugLog) {
 			_debugLog.push({ 
 				ts: _clock.get_ms(),
@@ -133,11 +133,36 @@ function ZX_BetaDisk() {
 				value: value
 			});
 		}
-		io_write(address, value);
+		io_write_vg93(address, value);
 	}
 
-	function debug_io_read(address) {
-		var result = io_read(address);
+	function dbg_io_write_ff(address, value) {
+		if (_rom_trdos && _debugLog) {
+			_debugLog.push({ 
+				ts: _clock.get_ms(),
+				op: 'o',
+				port: address & 0xFF,
+				value: value
+			});
+		}
+		io_write_ff(address, value);
+	}
+
+	function dbg_io_read_vg93(address) {
+		var result = io_read_vg93(address);
+		if (_rom_trdos && _debugLog) {
+			_debugLog.push({
+				ts: _clock.get_ms(),
+				op: 'i',
+				port: address & 0xFF,
+				value: result
+			});
+		}
+		return result;
+	}
+
+	function dbg_io_read_ff(address) {
+		var result = io_read_ff(address);
 		if (_rom_trdos && _debugLog) {
 			_debugLog.push({
 				ts: _clock.get_ms(),

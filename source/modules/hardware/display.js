@@ -372,7 +372,8 @@ function ZX_Display ( container ) {
 	
 	this.connect = function (bus) {
 		_bus = bus;
-		bus.on_mem_write(write);
+		bus.on_mem_write(write, { range: { begin: 0x4000, end: 0x5AFF } });
+		bus.on_mem_write(write, { range: { begin: 0xC000, end: 0xDAFF } });
 		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
 		bus.on_var_write(var_write_port_fe_value, 'port_fe_value');
 		bus.on_var_write(redraw, 'intrq');

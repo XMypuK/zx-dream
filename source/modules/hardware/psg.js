@@ -42,8 +42,18 @@ function ZX_PSG() {
     function connect(bus, clock) {
         _bus = bus;
         _clock = clock;
-        _bus.on_io_write(io_write);
-        _bus.on_io_read(io_read);
+        /*
+         * запись порта FFFD - запись адреса
+         * чтение порта FFFD - чтение данных
+         * запись порта BFFD - запись данных
+         * Дешифровка порта ведется только по линиям:
+         *   A1 = 0
+         *   A13, A15 = 1
+         *   A14 = 0 или 1
+         */
+        _bus.on_io_write(io_write_reg, { mask: 0xE002, value: 0xE000 });
+        _bus.on_io_write(io_write_data, { mask: 0xE002, value: 0xA000 });
+        _bus.on_io_read(io_read_data, { mask: 0xE002, value: 0xE000 });
         _bus.on_reset(reset);
         _bus.on_opt(function () { _processSubscriptionInvalid = true; }, OPT_TSTATES_PER_INTRQ);
         _bus.on_opt(function () { _processSubscriptionInvalid = true; }, OPT_INTRQ_PERIOD);
@@ -108,40 +118,23 @@ function ZX_PSG() {
         }
     }
 
-    /*
-     * запись порта FFFD - запись адреса
-     * чтение порта FFFD - чтение данных
-     * запись порта BFFD - запись данных
-     * Дешифровка порта ведется только по линиям:
-     *   A1 = 0
-     *   A13, A15 = 1
-     *   A14 = 0 или 1
-     */
-
-    function io_write(address, data) {
+    function io_write_reg(address, data) {
         if (_psgMode != VAL_PSG_OFF) {
-            switch (address & 0xE002) {
-                case 0xE000: writeRegIndex(data); break;
-                case 0xA000: writeData(data); break;
-            }
+            _regIndex = data & 0x0F;
         }
     }
 
-    function io_read(address, data) {
+    function io_write_data(address, data) {
         if (_psgMode != VAL_PSG_OFF) {
-            switch (address & 0xE002) {
-                case 0xE000: return readData(data);
-            }
+            _regs[_regIndex] = data & _masks[_regIndex];
+            onPsgRegisterSet();
         }
     }
 
-    function writeRegIndex(value) {
-        _regIndex = value & 0x0F;
-    }
-
-    function writeData(value) {
-        _regs[_regIndex] = value & _masks[_regIndex];
-        onPsgRegisterSet();
+    function io_read_data(address, data) {
+        if (_psgMode != VAL_PSG_OFF) {
+            return _regs[_regIndex];
+        }
     }
 
     function onPsgRegisterSet() {
@@ -193,13 +186,10 @@ function ZX_PSG() {
 
     function reset() {
         for (var i = 0; i < 16; i++) {
-            writeRegIndex(i);
-            writeData(0);
+            _regIndex = i;
+            _regs[_regIndex] = 0;
+            onPsgRegisterSet();
         }
-    }
-
-    function readData() {
-        return _regs[_regIndex];
     }
 
     function updateProcessSubscription() {

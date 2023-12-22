@@ -284,7 +284,9 @@ function ZX_Clock() {
 }
 
 function TimeoutQueue() {
-	var capacity = 100;
+	// вместимость очереди ставим с запасом
+	// (фактически одномоментно там порядка 5 заданий)
+	var capacity = 100; 
 	var queue = new Array(capacity);
 	var begin = 0;
 	var end = 0;

@@ -121,9 +121,9 @@ function ZX_RAM() {
 
 	this.connect = function(bus) {
 		_bus = bus;
-		bus.on_instruction_read(read);
-		bus.on_mem_read(read);
-		bus.on_mem_write(write);
+		bus.on_instruction_read(read, { range: { begin: 0x4000, end: 0xFFFF } });
+		bus.on_mem_read(read, { range: { begin: 0x4000, end: 0xFFFF } });
+		bus.on_mem_write(write, { range: { begin: 0x4000, end: 0xFFFF } });
 		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
 		bus.on_opt(opt_extendedMemory, OPT_EXTENDED_MEMORY);
 		bus.on_opt(opt_useTypedArrays, OPT_USE_TYPED_ARRAYS);

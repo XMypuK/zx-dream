@@ -194,21 +194,21 @@ function ZX_Keyboard() {
 		}
 	}
 
-	function io_read(address) {
-		if ((address & 0xff) == 0xfe) {
-			var port_hi = address >> 8;
-			var data = 0xff;
-			for (var index = 0; index < 8; index++) {
-				if ( !(port_hi & (0x01 << index)) ) {
-					data &= key_states[index];
-				}
-			}
-			return data;
-		}
+	function io_read_fe(address) {
+		var data = 0xFF;
+		!(address & 0x0100) && (data &= key_states[0]);
+		!(address & 0x0200) && (data &= key_states[1]);
+		!(address & 0x0400) && (data &= key_states[2]);
+		!(address & 0x0800) && (data &= key_states[3]);
+		!(address & 0x1000) && (data &= key_states[4]);
+		!(address & 0x2000) && (data &= key_states[5]);
+		!(address & 0x4000) && (data &= key_states[6]);
+		!(address & 0x8000) && (data &= key_states[7]);
+		return data;
 	}
 	
 	function connect(bus) {
-		bus.on_io_read(io_read);
+		bus.on_io_read(io_read_fe, { mask: 0xFF, value: 0xFE });
 	}
 
 	this.monitorKeyState = monitorKeyState;

@@ -70,9 +70,7 @@ function ZX_ROM() {
 	}
 
 	function read(address) {
-		if ( address < 0x4000 ) {
-			return read_byte(address);
-		}
+		return read_byte(address);
 	}
 
 	function var_write_port_7ffd_value(name, value) {
@@ -128,7 +126,7 @@ function ZX_ROM() {
 	this.connect = function(bus) {
 		_bus = bus;
 		bus.on_instruction_read(read_instruction);
-		bus.on_mem_read(read);
+		bus.on_mem_read(read, { range: { begin: 0x0000, end: 0x3FFF } });
 		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
 		bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
 		bus.on_var_write(var_write_rom_turbo, 'rom_turbo');

@@ -10,12 +10,12 @@ function ZX_Joystick() {
     var _value = 0;
 
     function connect(bus) {
-        bus.on_io_read(io_read);
+        bus.on_io_read(io_read_1f, { mask: 0xFF, value: 0x1F });
         bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
     }
 
-    function io_read(address) {
-        if (!_rom_trdos && (address & 0xFF) == 0x1F) {
+    function io_read_1f(address) {
+        if (!_rom_trdos) {
             return _value;
         }
     }

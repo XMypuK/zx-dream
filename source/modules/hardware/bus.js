@@ -2,128 +2,156 @@ function ZX_Bus() {
 	'use strict';
 
 	var instruction_read_handlers = [];
-	var mem_read_handlers = [];
-	var mem_write_handlers = [];
-	var io_read_handlers = [];
-	var io_write_handlers = [];
-	var var_read_handlers = [];
-	var var_write_handlers = [];
-	var specific_var_read_handlers = {};
-	var specific_var_write_handlers = {};
-	var reset_handlers = [];
-	var opt_handlers = [];
-	var specific_opt_handlers = [];
+	var memReadHandlers = [];
+	var memWriteHandlers = [];
+	var ioReadHandlers = [];
+	var ioWriteHandlers = [];
+	var varReadHandlers = [];
+	var varWriteHandlers = [];
+	var namedVarReadHandlers = {};
+	var namedVarWriteHandlers = {};
+	var resetHandlers = [];
+	var optHandlers = [];
+	var namedOptHandlers = [];
 
-	function register_handler(collection, fn) {
-		if (typeof fn === 'function') {
-			collection.push(fn);
-		}
+	function registerHandler(collection, fn) {
+		collection.push(fn);
 	}
 
-	function on_instruction_read(fn) {
-		register_handler(instruction_read_handlers, fn);
+	function onInstructionRead(fn, filter) {
+		registerHandler(instruction_read_handlers, { fn: fn, filter: filter });
 	}
 
-	function on_mem_read(fn) {
-		register_handler(mem_read_handlers, fn);
+	function onMemRead(fn, filter) {
+		registerHandler(memReadHandlers, { fn: fn, filter: filter });
 	}
 
-	function on_mem_write(fn) {
-		register_handler(mem_write_handlers, fn);
+	function onMemWrite(fn, filter) {
+		registerHandler(memWriteHandlers, { fn: fn, filter: filter });
 	}
 
-	function on_io_read(fn) {
-		register_handler(io_read_handlers, fn);
+	function onIoRead(fn, filter) {
+		registerHandler(ioReadHandlers, { fn: fn, filter: filter });
 	}
 
-	function on_io_write(fn) {
-		register_handler(io_write_handlers, fn);
+	function onIoWrite(fn, filter) {
+		registerHandler(ioWriteHandlers, { fn: fn, filter: filter });
 	}
 
-	function on_var_read(fn, name) {
-		var handlers = var_read_handlers;
+	function onVarRead(fn, name) {
+		var handlers = varReadHandlers;
 		if (!!name) {
-			handlers = specific_var_read_handlers[name] || (specific_var_read_handlers[name] = []);
+			handlers = namedVarReadHandlers[name] || (namedVarReadHandlers[name] = []);
 		}
-		register_handler(handlers, fn);
+		registerHandler(handlers, fn);
 	}
 
-	function on_var_write(fn, name) {
-		var handlers = var_write_handlers;
+	function onVarWrite(fn, name) {
+		var handlers = varWriteHandlers;
 		if (!!name) {
-			handlers = specific_var_write_handlers[name] || (specific_var_write_handlers[name] = []);
+			handlers = namedVarWriteHandlers[name] || (namedVarWriteHandlers[name] = []);
 		}
-		register_handler(handlers, fn);
+		registerHandler(handlers, fn);
 	}
 
-	function on_reset(fn) {
-		register_handler(reset_handlers, fn);
+	function onReset(fn) {
+		registerHandler(resetHandlers, fn);
 	}
 
-	function on_opt(fn, name) {
-		var handlers = opt_handlers;
+	function onOpt(fn, name) {
+		var handlers = optHandlers;
 		if (!!name) {
-			handlers = specific_opt_handlers[name] || (specific_opt_handlers[name] = []);
+			handlers = namedOptHandlers[name] || (namedOptHandlers[name] = []);
 		}
-		register_handler(handlers, fn);
+		registerHandler(handlers, fn);
 	}
 
-	function instruction_read(address) {
+	function instructionRead(address) {
 		var result;
 		for ( var i = 0; i < instruction_read_handlers.length; i++ ) {
-			var subresult = instruction_read_handlers[i](address);
-			if (subresult !== undefined) {
-				result = subresult;
+			var hndInfo = instruction_read_handlers[i];
+			var process = !hndInfo.filter
+				|| hndInfo.filter.range && hndInfo.filter.range.begin <= address && address <= hndInfo.filter.range.end
+				|| (hndInfo.filter.mask !== undefined) && (address & hndInfo.filter.mask) == hndInfo.filter.value;
+			if (process) {
+				var subresult = hndInfo.fn(address);
+				if (subresult !== undefined) {
+					result = subresult;
+				}
 			}
 		}
 		return result;
 	}
 
-	function mem_read(address) {
+	function memRead(address) {
 		var result = 0xff;
-		for ( var i = 0; i < mem_read_handlers.length; i++ ) {
-			var subresult = mem_read_handlers[i](address);
-			if (subresult !== undefined) {
-				result = subresult;
+		for ( var i = 0; i < memReadHandlers.length; i++ ) {
+			var hndInfo = memReadHandlers[i];
+			var process = !hndInfo.filter
+				|| hndInfo.filter.range && hndInfo.filter.range.begin <= address && address <= hndInfo.filter.range.end
+				|| (hndInfo.filter.mask !== undefined) && (address & hndInfo.filter.mask) == hndInfo.filter.value;
+			if (process) {
+				var subresult = hndInfo.fn(address);
+				if (subresult !== undefined) {
+					result = subresult;
+				}
 			}
 		}
 		return result;
 	}
 
-	function mem_write(address, data) {
-		for ( var i = 0; i < mem_write_handlers.length; i++ ) {
-			mem_write_handlers[i](address, data);
+	function memWrite(address, data) {
+		for ( var i = 0; i < memWriteHandlers.length; i++ ) {
+			var hndInfo = memWriteHandlers[i];
+			var process = !hndInfo.filter
+				|| hndInfo.filter.range && hndInfo.filter.range.begin <= address && address <= hndInfo.filter.range.end
+				|| (hndInfo.filter.mask !== undefined) && (address & hndInfo.filter.mask) == hndInfo.filter.value;
+			if (process) {
+				hndInfo.fn(address, data);
+			}
 		}
 	}
 
-	function io_read(address) {
+	function ioRead(address) {
 		var result = 0xFF;
-		for ( var i = 0; i < io_read_handlers.length; i++ ) {
-			var subresult = io_read_handlers[i](address);
-			if (subresult !== undefined) {
-				result &= subresult;
+		for ( var i = 0; i < ioReadHandlers.length; i++ ) {
+			var hndInfo = ioReadHandlers[i];
+			var process = !hndInfo.filter
+				|| (hndInfo.filter.mask !== undefined) && (address & hndInfo.filter.mask) == hndInfo.filter.value
+				|| hndInfo.filter.range && hndInfo.filter.range.begin <= address && address <= hndInfo.filter.range.end;
+			if (process) {
+				var subresult = hndInfo.fn(address);
+				if (subresult !== undefined) {
+					result &= subresult;
+				}
 			}
 		}
 		return result;
 	}
 
-	function io_write(address, data) {
-		for ( var i = 0; i < io_write_handlers.length; i++ ) {
-			io_write_handlers[i](address, data);
+	function ioWrite(address, data) {
+		for ( var i = 0; i < ioWriteHandlers.length; i++ ) {
+			var hndInfo = ioWriteHandlers[i];
+			var process = !hndInfo.filter
+				|| (hndInfo.filter.mask !== undefined) && (address & hndInfo.filter.mask) == hndInfo.filter.value
+				|| hndInfo.filter.range && hndInfo.filter.range.begin <= address && address <= hndInfo.filter.range.end;
+			if (process) {
+				hndInfo.fn(address, data);
+			}
 		}
 	}
 
-	function var_read(name) {
+	function varRead(name) {
 		var result;
-		var specific_handlers = specific_var_read_handlers[name] || [];
-		for ( var i = 0; i < specific_handlers.length; i++ ) {
-			var subresult = specific_handlers[i](name);
+		var namedHandlers = namedVarReadHandlers[name] || [];
+		for ( var i = 0; i < namedHandlers.length; i++ ) {
+			var subresult = namedHandlers[i](name);
 			if (subresult !== undefined) {
 				result = subresult;
 			}
 		}
-		for ( var i = 0; i < var_read_handlers.length; i++ ) {
-			var subresult = var_read_handlers[i](name);
+		for ( var i = 0; i < varReadHandlers.length; i++ ) {
+			var subresult = varReadHandlers[i](name);
 			if (subresult !== undefined) {
 				result = subresult;
 			}
@@ -131,48 +159,55 @@ function ZX_Bus() {
 		return result;
 	}
 
-	function var_write(name, value) {
-		var specific_handlers = specific_var_write_handlers[name] || [];
-		for ( var i = 0; i < specific_handlers.length; i++ ) {
-			specific_handlers[i](name, value);
+	function varWrite(name, value) {
+		var namedHandlers = namedVarWriteHandlers[name] || [];
+		for ( var i = 0; i < namedHandlers.length; i++ ) {
+			namedHandlers[i](name, value);
 		}
-		for ( var i = 0; i < var_write_handlers.length; i++ ) {
-			var_write_handlers[i](name, value);
+		for ( var i = 0; i < varWriteHandlers.length; i++ ) {
+			varWriteHandlers[i](name, value);
 		}
 	}
 
 	function reset() {
-		for ( var i = 0; i < reset_handlers.length; i++ ) {
-			reset_handlers[i]();
+		for ( var i = 0; i < resetHandlers.length; i++ ) {
+			resetHandlers[i]();
 		}
 	}
 
 	function opt(name, value) {
-		var specific_handlers = specific_opt_handlers[name] || [];
-		for ( var i = 0; i < specific_handlers.length; i++ ) {
-			specific_handlers[i](name, value);
+		var namedHandlers = namedOptHandlers[name] || [];
+		for ( var i = 0; i < namedHandlers.length; i++ ) {
+			namedHandlers[i](name, value);
 		}
-		for ( var i = 0; i < opt_handlers.length; i++ ) {
-			opt_handlers[i](name, value);
+		for ( var i = 0; i < optHandlers.length; i++ ) {
+			optHandlers[i](name, value);
 		}
 	}
 
-	this.on_instruction_read = on_instruction_read;
-	this.on_mem_read = on_mem_read;
-	this.on_mem_write = on_mem_write;
-	this.on_io_read = on_io_read;
-	this.on_io_write = on_io_write;
-	this.on_var_read = on_var_read;
-	this.on_var_write = on_var_write;
-	this.on_reset = on_reset;
-	this.on_opt = on_opt;
-	this.instruction_read = instruction_read;
-	this.mem_read = mem_read;
-	this.mem_write = mem_write;
-	this.var_read = var_read;
-	this.var_write = var_write;
-	this.io_read = io_read;
-	this.io_write = io_write;
+	function getBoostPath() {
+		return 'ZXContext._boost';
+	}
+	function getBoostObject() {
+		return (ZXContext._boost || (ZXContext._boost = {}));
+	}
+
+	this.on_instruction_read = onInstructionRead;
+	this.on_mem_read = onMemRead;
+	this.on_mem_write = onMemWrite;
+	this.on_io_read = onIoRead;
+	this.on_io_write = onIoWrite;
+	this.on_var_read = onVarRead;
+	this.on_var_write = onVarWrite;
+	this.on_reset = onReset;
+	this.on_opt = onOpt;
+	this.instruction_read = instructionRead;
+	this.mem_read = memRead;
+	this.mem_write = memWrite;
+	this.var_read = varRead;
+	this.var_write = varWrite;
+	this.io_read = ioRead;
+	this.io_write = ioWrite;
 	this.reset = reset;
 	this.opt = opt;
 }

@@ -2577,15 +2577,9 @@ function ZX_Z80 () {
     }
 
     function get_parity(value) {
-        var parity = true;
-        while (value) {
-            if (value & 1) {
-                parity = !parity;
-            }
-
-            value = value >> 1;
-        }
-        return parity;
+        var half = (value >> 4) ^ (value & 0x0F);
+        var quarter = (half >> 2) ^ (half & 0x03);
+        return !((quarter >> 1) ^ (quarter & 0x01));
     }
 
     function get_byte_sum_overflow(op1, op2, sum) {
