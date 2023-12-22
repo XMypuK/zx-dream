@@ -190,13 +190,13 @@
 		this.psgClock = ko.observable(ZXContext.settings.get_psgClock());
 		this.psgBufferSizeOptions = ko.observableArray([
 			{ value: 0, text: 'автоматически' },
-			{ value: 256, text: '256 байт' },
-			{ value: 512, text: '512 байт' },
-			{ value: 1024, text: '1 КБ' },
-			{ value: 2048, text: '2 КБ' },
-			{ value: 4096, text: '4 КБ' },
-			{ value: 8192, text: '8 КБ' },
-			{ value: 16384, text: '16 КБ' }
+			{ value: 256, text: '256 сэмплов' },
+			{ value: 512, text: '512 сэмплов' },
+			{ value: 1024, text: '1024 сэмплов' },
+			{ value: 2048, text: '2048 сэмплов' },
+			{ value: 4096, text: '4096 сэмплов' },
+			{ value: 8192, text: '8192 сэмплов' },
+			{ value: 16384, text: '16384 сэмплов' }
 		]);
 		this.psgBufferSize = ko.observable(ZXContext.settings.get_psgBufferSize());
 		this.useTypedArrays = ko.observable(ZXContext.settings.get_useTypedArrays());
