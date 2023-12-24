@@ -155,6 +155,7 @@ function ZX_Display ( container ) {
 	var port_fe_value = 0x00;
 	var borderChanged = false;
 	var _bus = null;
+	var _clock = null;
 	var extendedMemory = VAL_EXTENDED_MEMORY_OFF;
 
 	var renderer = new NullRenderer();
@@ -162,7 +163,7 @@ function ZX_Display ( container ) {
 	var screen7 = new ScreenPage(1);
 
 	function init() {
-		setTimeout(flashLoop, flashInterval);
+		_clock.setInterval(flashLoop, flashInterval, 0);
 		recreateRenderer();
 		inited = true;
 	}
@@ -214,7 +215,6 @@ function ZX_Display ( container ) {
 		flashInversion = !flashInversion;
 		screen5.set_flashInversion(flashInversion);
 		screen7.set_flashInversion(flashInversion);
-		setTimeout(flashLoop, flashInterval);
 	}
 
 	function redraw() {
@@ -370,8 +370,9 @@ function ZX_Display ( container ) {
 		screen7.set_useTypedArrays(value);
 	}
 	
-	this.connect = function (bus) {
+	this.connect = function (bus, clock) {
 		_bus = bus;
+		_clock = clock;
 		bus.on_mem_write(write, { range: { begin: 0x4000, end: 0x5AFF } });
 		bus.on_mem_write(write, { range: { begin: 0xC000, end: 0xDAFF } });
 		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');

@@ -43,7 +43,7 @@ $(window).load(function() {
 	ZXContext.hw.clock.connect(ZXContext.hw.bus, ZXContext.hw.cpu);
 	ZXContext.hw.rom.connect(ZXContext.hw.bus);
 	ZXContext.hw.ram.connect(ZXContext.hw.bus);
-	ZXContext.hw.display.connect(ZXContext.hw.bus);
+	ZXContext.hw.display.connect(ZXContext.hw.bus, ZXContext.hw.clock);
 	ZXContext.hw.port_fe.connect(ZXContext.hw.bus);
 	ZXContext.hw.port_7ffd.connect(ZXContext.hw.bus);
 	ZXContext.hw.keyboard.connect(ZXContext.hw.bus);
