@@ -94,8 +94,8 @@ function VG93(clock) {
 
         var _onIndexPulse = new Trigger();
         var _indexPulse = false;
-        var _indexPulseBeginSubscription = null;
-        var _indexPulseEndSubscription = null;
+        var _indexPulseBeginTask = null;
+        var _indexPulseEndTask = null;
 
         this.get_rotation = get_rotation;
         this.set_rotation = set_rotation;
@@ -113,13 +113,13 @@ function VG93(clock) {
             _rotation = value;
             if (_rotation) {
                 set_indexPulse(_revolutionProgress < INDEX_PULSE_DURATION);
-                _indexPulseBeginSubscription = _clock.subscribe(function () { set_indexPulse(true);  _lastRevolutionBegin = _clock.get_ms(); }, REVOLUTION_INTERVAL, 0, REVOLUTION_INTERVAL - _revolutionProgress);
-                _indexPulseEndSubscription = _clock.subscribe(function () { set_indexPulse(false); }, REVOLUTION_INTERVAL, 0, _revolutionProgress < INDEX_PULSE_DURATION ? INDEX_PULSE_DURATION - _revolutionProgress : REVOLUTION_INTERVAL + INDEX_PULSE_DURATION - _revolutionProgress);
+                _indexPulseBeginTask = _clock.setInterval(function () { set_indexPulse(true);  _lastRevolutionBegin = _clock.get_ms(); }, REVOLUTION_INTERVAL, 0, REVOLUTION_INTERVAL - _revolutionProgress);
+                _indexPulseEndTask = _clock.setInterval(function () { set_indexPulse(false); }, REVOLUTION_INTERVAL, 0, _revolutionProgress < INDEX_PULSE_DURATION ? INDEX_PULSE_DURATION - _revolutionProgress : REVOLUTION_INTERVAL + INDEX_PULSE_DURATION - _revolutionProgress);
             }
             else {
                 set_indexPulse(false);
-                _indexPulseBeginSubscription.cancel();
-                _indexPulseEndSubscription.cancel();
+                _indexPulseBeginTask.cancelled = true;
+                _indexPulseEndTask.cancelled = true;
                 _revolutionProgress = (_clock.get_ms() - _lastRevolutionBegin) % REVOLUTION_INTERVAL;
             }
         }
@@ -454,9 +454,9 @@ function VG93(clock) {
         var _crcBytesWritten = 0;
         var _dataLostError = 0;
         var _writeError = 0;
-        var _headEngagedTimeout = null;
-        var _waitForDrqServicedTimeout = null;
-        var _processNextSubscription = null;
+        var _headEngagementTask = null;
+        var _drqServiceWaitingTask = null;
+        var _processTask = null;
 
         function get_status() {
             return (!get_ready() << 7)
@@ -478,7 +478,7 @@ function VG93(clock) {
             if (_floppy.get_isReady()) {
                 set_headLoad(1);
                 if (_fDelay) {
-                    _headEngagedTimeout = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
+                    _headEngagementTask = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
                 }
                 else {
                     onHeadEngaged();
@@ -501,7 +501,7 @@ function VG93(clock) {
         function checkForWriteProtection() {
             if (!_floppy.get_isWriteProtected()) {
                 _drq = 1;
-                _waitForDrqServicedTimeout = _clock.setTimeout(waitDrqIsServiced, calculateReadWriteTimeout(3));
+                _drqServiceWaitingTask = _clock.setTimeout(waitDrqIsServiced, calculateReadWriteTimeout(3));
             }
             else {
                 onCompleted();
@@ -521,7 +521,7 @@ function VG93(clock) {
         function writeTrack() {
             _revolutionState.onIndexPulse.add(onCompleted);
             _stream = _floppy.openStream();
-            _processNextSubscription = _clock.subscribe(processNext, calculateReadWriteTimeout(1), 0, 0);
+            _processTask = _clock.setInterval(processNext, calculateReadWriteTimeout(1), 0, 0);
         }
 
         function processNext() {
@@ -601,18 +601,18 @@ function VG93(clock) {
         }
 
         function onCompleted() {
-            _processNextSubscription && _processNextSubscription.cancel();
+            _processTask && (_processTask.cancelled = true);
             _intrq = 1;
             set_busy(0);
         }
 
         function terminate() {
-            _headEngagedTimeout && _headEngagedTimeout.cancel();
+            _headEngagementTask && (_headEngagementTask.cancelled = true);
             _onHeadReady.remove(checkForWriteProtection);
-            _waitForDrqServicedTimeout && _waitForDrqServicedTimeout.cancel();
+            _drqServiceWaitingTask && (_drqServiceWaitingTask.cancelled = true);
             _revolutionState.onIndexPulse.remove(writeTrack);
             _revolutionState.onIndexPulse.remove(onCompleted);
-            _processNextSubscription && _processNextSubscription.cancel();
+            _processTask && (_processTask.cancelled = true);
         }
     }
 
@@ -624,8 +624,8 @@ function VG93(clock) {
         var _fDelay = !!(code & 0x04);
         var _stream = null;
         var _dataLostError = 0;
-        var _headEngagedTimeout = null;
-        var _readSubscription = null;
+        var _headEngagementTask = null;
+        var _readTask = null;
 
         function get_status() {
             return (!get_ready() << 7)
@@ -645,7 +645,7 @@ function VG93(clock) {
             if (_floppy.get_isReady()) {
                 set_headLoad(1);
                 if (_fDelay) {
-                    _headEngagedTimeout = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
+                    _headEngagementTask = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
                 }
                 else {
                     onHeadEngaged();
@@ -672,7 +672,7 @@ function VG93(clock) {
         function readTrack() {
             _stream = _floppy.openStream();
             _revolutionState.onIndexPulse.add(onCompleted);
-            _readSubscription = _clock.subscribe(processNext, calculateReadWriteTimeout(1), 0);
+            _readTask = _clock.setInterval(processNext, calculateReadWriteTimeout(1), 0);
         }
 
         function processNext() {
@@ -689,17 +689,17 @@ function VG93(clock) {
         }
 
         function onCompleted() {
-            _readSubscription && _readSubscription.cancel();
+            _readTask && (_readTask.cancelled = true);
             _intrq = 1;
             set_busy(0);
         }
 
         function terminate() {
-            _headEngagedTimeout && _headEngagedTimeout.cancel();
+            _headEngagementTask && (_headEngagementTask.cancelled = true);
             _onHeadReady.remove(waitForTrackBegin);
             _revolutionState.onIndexPulse.remove(readTrack);
             _revolutionState.onIndexPulse.remove(onCompleted);
-            _readSubscription && _readSubscription.cancel();
+            _readTask && (_readTask.cancelled = true);
         }
     }
 
@@ -722,8 +722,8 @@ function VG93(clock) {
         var _crcError = 0;
         var _dataLostError = 0;
 
-        var _headEngagedTimeout = null;
-        var _readSubscription = null;
+        var _headEngagementTask = null;
+        var _readTask = null;
 
         function get_status() {
             return (!get_ready() << 7) 
@@ -746,7 +746,7 @@ function VG93(clock) {
             if (_floppy.get_isReady()) {
                 set_headLoad(1);
                 if (_fDelay) {
-                    _headEngagedTimeout = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
+                    _headEngagementTask = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
                 }
                 else {
                     onHeadEngaged();
@@ -773,7 +773,7 @@ function VG93(clock) {
             _stream.seek(Math.min(startIndex, _stream.get_length()));
             _indexPulsesEncountered = 0;
             _amDetector = new VG93AMDetector(_doubleDensity);
-            _readSubscription = _clock.subscribe(processNext, calculateReadWriteTimeout(1), 0);
+            _readTask = _clock.setInterval(processNext, calculateReadWriteTimeout(1), 0);
             _revolutionState.onIndexPulse.add(onIndexPulse);
         }
         
@@ -819,7 +819,7 @@ function VG93(clock) {
                     if (_idCrc != _crc.value) {
                         _crcError = 1;
                     }
-                    _readSubscription.cancel();
+                    _readTask.cancelled = true;
                     _revolutionState.onIndexPulse.remove(onIndexPulse);
                     _amDetector = null;
                     _stream = null;
@@ -831,7 +831,7 @@ function VG93(clock) {
         function onIndexPulse() {
             _stream.seek(0);
             if (++_indexPulsesEncountered > 1) {
-                _readSubscription.cancel();
+                _readTask.cancelled = true;
                 _notFoundError = 1;
                 _amDetector = null;
                 _stream = null;
@@ -848,9 +848,9 @@ function VG93(clock) {
         }
 
         function terminate() {
-            _headEngagedTimeout && _headEngagedTimeout.cancel();
+            _headEngagementTask && (_headEngagementTask.cancelled = true);
             _onHeadReady.remove(initReading);
-            _readSubscription && _readSubscription.cancel();
+            _readTask && (_readTask.cancelled = true);
             _revolutionState.onIndexPulse.remove(onIndexPulse);
             _amDetector = null;
             _stream = null;
@@ -889,8 +889,8 @@ function VG93(clock) {
         var _dataLostError = 0;
         var _recordType = 0;
 
-        var _headEngagedTimeout = null;
-        var _readSubscription = null;
+        var _headEngagementTask = null;
+        var _readTask = null;
 
         function get_status() {
             return (!get_ready() << 7)
@@ -916,7 +916,7 @@ function VG93(clock) {
             if (ready) {
                 set_headLoad(1);
                 if (_fDelay) {
-                    _headEngagedTimeout = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
+                    _headEngagementTask = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
                 }
                 else {
                     onHeadEngaged();
@@ -928,7 +928,7 @@ function VG93(clock) {
         }
 
         function onHeadEngaged() {
-            _headEngagedTimeout = null;
+            _headEngagementTask = null;
             if (_headReady) {
                 initReading();
             }
@@ -945,7 +945,7 @@ function VG93(clock) {
             _amDetector = new VG93AMDetector(_doubleDensity);
             _opStage = OP_STAGE.DETECT_IDAM;
             _dataMarkerMaxDistance = _doubleDensity ? 43 : 30;
-            _readSubscription = _clock.subscribe(processNext, calculateReadWriteTimeout(1), 0);
+            _readTask = _clock.setInterval(processNext, calculateReadWriteTimeout(1), 0);
             _revolutionState.onIndexPulse.add(onIndexPulse);
         }
 
@@ -1032,7 +1032,7 @@ function VG93(clock) {
                             _opStage = OP_STAGE.DETECT_IDAM;
                         }
                         else {
-                            _readSubscription.cancel();
+                            _readTask.cancelled = true;
                             _revolutionState.onIndexPulse.remove(onIndexPulse);
                             _amDetector = null;
                             _stream = null;
@@ -1046,7 +1046,7 @@ function VG93(clock) {
         function onIndexPulse() {
             _stream.seek(0);
             if (++_indexPulsesEncountered > 1) {
-                _readSubscription.cancel();
+                _readTask.cancelled = true;
                 _notFoundError = 1;
                 _amDetector = null;
                 _stream = null;
@@ -1063,9 +1063,9 @@ function VG93(clock) {
         }
 
         function terminate() {
-            _headEngagedTimeout && _headEngagedTimeout.cancel();
+            _headEngagementTask && (_headEngagementTask.cancelled = true);
             _onHeadReady.remove(initReading);
-            _readSubscription && _readSubscription.cancel();
+            _readTask && (_readTask.cancelled = true);
             _revolutionState.onIndexPulse.remove(onIndexPulse);
             _amDetector = null;
             _stream = null;
@@ -1106,8 +1106,8 @@ function VG93(clock) {
         var _dataLostError = 0;
         var _writeError = 0;
 
-        var _headEngagedTimeout = null;
-        var _writeSubscription = null;
+        var _headEngagementTask = null;
+        var _writeTask = null;
 
         function get_status() {
             return (!get_ready() << 7)
@@ -1135,7 +1135,7 @@ function VG93(clock) {
             if (ready) {
                 set_headLoad(1);
                 if (_fDelay) {
-                    _headEngagedTimeout = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
+                    _headEngagementTask = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
                 }
                 else {
                     onHeadEngaged();
@@ -1171,7 +1171,7 @@ function VG93(clock) {
             _stream.seek(Math.min(startIndex, _stream.get_length()));
             _amDetector = new VG93AMDetector(_doubleDensity);
             _opStage = OP_STAGE.DETECT_IDAM;
-            _writeSubscription = _clock.subscribe(processNext, calculateReadWriteTimeout(1), 0);
+            _writeTask = _clock.setInterval(processNext, calculateReadWriteTimeout(1), 0);
             _revolutionState.onIndexPulse.add(onIndexPulse);
         }
         
@@ -1220,7 +1220,7 @@ function VG93(clock) {
                             case 10: 
                                 if (_drq) {
                                     _dataLostError = 1;
-                                    _writeSubscription.cancel();
+                                    _writeTask.cancelled = true;
                                     _revolutionState.onIndexPulse.remove(onIndexPulse);
                                     _amDetector = null;
                                     _stream = null;
@@ -1291,7 +1291,7 @@ function VG93(clock) {
                                 _opStage = OP_STAGE.DETECT_IDAM;
                             }
                             else {
-                                _writeSubscription.cancel();
+                                _writeTask.cancelled = true;
                                 _revolutionState.onIndexPulse.remove(onIndexPulse);
                                 _amDetector = null;
                                 _stream = null;
@@ -1306,7 +1306,7 @@ function VG93(clock) {
         function onIndexPulse() {
             _stream.seek(0);
             if (++_indexPulsesEncountered > 1) {
-                _writeSubscription.cancel();
+                _writeTask.cancelled = true;
                 _notFoundError = 1;
                 _amDetector = null;
                 _stream = null;
@@ -1323,9 +1323,9 @@ function VG93(clock) {
         }
 
         function terminate() {
-            _headEngagedTimeout && _headEngagedTimeout.cancel();
+            _headEngagementTask && (_headEngagementTask.cancelled = true);
             _onHeadReady.remove(checkForWriteProtection);
-            _writeSubscription && _writeSubscription.cancel();
+            _writeTask && (_writeTask.cancelled = true);
             _revolutionState.onIndexPulse.remove(onIndexPulse);
             _amDetector = null;
             _stream = null;
@@ -1353,9 +1353,9 @@ function VG93(clock) {
         var _rwCounter = 0;
         var _crc = null;
         var _indexPulsesEncountered = 0;
-        var _stepTimeout = null;
-        var _headEngagedTimeout = null;
-        var _verifySubscription = null;
+        var _stepTask = null;
+        var _headEngagementTask = null;
+        var _verifyTask = null;
 
         function get_status() {
             return (!get_ready() << 7)
@@ -1390,7 +1390,7 @@ function VG93(clock) {
                 else {
                     _floppy.stepOut();
                 }
-                _stepTimeout = _clock.setTimeout(onStepCompleted, STEP_DELAYS[_rate]);
+                _stepTask = _clock.setTimeout(onStepCompleted, STEP_DELAYS[_rate]);
             }
             else {
                 _track = 0;
@@ -1401,7 +1401,7 @@ function VG93(clock) {
         function onStepCompleted() {
             if (_fVerify) {
                 set_headLoad(1);
-                _headEngagedTimeout = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
+                _headEngagementTask = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
             }
             else {
                 onCompleted();
@@ -1424,7 +1424,7 @@ function VG93(clock) {
             _stream.seek(Math.min(startIndex, _stream.get_length()));
             _amDetector = new VG93AMDetector(_doubleDensity);
             _indexPulsesEncountered = 0;
-            _verifySubscription = _clock.subscribe(processNext, calculateReadWriteTimeout(1), 0);
+            _verifyTask = _clock.setInterval(processNext, calculateReadWriteTimeout(1), 0);
             _revolutionState.onIndexPulse.add(onIndexPulse);
         }
 
@@ -1462,7 +1462,7 @@ function VG93(clock) {
                         _idDetected = 0;
                     }
                     else {
-                        _verifySubscription.cancel();
+                        _verifyTask.cancelled = true;
                         _revolutionState.onIndexPulse.remove(onIndexPulse);
                         _amDetector = null;
                         _stream = null;
@@ -1475,7 +1475,7 @@ function VG93(clock) {
         function onIndexPulse() {
             _stream.seek(0);
             if (++_indexPulsesEncountered > 1) {
-                _verifySubscription.cancel();
+                _verifyTask.cancelled = true;
                 _seekError = 1;
                 _amDetector = null;
                 _stream = null;
@@ -1492,10 +1492,10 @@ function VG93(clock) {
         }
 
         function terminate() { 
-            _stepTimeout && _stepTimeout.cancel();
-            _headEngagedTimeout && _headEngagedTimeout.cancel();
+            _stepTask && (_stepTask.cancelled = true);
+            _headEngagementTask && (_headEngagementTask.cancelled = true);
             _onHeadReady.remove(verify);
-            _verifySubscription && _verifySubscription.cancel();
+            _verifyTask && (_verifyTask.cancelled = true);
             _revolutionState.onIndexPulse.remove(onIndexPulse);
         }
     }
@@ -1519,9 +1519,9 @@ function VG93(clock) {
         var _rwCounter = 0;
         var _crc = null;
         var _indexPulsesEncountered = 0;
-        var _stepTimeout = null;
-        var _headEngagedTimeout = null;
-        var _verifySubscription = null;
+        var _stepTask = null;
+        var _headEngagementTask = null;
+        var _verifyTask = null;
 
         function get_status() {
             return (!get_ready() << 7) 
@@ -1551,7 +1551,7 @@ function VG93(clock) {
         }
 
         function doStep() {
-            _stepTimeout = null;
+            _stepTask = null;
             if (_track == _data) {
                 onStepCompleted();
                 return;
@@ -1569,13 +1569,13 @@ function VG93(clock) {
             else {
                 _floppy.stepOut();
             }
-            _stepTimeout = _clock.setTimeout(doStep, STEP_DELAYS[_rate]);
+            _stepTask = _clock.setTimeout(doStep, STEP_DELAYS[_rate]);
         }
 
         function onStepCompleted() {
             if (_fVerify) {
                 set_headLoad(true);
-                _headEngagedTimeout = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
+                _headEngagementTask = _clock.setTimeout(onHeadEngaged, HEAD_ENGAGE_DURATION);
             }
             else {
                 onCompleted();
@@ -1583,7 +1583,7 @@ function VG93(clock) {
         }
 
         function onHeadEngaged() {
-            _headEngagedTimeout = null;
+            _headEngagementTask = null;
             if (_headReady) {
                 verify();
             }
@@ -1599,7 +1599,7 @@ function VG93(clock) {
             _stream.seek(Math.min(startIndex, _stream.get_length()));
             _amDetector = new VG93AMDetector(_doubleDensity);
             _indexPulsesEncountered = 0;
-            _verifySubscription = _clock.subscribe(processNext, calculateReadWriteTimeout(1), 0);
+            _verifyTask = _clock.setInterval(processNext, calculateReadWriteTimeout(1), 0);
             _revolutionState.onIndexPulse.add(onIndexPulse);
         }
 
@@ -1637,7 +1637,7 @@ function VG93(clock) {
                         _idDetected = 0;
                     }
                     else {
-                        _verifySubscription.cancel();
+                        _verifyTask.cancelled = true;
                         _revolutionState.onIndexPulse.remove(onIndexPulse);
                         _amDetector = null;
                         _stream = null;
@@ -1650,7 +1650,7 @@ function VG93(clock) {
         function onIndexPulse() {
             _stream.seek(0);
             if (++_indexPulsesEncountered > 1) {
-                _verifySubscription.cancel();
+                _verifyTask.cancelled = true;
                 _seekError = 1;
                 _amDetector = null;
                 _stream = null;
@@ -1667,10 +1667,10 @@ function VG93(clock) {
         }
 
         function terminate() { 
-            _stepTimeout && _stepTimeout.cancel();
-            _headEngagedTimeout && _headEngagedTimeout.cancel();
+            _stepTask && (_stepTask.cancelled = true);
+            _headEngagementTask && (_headEngagementTask.cancelled = true);
             _onHeadReady.remove(verify);
-            _verifySubscription && _verifySubscription.cancel();
+            _verifyTask && (_verifyTask.cancelled = true);
             _revolutionState.onIndexPulse.remove(onIndexPulse);
         }
     }

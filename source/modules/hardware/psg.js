@@ -34,8 +34,8 @@ function ZX_PSG() {
     var _psgMode = VAL_PSG_OFF;
     var _psgClock = 1773400;
     var _psgBufferSize = 0;
-    var _processSubscription;
-    var _processSubscriptionInvalid = false;
+    var _processTask;
+    var _processTaskInvalid = false;
     var _lBuffer, _rBuffer;
     var _wrIndex = 0, _rdIndex = 0;
 
@@ -55,8 +55,8 @@ function ZX_PSG() {
         _bus.on_io_write(io_write_data, { mask: 0xE002, value: 0xA000 });
         _bus.on_io_read(io_read_data, { mask: 0xE002, value: 0xE000 });
         _bus.on_reset(reset);
-        _bus.on_opt(function () { _processSubscriptionInvalid = true; }, OPT_TSTATES_PER_INTRQ);
-        _bus.on_opt(function () { _processSubscriptionInvalid = true; }, OPT_INTRQ_PERIOD);
+        _bus.on_opt(function () { _processTaskInvalid = true; }, OPT_TSTATES_PER_INTRQ);
+        _bus.on_opt(function () { _processTaskInvalid = true; }, OPT_INTRQ_PERIOD);
         try {
             init();
         }
@@ -88,7 +88,7 @@ function ZX_PSG() {
             _rBuffer = new Float32Array(_audioProcessorNode.bufferSize * 2);
             _rdIndex = 0;
             _wrIndex = 0;
-            updateProcessSubscription();
+            rescheduleProcessTask();
             onStateChange(_audioContext.state);
             _audioContext.addEventListener('statechange', function (e) { onStateChange(e.target.state); })
         }
@@ -98,9 +98,9 @@ function ZX_PSG() {
     }
 
     function destroyAudioContext() {
-        if (_processSubscription) {
-            _processSubscription.cancel();
-            _processSubscription = null;
+        if (_processTask) {
+            _processTask.cancelled = true;
+            _processTask = null;
         }
         if (_audioProcessorNode) {
             _audioProcessorNode.disconnect();
@@ -192,14 +192,14 @@ function ZX_PSG() {
         }
     }
 
-    function updateProcessSubscription() {
+    function rescheduleProcessTask() {
         if (!_audioContext)
             return;
-        if (_processSubscription) {
-            _processSubscription.cancel();
+        if (_processTask) {
+            _processTask.cancelled = true;
         }
-        _processSubscription = _clock.subscribe(process, 1000 / _sampleRate, 0);
-        _processSubscriptionInvalid = false;
+        _processTask = _clock.setInterval(process, 1000 / _sampleRate, 0);
+        _processTaskInvalid = false;
     }
 
     function process() {
@@ -218,8 +218,8 @@ function ZX_PSG() {
             }
         }
 
-        if (_processSubscriptionInvalid) {
-            updateProcessSubscription();
+        if (_processTaskInvalid) {
+            rescheduleProcessTask();
         }
     }
 

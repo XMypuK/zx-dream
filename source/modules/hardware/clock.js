@@ -1,10 +1,4 @@
 function ZX_Clock() {
-
-	var _bus;
-	var _cpu;
-	var _timeoutQueue = new TimeoutQueue();
-	var _interruptSubscription = null;
-
 	/*
 	 * Вроде как, в Pentagon прерывание происходит каждые 71680 тактов.
 	 * При частоте 3.5МГц это означает, что:
@@ -17,22 +11,27 @@ function ZX_Clock() {
 	// количество выполняемых процессором тактов между маскируемыми прерываниями
 	var tstatesPerIntrq = 71680;
 	// количество выполняемых процессором тактов за одну миллисекунду
-	var tstates_per_ms = 3500;
+	var tstatesPerMs = 3500;
 	// флаг работы рабочего цикла
 	var running = false;
 	// идентификатор интервала рабочего цикла
-	var interval_id;
+	var intervalId;
 	// время запуска последней итерации рабочего цикла
-	var interval_timestamp;
+	var intervalTimestamp;
 	// время последнего вывода информации о производительности
-	var performance_timestamp;
+	var performanceTimestamp;
 	// счетчик тактов с последнего вывода информации о производительности
-	var performance_tstates;
+	var performanceTstates;
 	// счетчик фреймов (прерываний) с последнего вывода инфорамции о производительности
-	var performance_fps;
+	var performanceFps;
 	// счетчик тактов с начала работы
 	var tstates = 0;
-	var resubscribeOnInterrupts = false;
+
+	var _bus;
+	var _cpu;
+	var _taskQueue = new TaskQueue(tstatesPerMs);
+	var _interruptTask = null;
+	var _rescheduleTaskOnNextInterrupt = false;
 
 	var debug = false;
 	var _checkBreakConditionCallback = function (state) { return false; }
@@ -44,11 +43,11 @@ function ZX_Clock() {
 		debug = false;
 		running = true;
 		var now = Date.now();
-		interval_id = setInterval(process, 4);
-		interval_timestamp = now;
-		performance_timestamp = now;
-		performance_tstates = 0;
-		performance_fps = 0;
+		intervalId = setInterval(process, 4);
+		intervalTimestamp = now;
+		performanceTimestamp = now;
+		performanceTstates = 0;
+		performanceFps = 0;
 	}
 
 	function runDebug(checkBreakConditionCallback, stopCallback) {
@@ -57,11 +56,11 @@ function ZX_Clock() {
 		debug = true;
 		running = true;
 		var now = Date.now();
-		interval_id = setInterval(processDebug, 4);
-		interval_timestamp = now;
-		performance_timestamp = now;
-		performance_tstates = 0;
-		performance_fps = 0;
+		intervalId = setInterval(processDebug, 4);
+		intervalTimestamp = now;
+		performanceTimestamp = now;
+		performanceTstates = 0;
+		performanceFps = 0;
 		_checkBreakConditionCallback = checkBreakConditionCallback;
 		_stopCallback = stopCallback;
 	}
@@ -70,7 +69,7 @@ function ZX_Clock() {
 		if ( !running )
 			return;
 		running = false;
-		clearInterval(interval_id);
+		clearInterval(intervalId);
 		if (debug) {
 			_stopCallback();
 		}
@@ -98,72 +97,72 @@ function ZX_Clock() {
 		// фиксация время запуска итерации
 		var now = Date.now();
 		// проверка на необходимость вывода информации о производительности.
-		var performance_elapsed = now - performance_timestamp
-		if ( performance_elapsed >= 1000 ) {
+		var performanceElapsed = now - performanceTimestamp
+		if ( performanceElapsed >= 1000 ) {
 			_bus.var_write('performance', {
-				frequency: performance_tstates / (performance_elapsed * 1000),
-				fps: performance_fps * 1000 / performance_elapsed
+				frequency: performanceTstates / (performanceElapsed * 1000),
+				fps: performanceFps * 1000 / performanceElapsed
 			});
-			performance_timestamp = now;
-			performance_tstates = 0;
-			performance_fps = 0;
+			performanceTimestamp = now;
+			performanceTstates = 0;
+			performanceFps = 0;
 		}
 		// расчет времени с запуска предыдущей итерации
-		var elapsed = now - interval_timestamp;
-		interval_timestamp = now;
+		var elapsed = now - intervalTimestamp;
+		intervalTimestamp = now;
 		// расчет количества тактов для выполнения
-		var planned_tstates = tstates_per_ms * elapsed;
-		if (planned_tstates > tstatesPerIntrq) {
-			planned_tstates = tstates_per_ms * 4;
+		var plannedTstates = tstatesPerMs * elapsed;
+		if (plannedTstates > tstatesPerIntrq) {
+			plannedTstates = tstatesPerMs * 4;
 		}
 		// сброс счетчика тактов процессора
 		_cpu.set_tstates(0);
 		var lastTstates = 0;
 		var curTstates;
 		// работа процессора
-		while ((curTstates = _cpu.get_tstates()) < planned_tstates) {
+		while ((curTstates = _cpu.get_tstates()) < plannedTstates) {
 			tstates += (curTstates - lastTstates);
 			lastTstates = curTstates;
-			_timeoutQueue.process(tstates);
+			_taskQueue.process(tstates);
 			_cpu.process();
 		}
 		// корректировка счетчиков
 		tstates += (curTstates - lastTstates);
 		lastTstates = curTstates;
-		performance_tstates += curTstates;
+		performanceTstates += curTstates;
 	}
 	
 	function processDebug() {
 		// фиксация время запуска итерации
 		var now = Date.now();
 		// проверка на необходимость вывода информации о производительности.
-		var performance_elapsed = now - performance_timestamp
-		if ( performance_elapsed >= 1000 ) {
+		var performanceElapsed = now - performanceTimestamp
+		if ( performanceElapsed >= 1000 ) {
 			_bus.var_write('performance', {
-				frequency: performance_tstates / (performance_elapsed * 1000),
-				fps: performance_fps * 1000 / performance_elapsed
+				frequency: performanceTstates / (performanceElapsed * 1000),
+				fps: performanceFps * 1000 / performanceElapsed
 			});
-			performance_timestamp = now;
-			performance_tstates = 0;
-			performance_fps = 0;
+			performanceTimestamp = now;
+			performanceTstates = 0;
+			performanceFps = 0;
 		}
 		// расчет времени с запуска предыдущей итереации
-		var elapsed = now - interval_timestamp;
-		interval_timestamp = now;
+		var elapsed = now - intervalTimestamp;
+		intervalTimestamp = now;
 		// расчет количества тактов для выполнения
-		var planned_tstates = tstates_per_ms * elapsed;
-		if (planned_tstates > tstatesPerIntrq) {
-			planned_tstates = tstates_per_ms * 4;
+		var plannedTstates = tstatesPerMs * elapsed;
+		if (plannedTstates > tstatesPerIntrq) {
+			plannedTstates = tstatesPerMs * 4;
 		}
 		// сброс счетчика тактов процессора
 		_cpu.set_tstates(0);
 		var lastTstates = 0;
 		var curTstates;
 		// работа процессора
-		while ((curTstates = _cpu.get_tstates()) < planned_tstates) {
+		while ((curTstates = _cpu.get_tstates()) < plannedTstates) {
 			tstates += (curTstates - lastTstates);
 			lastTstates = curTstates;
-			_timeoutQueue.process(tstates);
+			_taskQueue.process(tstates);
 			var state = _cpu.get_state();
 			if (_checkBreakConditionCallback(state)) {
 				stop();
@@ -172,31 +171,30 @@ function ZX_Clock() {
 			_cpu.process();
 		}
 		// корректировка счетчиков
-		var processed_tstates = (curTstates = _cpu.get_tstates());
+		var processedTstates = (curTstates = _cpu.get_tstates());
 		tstates += (curTstates - lastTstates);
 		lastTstates = curTstates;
-		performance_tstates += processed_tstates;
+		performanceTstates += processedTstates;
 	}
 
-	var updateInterruptSubscription = function() {
-		if (_interruptSubscription) {
-			_interruptSubscription.cancel();
-		}
-		_interruptSubscription = this.subscribe(onInterrupt, intrqPeriod, 0);
+	var rescheduleInterruptTask = function() {
+		_interruptTask && (_interruptTask.cancelled = true);
+		_interruptTask = this.setInterval(onInterrupt, intrqPeriod, 0);
 	}.bind(this);
 
 	function onInterrupt() {
 		_bus.var_write('intrq');
-		performance_fps++;
-		if (resubscribeOnInterrupts) {
-			updateInterruptSubscription();
-			resubscribeOnInterrupts = false;
+		performanceFps++;
+		if (_rescheduleTaskOnNextInterrupt) {
+			rescheduleInterruptTask();
+			_rescheduleTaskOnNextInterrupt = false;
 		}
 	}
 
-	function update_tstates_per_ms() {
-		tstates_per_ms = tstatesPerIntrq / intrqPeriod;
-		resubscribeOnInterrupts = true;
+	function updateTstatesPerMs() {
+		tstatesPerMs = tstatesPerIntrq / intrqPeriod;
+		_taskQueue.set_tstatesPerMs(tstatesPerMs);
+		_rescheduleTaskOnNextInterrupt = true;
 	}
 
 	/********************/
@@ -207,115 +205,121 @@ function ZX_Clock() {
 	this.stop = stop;
 	this.get_running = function () { return running; }
 	this.get_tstates = function () { return tstates; }
-	this.get_ms = function () { return tstates / tstates_per_ms; }
+	this.get_ms = function () { return tstates / tstatesPerMs; }
 	this.connect = function (bus, cpu) {
 		_bus = bus;
 		_cpu = cpu;
 
 		_bus.on_opt(function (name, value) {
 			tstatesPerIntrq = value;
-			update_tstates_per_ms();
+			updateTstatesPerMs();
 		}, OPT_TSTATES_PER_INTRQ);
 	
 		_bus.on_opt(function (name, value) {
 			intrqPeriod = value; 
-			update_tstates_per_ms();
+			updateTstatesPerMs();
 		}, OPT_INTRQ_PERIOD);
 
-		updateInterruptSubscription();
+		rescheduleInterruptTask();
 	}
 	this.setTimeout = function(func, ms) {
-		return _timeoutQueue.enqueue(tstates + ms * tstates_per_ms, func);
+		return _taskQueue.enqueue(tstates, ms, func);
 	}
-	this.setInterval = function(func, ms) {
-		var state = {
-			func: func,
-			ms: ms,
-			init: tstates,
-			iter: 0,
-			rec: null,
-			getNextTstates: function () { return this.init + ++this.iter * this.ms * tstates_per_ms; }
-		};
-		state.rec = _timeoutQueue.enqueue(state.getNextTstates(), execAndReqenqueue.bind(null, state));
-		return state.rec;
-
-		function execAndReqenqueue(state) {
-			state.func();
-			var rec2 = _timeoutQueue.enqueue(state.getNextTstates(), execAndReqenqueue.bind(null, state));
-			rec2.cancelled = state.rec.cancelled;
-		}
-	}
-	this.subscribe = function (func, interval, count, firstInterval) {
-		var state = {
-			func: func,
-			start: tstates,
-			interval: interval,
-			firstInterval: firstInterval !== undefined ? firstInterval : interval,
-			count: count !== undefined ? count : 1,
-			next: 1,
-			cancelled: false,
-			underlyingTimeout: null,
-			get_leftOver: function () {
-				if (this.underlyingTimeout) {
-					return (this.underlyingTimeout.tstates - tstates) / tstates_per_ms;
-				}
-				else {
-					return 0;
-				}
-			},
-			cancel: function () { 
-				this.cancelled = true; 
-				if (this.underlyingTimeout) { 
-					this.underlyingTimeout.cancelled = true; 
-				} 
-			}
-		};
-		state.underlyingTimeout = _timeoutQueue.enqueue(state.start + state.firstInterval * tstates_per_ms, onTimeout.bind(state));
-		return state;
-
-		function onTimeout() {
-			this.func();
-			if (this.cancelled || this.count && this.next >= this.count)
-				return;
-
-			this.underlyingTimeout = _timeoutQueue.enqueue(this.start + (this.firstInterval + this.next++ * this.interval) * tstates_per_ms, onTimeout.bind(this));
-		}
+	this.setInterval = function (func, interval, count, firstInterval) {
+		var firstInterval = (firstInterval !== undefined) ? firstInterval : interval;
+		return _taskQueue.enqueue(tstates, firstInterval, func, count, interval);
 	}
 }
 
-function TimeoutQueue() {
+function TaskQueue(tstatesPerMs) {
 	// вместимость очереди ставим с запасом
 	// (фактически одномоментно там порядка 5 заданий)
 	var capacity = 100; 
 	var queue = new Array(capacity);
 	var begin = 0;
 	var end = 0;
+	var _tstatesPerMs = tstatesPerMs;
 
-	this.enqueue = function (tstates, func) {
+	this.set_tstatesPerMs = function (value) {
+		_tstatesPerMs = value;
+		var linearEnd = end < begin ? end + capacity : end;
+		for (var linearIndex = begin; linearIndex < linearEnd; linearIndex++) {
+			var task = queue[linearIndex % capacity];
+			if (!task.valuesInTs && task.recalculateOnMsChanged) {
+				task.recalculate = true;
+			}
+		}
+	}
+	this.get_tstatesPerMs = function () {
+		return _tstatesPerMs;
+	}
+
+	this.enqueue = function (tsNow, timeout, func, count, repeatInterval, valuesInTs) {
+		// init task
+		var task = {
+			tsStart: tsNow,
+			tsEvent: tsNow + (valuesInTs ? timeout : (timeout * _tstatesPerMs)),
+			timeout: timeout,
+			next: 1,
+			count: count !== undefined ? count : 1,
+			repeatInterval: repeatInterval !== undefined ? repeatInterval : timeout,
+			valuesInTs: valuesInTs !== undefined ? valuesInTs : false,
+			invoke: func,
+			recalculateOnMsChanged: !valuesInTs,
+			cancelled: false,
+			recalculate: false
+		};
+		// put in queue
 		var linearEnd = end < begin ? end + capacity : end;
 		var i = linearEnd;
-		while ((i - 1) >= begin && queue[(i - 1) % capacity].tstates > tstates) {
+		while ((i - 1) >= begin && queue[(i - 1) % capacity].tsEvent > task.tsEvent) {
 			queue[i % capacity] = queue[(i - 1) % capacity];
 			i--;
 		}
-		var state = queue[i % capacity] = {
-			tstates: tstates,
-			func: func,
-			cancelled: false,
-			cancel: function () { this.cancelled = true; }
-		};
+		queue[i % capacity] = task;
 		end = (end + 1) % capacity;
-		return state;
+		return task;
 	}
 
-	this.process = function (tstates) {
+	this.reenqueue = function (task) {
+		// update task
+		if (task.recalculate) {
+			task.tsStart = task.tsEvent;
+			task.timeout = 0;
+			if (task.count) {
+				task.count -= (task.next - 1);
+			}
+			task.next = 1;
+			task.recalculate = false;
+		}
+		task.tsEvent = task.tsStart + (
+			task.valuesInTs 
+			? (task.timeout + task.next * task.repeatInterval)
+			: (task.timeout + task.next * task.repeatInterval) * _tstatesPerMs);
+		task.next++;
+		// put in queue
+		var linearEnd = end < begin ? end + capacity : end;
+		var i = linearEnd;
+		while ((i - 1) >= begin && queue[(i - 1) % capacity].tsEvent > task.tsEvent) {
+			queue[i % capacity] = queue[(i - 1) % capacity];
+			i--;
+		}
+		queue[i % capacity] = task;
+		end = (end + 1) % capacity;
+		return task;
+	}
+
+	this.process = function (tsNow) {
 		while (true) {
 			var linearEnd = end < begin ? end + capacity : end;
-			if (begin < linearEnd && queue[begin].tstates <= tstates) {
-				var state = queue[begin++];
+			if (begin < linearEnd && queue[begin].tsEvent <= tsNow) {
+				var task = queue[begin++];
 				begin %= capacity;
-				if (!state.cancelled) {
-					state.func();
+				if (!task.cancelled) {
+					task.invoke();
+					if (!task.cancelled && (!task.count || task.next < task.count)) {
+						this.reenqueue(task);
+					}
 				}
 			}
 			else 
