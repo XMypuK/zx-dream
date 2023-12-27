@@ -89,7 +89,7 @@
 			
 		});
 
-		mouse.subscribe(function ( state ) {
+		mouse.get_onAction().subscribe(function ( state ) {
 			if ( state.type == 'key' ) {
 				if ( state.pressed ) {
 					$buttons

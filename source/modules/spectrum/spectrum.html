@@ -51,7 +51,7 @@ $(window).load(function() {
 	ZXContext.hw.betadisk.connect(ZXContext.hw.bus, ZXContext.hw.clock,	ZXContext.hw.drives);
 	ZXContext.hw.joystick.connect(ZXContext.hw.bus);
 	ZXContext.hw.dummyGS.connect(ZXContext.hw.bus);
-	ZXContext.hw.psg.subscribeOnStateChange(function (state) {
+	ZXContext.hw.psg.get_onStateChanged().subscribe(function (state) {
 		$(document.body).toggleClass('-sound_on', state == 'running');
 	});
 	ZXContext.hw.psg.connect(ZXContext.hw.bus, ZXContext.hw.clock);

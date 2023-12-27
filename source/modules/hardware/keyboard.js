@@ -181,18 +181,13 @@ function ZX_Keyboard() {
 			}
 		}
 
-		notifyListeners(keys, pressed);
+		_onKeyStateChanged.emit({
+			keys: keys,
+			pressed: pressed
+		});
 	}
 
-	var keyStateListeners = [];
-	function monitorKeyState ( listener ) {
-		keyStateListeners.push(listener);
-	}
-	function notifyListeners ( keys, pressed ) {
-		for ( var i = 0; i < keyStateListeners.length; i++ ) {
-			keyStateListeners[i](keys, pressed);
-		}
-	}
+	var _onKeyStateChanged = new ZXEvent();
 
 	function io_read_fe(address) {
 		var data = 0xFF;
@@ -211,7 +206,9 @@ function ZX_Keyboard() {
 		bus.on_io_read(io_read_fe, { mask: 0xFF, value: 0xFE });
 	}
 
-	this.monitorKeyState = monitorKeyState;
+	this.get_onKeyStateChanged = function () {
+		return _onKeyStateChanged.pub;
+	}
 	this.switchKeys = switch_keys;
 	this.connect = connect;
 }

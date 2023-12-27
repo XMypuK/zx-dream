@@ -53,8 +53,8 @@ function ZX_DriveDispatcher(toolbar) {
         driveBox.endInit();
         $(toolbar).append(fragment);
         driveBoxes.push(driveBox);
-        ZXContext.hw.drives[index].subscribe(function (eventName, eventArgs) {
-            onDriveEvent(index, eventName, eventArgs);
+        ZXContext.hw.drives[index].get_onStateChanged().subscribe(function (state) {
+            onDriveStateChanged(index, state);
         });
     }
 
@@ -68,12 +68,11 @@ function ZX_DriveDispatcher(toolbar) {
         }
     }
 
-    function onDriveEvent(index, eventName, eventArgs) {
-        switch (eventName) {
-            case 'SET_CYL': driveBoxes[index].set_cyl(eventArgs); break;
-            case 'SET_HEAD': driveBoxes[index].set_head(eventArgs); break;
-            case 'SET_MOTOR': driveBoxes[index].set_motor(eventArgs); break;
-        }
+    function onDriveStateChanged(index, state) {
+        var driveBox = driveBoxes[index];
+        driveBox.set_cyl(state.cyl);
+        driveBox.set_head(state.head);
+        driveBox.set_motor(state.motor);
     }
 
     function open(driveIndex, driveBox) {

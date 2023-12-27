@@ -4,7 +4,7 @@ function ZX_Mouse () {
 	var scrollPos = 0x0F; // 0 - 15
 	var x = 1; // 0 - 255
 	var y = 2; // 0 - 255
-	var listeners = [];
+	var _onAction = new ZXEvent();
 	
 	function io_read_buttons(address) {
 		return ( scrollPos << 4 ) | buttons;
@@ -21,12 +21,6 @@ function ZX_Mouse () {
 	function io_read_7ffd(address) {
 		return _bus.var_read('port_7ffd_value');
 	}
-		
-	function notifyListeners( state ) {
-		for ( var i = 0; i < listeners.length; i++ ) {
-			listeners[i](state);
-		}
-	}	
 
 	this.switchButton = function ( num, pressed ) {
 		var idx = num - 1;
@@ -38,28 +32,26 @@ function ZX_Mouse () {
 			buttons |= (1 << idx) & 0x0f;
 		else
 			buttons &= ~(1 << idx) & 0x0f;
-		notifyListeners({ type: 'key', num: num, pressed: !!pressed });
+		_onAction.emit({ type: 'key', num: num, pressed: !!pressed });
 	}
 
 	this.wheel = function (diff) {
 		scrollPos = (scrollPos + diff) & 0x0f;
-		notifyListeners({ type: 'wheel', diff: diff });
+		_onAction.emit({ type: 'wheel', diff: diff });
 	}
 
 	this.moveX = function (diff) {
 		x = ( x + diff ) & 0xff;
-		notifyListeners({ type: 'move-x', diff: diff });
+		_onAction.emit({ type: 'move-x', diff: diff });
 	}
 
 	this.moveY = function (diff) {
 		y = ( y + diff ) & 0xff;
-		notifyListeners({ type: 'move-y', diff: diff });
+		_onAction.emit({ type: 'move-y', diff: diff });
 	}
 
-	this.subscribe = function ( listener ) {
-		if ( typeof listener == 'function' ) {
-			listeners.push(listener);
-		}
+	this.get_onAction = function () {
+		return _onAction.pub;
 	}
 
 	this.connect = function (bus) {

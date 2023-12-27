@@ -2,7 +2,7 @@ function ZX_PSG() {
     var get_ready$ = $.Deferred();
     var _audioContext;
     var _audioProcessorNode;
-    var _stateChangeListeners = [];
+    var _stateChangedEvent = new ZXEvent();
 
     var PSG_REG = {
         TONE_A_FINE: 0,
@@ -113,9 +113,7 @@ function ZX_PSG() {
     }
 
     function onStateChange(state) {
-        for (var i = 0; i < _stateChangeListeners.length; i++) {
-            _stateChangeListeners[i](state);
-        }
+        _stateChangedEvent.emit(state);
     }
 
     function io_write_reg(address, data) {
@@ -255,11 +253,21 @@ function ZX_PSG() {
     this.get_ready$ = function () {
         return get_ready$;
     }
-    this.get_audioContext = function () {
-        return _audioContext;
+    this.get_audioContextState = function () {
+        return _audioContext && _audioContext.state || null;
     }
-    this.subscribeOnStateChange = function (fn) {
-        _stateChangeListeners.push(fn);
+    this.set_audioContextState = function (value) {
+        if (!_audioContext)
+            throw new Error('Контекст воспроизведения звука не создан.');
+        switch (value) {
+            case 'suspended': _audioContext.suspend(); break;
+            case 'running': _audioContext.resume(); break;
+            case 'closed': _audioContext.close(); break;
+            default: throw new Error('Неверный статус контекста воспроизведения звука.');
+        }
+    }
+    this.get_onStateChanged = function () {
+        return _stateChangedEvent.pub;
     }
     this.applySettings = function (psgMode, psgClock, psgBufferSize) {
         _psgMode = psgMode;

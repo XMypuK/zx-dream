@@ -25,6 +25,34 @@ var VAL_PSG_OFF = 0;
 var VAL_PSG_AY_3_891X = 1;
 var VAL_PSG_YM_2149 = 2;
 
+function ZXEvent() {
+	var handlers = [];
+
+	this.emit = function (args) {
+		for (var i = 0; i < handlers.length; i++) {
+			handlers[i](args);
+		}
+	}
+
+	this.pub = {
+		subscribe: function (handler) {
+			if (!(typeof handler === 'function'))
+				throw new Error('Argument error: Handler must be a function.');
+	
+			handlers.push(handler);
+		},
+	
+		unsubscribe: function (handler) {
+			for (var i = 0; i < handlers.length; i++) {
+				if (handlers[i] === handler) {
+					handlers.splice(i, 1);
+					break;
+				}
+			}
+		}
+	};
+}
+
 function stringToBytes( str ) {
   	var ch;
   	var stack;
@@ -506,7 +534,7 @@ function CRCWrapper(stream, crc) {
  * При реализации следующего класса частично были использованы (с предварительной переработкой)
  * исходные коды Miodrag Milanovic (https://git.redump.net/mame/tree/src/lib/formats/td0_dsk.cpp)
  * и Flat Rock Software (https://github.com/CatacombGames/CatacombApocalypse/blob/master/LZHUF.C),
- * распространяемые под свобондными лицензиями (BSD-3-Clause, GNU).
+ * распространяемые под свободными лицензиями (BSD-3-Clause, GNU).
  */
 function LZSSDecompressionStream(underlyingStream) {
 	var _underlyingStream = underlyingStream;

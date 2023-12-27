@@ -12,16 +12,18 @@ function ZX_Floppy() {
     var _cyl = 0;
     var _head = 0;
     var _motor = 0;
-    var _listeners = [];
+    var _stateChangedEvent = new ZXEvent();
 
     this._debug_getRaw = function() {
         return _cylinders;
     }
 
-    function notifyListeners(eventName, eventParams) {
-        for ( var i = 0; i < _listeners.length; i++ ) {
-            _listeners[i](eventName, eventParams);
-        }
+    function onStateChanged() {
+        _stateChangedEvent.emit({
+            cyl: _cyl,
+            head: _head,
+            motor: !!_motor
+        });
     }
 
     function createTrDosSector(cyl, sec, sectorSize, data, dataOffset) {
@@ -81,26 +83,24 @@ function ZX_Floppy() {
 	this.get_cylCount = function () { return _cylinders.length; }
 	this.get_headCount = function () { return _headCount; }
     this.get_cylinder = function () { return _cyl; }
-    this.set_head = function (value) { _head = value; notifyListeners('SET_HEAD', _head); }
+    this.set_head = function (value) { _head = value; onStateChanged(); }
     this.get_head = function () { return _head }
-    this.set_motor = function (value) { _motor = +!!value; notifyListeners('SET_MOTOR', _motor); }
+    this.set_motor = function (value) { _motor = +!!value; onStateChanged(); }
     this.get_motor = function () { return !!_motor; }
-    this.subscribe = function (listener) { 
-        if (typeof(listener) === 'function') {
-            _listeners.push(listener);
-        }
+    this.get_onStateChanged = function () {
+        return _stateChangedEvent.pub;
     }
 
     this.stepIn = function () {
         if (_cyl < _cylinders.length - 1) {
             _cyl++;
-            notifyListeners('SET_CYL', _cyl);
+            onStateChanged();
         }
     }
     this.stepOut = function () {
         if (_cyl > 0) {
             _cyl--;
-            notifyListeners('SET_CYL', _cyl);
+            onStateChanged();
         }
     }
     this.openStream = function() {
@@ -161,7 +161,7 @@ function ZX_Floppy() {
         _isDoubleDensity = true;
         _isWriteProtected = false;
         _isReady = true;
-        notifyListeners('SET_CYL', _cyl);
+        onStateChanged();
     }
 
     this.insertSCL = function (bin) {
@@ -353,7 +353,7 @@ function ZX_Floppy() {
         _isDoubleDensity = true;
         _isWriteProtected = isWriteProtected;
         _isReady = true;
-        notifyListeners('SET_CYL', _cyl);
+        onStateChanged();
     }
 
     this.insertTD0 = function (bin) {
@@ -606,7 +606,7 @@ function ZX_Floppy() {
         _isDoubleDensity = doubleDensity;
         _isWriteProtected = false;
         _isReady = true;
-        notifyListeners('SET_CYL', _cyl);
+        onStateChanged();
     }
 
     this.insertUDI = function (bin) {
@@ -660,7 +660,7 @@ function ZX_Floppy() {
         _isDoubleDensity = type == 0x00;
         _isWriteProtected = false;
         _isReady = true;
-        notifyListeners('SET_CYL', _cyl);
+        onStateChanged();
     }
 
     this.insertDSK = function (bin) {
@@ -854,7 +854,7 @@ function ZX_Floppy() {
         _isDoubleDensity = !wholeDiskIsInFM;
         _isWriteProtected = false;
         _isReady = true;
-        notifyListeners('SET_CYL', _cyl);
+        onStateChanged();
     }
 
     this.create = function (cylCount, headCount, trdosFormat) {
@@ -902,7 +902,7 @@ function ZX_Floppy() {
         _isDoubleDensity = true;
         _isWriteProtected = false;
         _isReady = true;
-        notifyListeners('SET_CYL', _cyl);
+        onStateChanged();
     }
 
     this.eject = function () {
