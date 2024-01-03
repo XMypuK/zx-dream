@@ -23,13 +23,18 @@
 		
 		var $dlg = null;
 		var openResult$ = null;
+		var openResult$resolve = null;
+		var openResult$reject = null;
 		var formats = null;
 
 		this.open = open;
 
 		function open(compatible_formats) {
 			if (!openResult$) {
-				openResult$ = $.Deferred();
+				openResult$ = new Promise(function (resolve, reject) {
+					openResult$resolve = resolve;
+					openResult$reject = reject; 
+				});
 				formats = compatible_formats;
 				formats.sort();
 				init();
@@ -56,7 +61,7 @@
 					$(this).dialog('destroy');
 					$(this).remove(); 
 					if (openResult$) {
-						openResult$.reject();
+						openResult$resolve();
 						openResult$ = null;
 					}
 				}
@@ -79,7 +84,7 @@
 			}
 
 			if (openResult$) {
-				openResult$.resolve($format.val());
+				openResult$resolve($format.val());
 				openResult$ = null;
 			}
 			$dlg.dialog('close');
@@ -88,7 +93,7 @@
 
 		function cancel() {
 			if (openResult$) {
-				openResult$.reject();
+				openResult$resolve();
 				openResult$ = null;
 			}			
 			$dlg.dialog('close');

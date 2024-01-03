@@ -77,36 +77,33 @@ function ZX_DriveDispatcher(toolbar) {
 
     function open(driveIndex, driveBox) {
         var browser = new ServerBrowser();
-        browser.open()
-            .then(function (filename) {
-                driveBox.set_status(DriveBoxStatus.loading);
-                return loadServerFile(filename).then(function (data) {
-                    try {
-                        var format = DiskImageFormat.getFromFileName(filename);
-                        switch (format) {
-                            case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
-                            case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
-                            case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
-                            case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
-                            case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
-                            case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
-                        }
-                        driveBox.set_status(DriveBoxStatus.loaded);
-                        driveBox.set_title(filename);
-                        ZXContext.settings.set_drive(driveIndex, 'server:' + filename);
-                        clearImageCache(driveIndex);
-                    }
-                    catch (error) {
-                        return $.Deferred().reject(error);
-                    }
-                });
-            })
-            .fail(function (errorMessage) {
-                if (errorMessage) {
-                    driveBox.set_status(DriveBoxStatus.error);
-                    alert(errorMessage);
+        browser.open().then(function (filename) {
+            if (!filename)
+                return;
+                
+            driveBox.set_status(DriveBoxStatus.loading);
+            return loadServerFile(filename).then(function (data) {
+                var format = DiskImageFormat.getFromFileName(filename);
+                switch (format) {
+                    case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
+                    case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
+                    case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
+                    case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
+                    case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
+                    case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
                 }
+                driveBox.set_status(DriveBoxStatus.loaded);
+                driveBox.set_title(filename);
+                ZXContext.settings.set_drive(driveIndex, 'server:' + filename);
+                clearImageCache(driveIndex);
             });
+        })
+        .catch(function (errorMessage) {
+            if (errorMessage) {
+                driveBox.set_status(DriveBoxStatus.error);
+                alert(errorMessage);
+            }
+        });
     }
 
     function openLocal(driveIndex, driveBox) {
@@ -115,44 +112,29 @@ function ZX_DriveDispatcher(toolbar) {
             var filename = ($input.val() || '').replace(/^.*[\\\/]/, '');
             if (!filename)
                 return;
-            $.when()
-            .then(function () {
-                var format;
-                try { 
-                    format = DiskImageFormat.getFromFileName(filename); 
-                }
-                catch (error) { 
-                    return $.Deferred().reject(error); 
-                }
+            Promise.all([]).then(function () {
+                var format  = DiskImageFormat.getFromFileName(filename);
                 driveBox.set_status(DriveBoxStatus.loading);
                 return loadLocalFile($input[0]).then(function (data) {
-                    try {
-                        switch (format) {
-                            case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
-                            case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
-                            case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
-                            case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;                        
-                            case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
-                            case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
-                        }
-                        driveBox.set_status(DriveBoxStatus.loaded);
-                        driveBox.set_title(filename);
-                        ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
-                        createImageCache(driveIndex, filename, data);
+                    switch (format) {
+                        case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
+                        case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
+                        case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
+                        case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;                        
+                        case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
+                        case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
                     }
-                    catch (error) {
-                        return $.Deferred().reject(error);
-                    }
+                    driveBox.set_status(DriveBoxStatus.loaded);
+                    driveBox.set_title(filename);
+                    ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
+                    createImageCache(driveIndex, filename, data);
                 });
-            })
-            .then(function () {
-                $input.remove();
-            })
-            .fail(function (errorMessage) {
+            }).catch(function (errorMessage) {
                 if (errorMessage) {
                     driveBox.set_status(DriveBoxStatus.error);
                     alert(errorMessage);
                 }
+            }).finally(function () {
                 $input.remove();
             });
         });
@@ -168,49 +150,48 @@ function ZX_DriveDispatcher(toolbar) {
 
 		var formats = floppy.getCompatibleFormats();
 		var dlg = new SaveImageDialog();
-		dlg.open(formats)
-            .then(function (format) {
-                try {
-                    var data;
-                    switch (format) {
-                        case 'TRD': data = floppy.saveToTRD(); break;
-                        case 'FDI': data = floppy.saveToFDI(); break;
-                        case 'SCL': data = floppy.saveToSCL(); break;
-                        case 'TD0': data = floppy.saveToTD0(); break;
-                        case 'UDI': data = floppy.saveToUDI();break;
-                        case 'DSK': throw new Error('Not implemented.'); break;
-                    }
-                    downloadBinaryData(data, 'custom_image.' + format);
-                }
-                catch (error) {
-                    return $.Deferred().reject(error);
-                }
-            })
-            .fail(function (errorMessage) {
-                if (errorMessage) {
-                    alert(errorMessage);
-                }
-            });
+		dlg.open(formats).then(function (format) {
+            if (!format)
+                return;
+
+            var data;
+            switch (format) {
+                case 'TRD': data = floppy.saveToTRD(); break;
+                case 'FDI': data = floppy.saveToFDI(); break;
+                case 'SCL': data = floppy.saveToSCL(); break;
+                case 'TD0': data = floppy.saveToTD0(); break;
+                case 'UDI': data = floppy.saveToUDI();break;
+                case 'DSK': throw new Error('Not implemented.'); break;
+            }
+            downloadBinaryData(data, 'custom_image.' + format);
+        })
+        .catch(function (errorMessage) {
+            if (errorMessage) {
+                alert(errorMessage);
+            }
+        });
     }
 
     function create(driveIndex, driveBox) {
         var dlg = new CreateImageDialog();
-		dlg.open()
-            .then(function (imageParams) {
-                ZXContext.hw.drives[driveIndex].create(
-                    imageParams.cyl_count,
-                    imageParams.head_count, 
-                    imageParams.trdos_format);
-                driveBox.set_status(DriveBoxStatus.loaded);
-                driveBox.set_title('custom_image.fdi');
-                ZXContext.settings.set_drive(driveIndex, 'local:custom_image.fdi');
-                createImageCache(driveIndex, 'custom_image.fdi', ZXContext.hw.drives[driveIndex].saveToFDI());
-            })
-            .fail(function (errorMessage) {
-                if (errorMessage) {
-                    alert(errorMessage);
-                }
-            });
+		dlg.open().then(function (imageParams) {
+            if (imageParams)
+                return;
+
+            ZXContext.hw.drives[driveIndex].create(
+                imageParams.cyl_count,
+                imageParams.head_count, 
+                imageParams.trdos_format);
+            driveBox.set_status(DriveBoxStatus.loaded);
+            driveBox.set_title('custom_image.fdi');
+            ZXContext.settings.set_drive(driveIndex, 'local:custom_image.fdi');
+            createImageCache(driveIndex, 'custom_image.fdi', ZXContext.hw.drives[driveIndex].saveToFDI());
+        })
+        .catch(function (errorMessage) {
+            if (errorMessage) {
+                alert(errorMessage);
+            }
+        });
     }
 
     function eject(driveIndex, driveBox) {
@@ -227,47 +208,42 @@ function ZX_DriveDispatcher(toolbar) {
 			return;
         var driveBox = driveBoxes[driveIndex];
         driveBox.set_status(DriveBoxStatus.loading);
-		$.when()
-            .then(function () {
-                var semicolonIndex = prefixAndFilename.indexOf(':');
-                var prefix = (semicolonIndex > 0) ? prefixAndFilename.substr(0, semicolonIndex) : '';
-                var filename = (semicolonIndex >= 0) ? prefixAndFilename.substr(semicolonIndex + 1) : prefixAndFilename;
-                var load = (prefix === 'local')
-                    ? loadImageCache(driveIndex).then(function (imageInfo) { return imageInfo.data; })
-                    : loadServerFile(filename);
-                return load.then(function (data) {
-                    try {
-                        var format = DiskImageFormat.getFromFileName(filename);
-                        switch (format) {
-                            case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
-                            case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
-                            case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
-                            case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
-                            case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
-                            case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
-                        }                    
-                        driveBox.set_status(DriveBoxStatus.loaded);
-                        driveBox.set_title(filename);
-                    }
-                    catch (error) {
-                        return $.Deferred().reject(error);
-                    }
-                })
+		Promise.all([]).then(function () {
+            var semicolonIndex = prefixAndFilename.indexOf(':');
+            var prefix = (semicolonIndex > 0) ? prefixAndFilename.substr(0, semicolonIndex) : '';
+            var filename = (semicolonIndex >= 0) ? prefixAndFilename.substr(semicolonIndex + 1) : prefixAndFilename;
+            var load = (prefix === 'local')
+                ? loadImageCache(driveIndex).then(function (imageInfo) { return imageInfo.data; })
+                : loadServerFile(filename);
+            return load.then(function (data) {
+                var format = DiskImageFormat.getFromFileName(filename);
+                switch (format) {
+                    case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
+                    case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
+                    case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
+                    case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
+                    case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
+                    case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
+                }                    
+                driveBox.set_status(DriveBoxStatus.loaded);
+                driveBox.set_title(filename);
             })
-            .fail(function (errorMessage) {
-                if (errorMessage) {
-                    driveBox.set_status(DriveBoxStatus.error);
-                    alert(errorMessage);
-                }
-            });
+        })
+        .catch(function (errorMessage) {
+            if (errorMessage) {
+                driveBox.set_status(DriveBoxStatus.error);
+                alert(errorMessage);
+            }
+        });
 	}
 
     function loadImageCache(driveIndex) {
-		if (!localStorage)
-			return;
+        return new Promise(function (resolve, reject) {
+            if (!localStorage) {
+                reject('Local Storage is not supported by browser.');
+                return;
+            }
 
-		var promise$ = $.Deferred();
-		try {
 			var cacheKey = 'drive' + driveIndex + "_cache";
 			var cacheData = localStorage[cacheKey];
 			if (!cacheData) 
@@ -278,15 +254,11 @@ function ZX_DriveDispatcher(toolbar) {
 			var filename = cacheData.substr(0, dataSeparator);
 			var base64Data = cacheData.substr(dataSeparator + 1);
 			var data = base64Decode(base64Data);
-			promise$.resolve({
+            resolve({
 				filename: filename,
 				data: data
 			});
-		}
-		catch (error) {
-			promise$.reject(error);
-		}
-		return promise$;
+        });
 	}
 
     function createImageCache(driveIndex, filename, data) {

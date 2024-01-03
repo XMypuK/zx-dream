@@ -203,31 +203,24 @@
             var $input = $('<input type="file" accept=".sna,.z80" style="visibility: hidden;" />').appendTo(document.body);
             $input.on('change', function (e) {
                 var filename = ($input.val() || '').replace(/^.*[\\\/]/, '');
-
                 if (!filename)
                     return;
 
-                $.when()
-                .then(function () {
-                    try {
-                        var format = ((/\.(SNA|Z80)/i).exec(filename)[1] || '').toUpperCase();
-                        if (format != 'SNA' && format != 'Z80')
-                            throw new Error('Неподдерживаемый формат файла.');
-                        return loadLocalFile($input[0]).then(function (data) {
-                            var snapshot = null;
-                            switch (format) {
-                                case 'SNA': snapshot = ZX_Snapshot.createFromSNA(data); break;
-                                case 'Z80': snapshot = ZX_Snapshot.createFromZ80(data); break;
-                            }
-                            if (snapshot) {
-                                ZX_Snapshot.restore(snapshot, ZXContext.hw.bus, ZXContext.hw.cpu);
-                            }
-                        })
-                    }
-                    catch (error) {
-                        return $.Deferred().reject(error);
-                    }
-                }).fail(function (errorMessage) {
+                Promise.all([]).then(function () {
+                    var format = ((/\.(SNA|Z80)/i).exec(filename)[1] || '').toUpperCase();
+                    if (format != 'SNA' && format != 'Z80')
+                        throw new Error('Неподдерживаемый формат файла.');
+                    return loadLocalFile($input[0]).then(function (data) {
+                        var snapshot = null;
+                        switch (format) {
+                            case 'SNA': snapshot = ZX_Snapshot.createFromSNA(data); break;
+                            case 'Z80': snapshot = ZX_Snapshot.createFromZ80(data); break;
+                        }
+                        if (snapshot) {
+                            ZX_Snapshot.restore(snapshot, ZXContext.hw.bus, ZXContext.hw.cpu);
+                        }
+                    })
+                }).catch(function (errorMessage) {
                     if (errorMessage) {
                         alert(errorMessage);
                     }
@@ -244,8 +237,10 @@
 
         function openProperties() {
             var dlg = new SettingsDialog();
-            dlg.open().then(function () {
-                applySettings();
+            dlg.open().then(function (settingsChanged) {
+                if (settingsChanged) {
+                    applySettings();
+                }
             });
         }
 

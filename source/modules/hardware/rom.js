@@ -14,12 +14,12 @@ function ZX_ROM() {
 		{ key: 'trdos', name: 'tr5_04t.rom' }
 	];
 
-	var ready$ = $.when(
+	var ready$ = Promise.all([
 		get_rom(roms[0]),
 		get_rom(roms[1]),
 		get_rom(roms[2]),
 		get_rom(roms[3])
-	);
+	]);
 
 	function get_rom(rom) {
 		return loadServerFile(rom.name).then(function (data) {

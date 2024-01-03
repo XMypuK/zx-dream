@@ -59,12 +59,12 @@ $(window).load(function() {
 	ZXContext.ui.workspace.init();
 	
 	// ждем загрузки ПЗУ и инициализации аудио
-	$.when(
-		ZXContext.hw.rom.get_ready$().fail(function (error) {
+	Promise.all([
+		ZXContext.hw.rom.get_ready$().catch(function (error) {
 			alert('Не удалось загрузить ПЗУ: ' + error);
 		}),
 		ZXContext.hw.psg.get_ready$()
-	).then(function () {
+	]).then(function () {
 		start();
 	});
 

@@ -230,6 +230,8 @@
 	function SettingsDialog() {
 		var $dlg = $("<?=settings-dialog?>");
 		var openResult$ = null;
+		var openResult$resolve = null;
+		var openResult$reject = null;
 		var defaultSettings = ZXContext.settings.get_defaultValues();
 		var model;
 
@@ -237,7 +239,10 @@
 
 		function open() {
 			if (!openResult$) {
-				openResult$ = $.Deferred();
+				openResult$ = new Promise(function (resolve, reject) {
+					openResult$resolve = resolve;
+					openResult$reject = reject;
+				});
 				init();
 			}
 			return openResult$;
@@ -260,7 +265,7 @@
 					$(this).remove(); 
 
 					if (openResult$) {
-						openResult$.reject();
+						openResult$resolve();
 						openResult$ = null;
 					}
 				}
@@ -290,7 +295,7 @@
 			ZXContext.settings.set_useTypedArrays(model.useTypedArrays());
 
 			if (openResult$) {
-				openResult$.resolve();
+				openResult$resolve(true);
 				openResult$ = null;
 			}
 
@@ -300,7 +305,7 @@
 
 		function cancel() {
 			if (openResult$) {
-				openResult$.reject();
+				openResult$resolve();
 				openResult$ = null;
 			}			
 			$dlg.dialog('close');
@@ -310,7 +315,7 @@
 		function reset() {
 			ZXContext.settings.reset();
 			if (openResult$) {
-				openResult$.resolve();
+				openResult$resolve(true);
 				openResult$ = null;
 			}
 			$dlg.dialog('close');

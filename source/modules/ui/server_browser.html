@@ -66,13 +66,18 @@
 		
 		var $dlg = $("<?=server-browser?>");
 		var openResult$ = null;
+		var openResult$resolve = null;
+		var openResult$reject = null;
 		var files = [];
 
 		this.open = open;
 
 		function open() {
 			if (!openResult$) {
-				openResult$ = $.Deferred();
+				openResult$ = new Promise(function (resolve, reject) {
+					openResult$resolve = resolve;
+					openResult$reject = reject;
+				});
 				init();
 			}
 			return openResult$;
@@ -90,7 +95,7 @@
 					$(this).remove(); 
 
 					if (openResult$) {
-						openResult$.reject();
+						openResult$resolve();
 						openResult$ = null;
 					}
 				}
@@ -99,7 +104,10 @@
 			$dlg.on('keyup', function(e) { e.stopPropagation(); });
 
 			// загрузка каталога с сервера
-			$.get('get_catalog.php', [], function(data) {
+			doRequest({
+				url: '/get_catalog.php',
+				responseType: 'json'
+			}).then(function (data) {
 				if ( data && data.length !== undefined ) {
 					files = data;
 					refresh_tags();
@@ -108,7 +116,7 @@
 				else {
 					alert('Неожиданный ответ от сервера.');
 				}
-			}, 'json');
+			});
 		}
 
 		
@@ -124,7 +132,7 @@
 			}
 
 			if (openResult$) {
-				openResult$.resolve(filename);
+				openResult$resolve(filename);
 				openResult$ = null;
 			}
 

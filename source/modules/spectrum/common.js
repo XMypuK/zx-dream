@@ -143,77 +143,95 @@ function handleError(error) {
 	window.console && console.log && console.log(error);
 }
 
-function loadLocalFile(fileinput) {
-	var promise$ = $.Deferred();
-	try {
-		if (!fileinput)
-			throw new Error('Не указано поле ввода для загрузки.');
-		if ( window.File && window.FileReader ) {
-			// загрузка с диска напрямую
-			var reader = new FileReader();
-			reader.onload = function(e) { 
-				var data = stringToBytes(e.target.result);
-				promise$.resolve(data); 
+function doRequest(options) {
+	return new Promise(function (resolve, reject) {
+		var req = new XMLHttpRequest();
+		req.onreadystatechange = function () {
+			if (req.readyState === XMLHttpRequest.DONE) {
+				if (req.status === 200)
+					resolve(req.response);
+				else 
+					reject(req.statusText);
 			}
-			reader.onerror = function(e) { 
-				promise$.reject(e); 
-			}
-			reader.readAsBinaryString(fileinput.files[0]);
 		}
-		else {
-			// загрузка с диска через сервер
-			var action_url = 'get_base64.php?input=' + encodeURIComponent(fileinput.name);
-			var $iframe =
-				$('<iframe>')
-					.prop({ id: 'file_load_frame', name: 'file_load_frame' })
-					.css('display', 'none')
-					.appendTo(document.body);
-			var $form = 
-				$('<form>')
-					.prop({ action: action_url, method: 'post', enctype: 'multipart/form-data', target: 'file_load_frame' })
-					.append(fileinput)
-					.appendTo(document.body);
+		req.responseType = options.responseType || '';
+		req.open(options.method || 'GET', options.url, !options.sync);
+		req.send(options.data || undefined);
+	});
+}
 
-			$iframe.on('load', function(e) {
-				var base64_data = $iframe.contents().text().trim();
-				var data = base64Decode(base64_data)
-				$iframe.remove();
-				$form.remove();
-				promise$.resolve(data);
-			});
-			$iframe.on('error', function(e) { 
-				promise$.reject(e); 
-			});
-			$form.submit();
+function loadLocalFile(fileinput) {
+	return new Promise(function (resolve, reject) {
+		try {
+			if (!fileinput)
+				throw new Error('Не указано поле ввода для загрузки.');
+			if (typeof File !== 'undefined' && typeof FileReader !== 'undefined') {
+				// загрузка с диска напрямую
+				var reader = new FileReader();
+				reader.onload = function(e) { 
+					var data = stringToBytes(e.target.result);
+					resolve(data); 
+				}
+				reader.onerror = function(e) { 
+					reject(e); 
+				}
+				reader.readAsBinaryString(fileinput.files[0]);
+			}
+			else {
+				// загрузка с диска через сервер
+				var iframe = document.createElement('iframe');
+				iframe.id = 'file_load_frame';
+				iframe.name = 'file_load_frame';
+				iframe.style.display = 'none';
+
+				var form = document.createElement('form');
+				form.action = '/get_base64.php?input=' + encodeURIComponent(fileinput.name);
+				form.method = 'POST';
+				form.enctype = 'multipart/form-data';
+				form.target = 'file_load_frame';
+				form.append(fileinput);
+
+				iframe.addEventListener('load', function (e) {
+					var base64 = (iframe.textContent || '').replace(/^\s+|\s+$/g, '');
+					var data = base64Decode(base64);
+					iframe.remove();
+					form.remove();
+					resolve(data);
+				});
+				iframe.addEventListener('error', function (e) {
+					reject(e);
+				});
+
+				document.body.append(iframe);
+				document.body.append(form);
+				form.submit();
+			}
 		}
-	}
-	catch (error) {
-		promise$.reject(error);
-	}
-	return promise$;
+		catch (error) {
+			reject(error);
+		}
+	});
 }
 
 function loadServerFile(filename) {
-	var promise$ = $.Deferred();
-	try {
-		if (!filename)
-			throw new Error('Не указано имя файла.');
+	return new Promise(function (resolve, reject) {
+		if (!filename) {
+			reject('Не указано имя файла.');
+			return;
+		}
 		var typeMatch = (/\.([^\.\\\/]+)$/).exec(filename);
 		var type = typeMatch && typeMatch[1] || '';
-		$.ajax({
-			url: 'get_base64.php?type=' + encodeURIComponent(type) + '&name=' + encodeURIComponent(filename),
-			dataType: 'text'
+
+		doRequest({
+			url: '/get_base64.php?type=' + encodeURIComponent(type) + '&name=' + encodeURIComponent(filename),
+			responseType: 'text'
 		}).then(function (base64_data) {
 			var data = base64Decode(base64_data);
-			promise$.resolve(data);
-		}).fail(function (error) {
-			promise$.reject(error);
+			resolve(data);
+		}).catch(function (error) {
+			reject(error);
 		});
-	}
-	catch (error) {
-		promise$.reject(error);
-	}
-	return promise$;
+	});
 }
 
 function downloadText(text, filename) {

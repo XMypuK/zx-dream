@@ -1,5 +1,10 @@
 function ZX_PSG() {
-    var get_ready$ = $.Deferred();
+    var get_ready$resolve = null;
+    var get_ready$reject = null;
+    var get_ready$ = new Promise(function (resolve, reject) {
+        get_ready$resolve = resolve;
+        get_ready$reject = reject;
+    });
     var _audioContext;
     var _audioProcessorNode;
     var _stateChangedEvent = new ZXEvent();
@@ -61,7 +66,7 @@ function ZX_PSG() {
             init();
         }
         finally {
-            get_ready$.resolve();
+            get_ready$resolve();
         }
     }
     
