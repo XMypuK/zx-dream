@@ -2,9 +2,9 @@ function ZX_Keyboard() {
 	"use strict";
 	
 	var _keyStates = [ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff ];
-	var _onKeyStateChanged = new ZXEvent();
+	var _onKeysStateChanged = new ZXEvent();
 
-	function switchKeys( keys, pressed ) {
+	function switchKeys(keys, pressed) {
 		for ( var i = 0; i < keys.length; i++ ) {
 			if ( pressed ) {
 				_keyStates[keys[i].index] &= ((0x01 << keys[i].bit) ^ 0xff);
@@ -14,7 +14,7 @@ function ZX_Keyboard() {
 			}
 		}
 
-		_onKeyStateChanged.emit({
+		_onKeysStateChanged.emit({
 			keys: keys,
 			pressed: pressed
 		});
@@ -38,8 +38,8 @@ function ZX_Keyboard() {
 		bus.on_io_read(io_read_fe, { mask: 0xFF, value: 0xFE });
 	}
 
-	this.get_onKeyStateChanged = function () {
-		return _onKeyStateChanged.pub;
+	this.get_onKeysStateChanged = function () {
+		return _onKeysStateChanged.pub;
 	}
 	this.switchKeys = switchKeys;
 	this.connect = connect;
