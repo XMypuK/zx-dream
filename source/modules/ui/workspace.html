@@ -173,7 +173,19 @@
 
         function initVirtualMouse() {
             // подключение виртуальной мыши
-            ZXContext.ui.mouse = new VirtualMouse(vmouse, ZXContext.hw.mouse);
+            ZXContext.ui.vmouse = new VirtualMouse(control);
+            ZXContext.ui.vmouse.get_onKeyStateChanged().subscribe(function (args) {
+                ZXContext.hw.mouse.switchButton(args.key, args.pressed);
+            });
+            ZXContext.ui.vmouse.get_onMove().subscribe(function (args) {
+                args.offsetX && ZXContext.hw.mouse.moveX(args.offsetX);
+                args.offsetY && ZXContext.hw.mouse.moveY(args.offsetY);
+            });
+            ZXContext.hw.mouse.get_onAction().subscribe(function (state) {
+                if (state.type == 'key') {
+                    ZXContext.ui.vmouse.refreshKeyState(state.num, state.pressed);
+                }
+            });
         }
 
         function initToolbar() {
