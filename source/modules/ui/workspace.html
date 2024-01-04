@@ -3,6 +3,7 @@
 <include source="create_image_dialog.html" includeType="embed" />
 <include source="save_image_dialog.html" includeType="embed" />
 <include source="server_browser.html" includeType="embed" />
+<include source="pc_keyboard.js" includeType="embed" />
 <include source="virtual_keyboard.html" includeType="embed" />
 <include source="virtual_mouse.html" includeType="embed" />
 <include source="about_dialog.html" includeType="embed" />
@@ -138,6 +139,7 @@
         function init() {
             $container.append($workspace);
             initToolbar();
+            initKeyboard();
             initLayout();
             initVirtualKeyboard();
             initVirtualMouse();
@@ -147,6 +149,13 @@
         function initLayout() {
             $(window).resize(adjustWorkspaceLayout);
             adjustWorkspaceLayout();
+        }
+
+        function initKeyboard() {
+            ZXContext.ui.keyboard = new PCKeyboard();
+            ZXContext.ui.keyboard.get_onKeysStateChanged().subscribe(function (args) {
+                ZXContext.hw.keyboard.switchKeys(args.keys, args.pressed);
+            });
         }
 
         function initVirtualKeyboard() {
