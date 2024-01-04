@@ -10,7 +10,7 @@
 
 $(window).load(function() {
 	window.ZXContext = {
-		settings: new ZX_Settings(),
+		settings: new ZX_StorableSettings(),
 		hw: {},
 		ui: {},
 		debugMode: (/(\&|\?)debug=?/).test(window.location.search)

@@ -127,7 +127,6 @@
 
 <script type="text/javascript">
 	function SettingsKoModel() {
-		this.defaultSettings = ko.observable(ZXContext.settings.defaultSettings);
 		this.semicolors = ko.observable(ZXContext.settings.get_semicolors());
 		this.renderTypeOptions = ko.pureComputed(function () {
 			var result = [
@@ -232,7 +231,6 @@
 		var openResult$ = null;
 		var openResult$resolve = null;
 		var openResult$reject = null;
-		var defaultSettings = ZXContext.settings.get_defaultValues();
 		var model;
 
 		this.open = open;
@@ -279,18 +277,18 @@
 		
 
 		function apply() {
-			ZXContext.settings.set_tstatesPerIntrq(+model.tstatesPerIntrq() || defaultSettings.tstatesPerIntrq);
-			ZXContext.settings.set_tstatesPerIntrqTurbo(+model.tstatesPerIntrqTurbo() || defaultSettings.tstatesPerIntrqTurbo);
-			ZXContext.settings.set_intrqPeriod(+model.intrqPeriod() || defaultSettings.intrqPeriod);
+			ZXContext.settings.set_tstatesPerIntrq(+model.tstatesPerIntrq() || ZX_Settings.defaultValues.tstatesPerIntrq);
+			ZXContext.settings.set_tstatesPerIntrqTurbo(+model.tstatesPerIntrqTurbo() || ZX_Settings.defaultValues.tstatesPerIntrqTurbo);
+			ZXContext.settings.set_intrqPeriod(+model.intrqPeriod() || ZX_Settings.defaultValues.intrqPeriod);
 			ZXContext.settings.set_turboMode(model.turboMode());
 			ZXContext.settings.set_extendedMemory(+model.extendedMemory());
 			ZXContext.settings.set_semicolors(model.semicolors());
-			ZXContext.settings.set_rendererType(+model.rendererType() || defaultSettings.rendererType);
-			ZXContext.settings.set_scaleType(+model.scaleType() || defaultSettings.scaleType);
-			ZXContext.settings.set_scaleValue(+model.scaleValue() || defaultSettings.scaleValue);
+			ZXContext.settings.set_rendererType(+model.rendererType() || ZX_Settings.defaultValues.rendererType);
+			ZXContext.settings.set_scaleType(+model.scaleType() || ZX_Settings.defaultValues.scaleType);
+			ZXContext.settings.set_scaleValue(+model.scaleValue() || ZX_Settings.defaultValues.scaleValue);
 			ZXContext.settings.set_renderOnAnimationFrame(model.renderOnAnimationFrame());
 			ZXContext.settings.set_psg(+model.psg());
-			ZXContext.settings.set_psgClock(+model.psgClock() || defaultSettings.psgClock);
+			ZXContext.settings.set_psgClock(+model.psgClock() || ZX_Settings.defaultValues.psgClock);
 			ZXContext.settings.set_psgBufferSize(+model.psgBufferSize());
 			ZXContext.settings.set_useTypedArrays(model.useTypedArrays());
 
