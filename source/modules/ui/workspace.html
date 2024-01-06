@@ -4,6 +4,7 @@
 <include source="save_image_dialog.html" includeType="embed" />
 <include source="server_browser.html" includeType="embed" />
 <include source="pc_keyboard.js" includeType="embed" />
+<include source="virtual_display.js" includeType="embed" />
 <include source="virtual_keyboard.html" includeType="embed" />
 <include source="virtual_mouse.html" includeType="embed" />
 <include source="about_dialog.html" includeType="embed" />
@@ -143,6 +144,7 @@
             initLayout();
             initVirtualKeyboard();
             initVirtualMouse();
+            initVirtualDisplay();
             applySettings();
         }
 
@@ -185,6 +187,13 @@
                 if (state.type == 'key') {
                     ZXContext.ui.vmouse.refreshKeyState(state.num, state.pressed);
                 }
+            });
+        }
+
+        function initVirtualDisplay() {
+            ZXContext.ui.vdisplay = new VirtualDisplay($display[0]);
+            ZXContext.ui.vdisplay.get_onInitialized().subscribe(function (args) {
+                ZXContext.hw.display.bind(args.canvases);
             });
         }
 
@@ -276,16 +285,23 @@
             ZXContext.hw.bus.opt(OPT_INTRQ_PERIOD, s.get_intrqPeriod());
             ZXContext.hw.bus.opt(OPT_EXTENDED_MEMORY, s.get_extendedMemory());
             ZXContext.hw.bus.opt(OPT_SEMICOLORS, s.get_semicolors());
-            ZXContext.hw.bus.opt(OPT_RENDERER, s.get_rendererType());
-            ZXContext.hw.bus.opt(OPT_SCALE_METHOD, s.get_scaleType());
-            ZXContext.hw.bus.opt(OPT_SCALE, s.get_scaleValue());
+            ZXContext.hw.bus.opt(OPT_RENDERING_PARAMS, {
+                scale: s.get_scaleValue(),
+                scaleType: s.get_scaleType(),
+                rendererType: s.get_rendererType(),
+                renderOnAnimationFrame: s.get_renderOnAnimationFrame()
+            });
             ZXContext.hw.bus.opt(OPT_USE_TYPED_ARRAYS, s.get_useTypedArrays());
-            ZXContext.hw.bus.opt(OPT_RENDER_ON_ANIMATION_FRAME, s.get_renderOnAnimationFrame());
             ZXContext.hw.psg.applySettings(
                 s.get_psg(),
                 s.get_psgClock(),
                 s.get_psgBufferSize()
             );
+            ZXContext.ui.vdisplay.init(
+                16, 
+                ZXContext.settings.get_scaleValue(), 
+                ZXContext.settings.get_scaleType(), 
+                ZXContext.settings.get_rendererType());
         }
     }
 </script>

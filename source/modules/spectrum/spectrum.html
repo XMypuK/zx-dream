@@ -23,7 +23,7 @@ $(window).load(function() {
 	ZXContext.hw.cpu = new ZX_Z80();
 	ZXContext.hw.rom = new ZX_ROM();
 	ZXContext.hw.ram = new ZX_RAM();
-	ZXContext.hw.display = new ZX_Display(ZXContext.ui.workspace.get_display());
+	ZXContext.hw.display = new ZX_Display();
 	ZXContext.hw.port_fe = new ZX_PortFE();
 	ZXContext.hw.port_7ffd = new ZX_Port7FFD();
 	ZXContext.hw.keyboard = new ZX_Keyboard();
