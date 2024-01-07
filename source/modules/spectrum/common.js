@@ -155,14 +155,22 @@ function doRequest(options) {
 		var req = new XMLHttpRequest();
 		req.onreadystatechange = function () {
 			if (req.readyState === XMLHttpRequest.DONE) {
-				if (req.status === 200)
-					resolve(req.response);
+				if (req.status === 200) {
+					var response = req.response;
+					// HACK for IE11
+					if (options.responseType === 'json' && typeof response === 'string') {
+						response = JSON.parse(response);
+					}
+					resolve(response);
+				}
 				else 
 					reject(req.statusText);
 			}
 		}
-		req.responseType = options.responseType || '';
 		req.open(options.method || 'GET', options.url, !options.sync);
+		// 'responseType' and 'timeout' properties should be set after calling 'open' method.
+		// Otherwise, 'Invalid state error' is produced in IE11.
+		req.responseType = options.responseType || '';
 		req.send(options.data || undefined);
 	});
 }
