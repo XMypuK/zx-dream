@@ -262,13 +262,20 @@ function downloadText(text, filename) {
 function downloadBinaryData(data, filename) {
 	filename = filename || 'data.bin';
 	if (window.URL && URL.createObjectURL && window.Blob) {
-		var link = document.createElement('a');
 		var typedData = new Uint8Array(data);
 		var file = new Blob([typedData], { type: 'application/octet-stream' });
-		link.href = URL.createObjectURL(file);
-		link.download = filename;
-		link.click();
-		URL.revokeObjectURL(link.href);
+		if (window.navigator.msSaveBlob) {
+			// works in IE11
+			window.navigator.msSaveBlob(file, filename);
+		}
+		else {
+			// works in other browsers
+			var link = document.createElement('a');
+			link.href = URL.createObjectURL(file);
+			link.download = filename;
+			link.click();
+			URL.revokeObjectURL(link.href);
+		}
 	}
 	else {
 		var base64_data = base64Encode(data);
