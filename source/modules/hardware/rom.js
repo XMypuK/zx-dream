@@ -1,11 +1,13 @@
 function ZX_ROM() {
-	'use strict';
+	"use strict";
 	
 	var ROM_SIZE = 0x4000;
 
 	var _bus;
-	var memory = {};
-	var useTypedArrays = isTypedArraysSupported();
+	var _memory = {};
+	var _rom_trdos = false;
+	var _rom_turbo = false;
+	var _port_7ffd_value = 0x00;
 
 	var roms = [
 		{ key: 'sos', name: '48.rom' },
@@ -26,97 +28,74 @@ function ZX_ROM() {
 			if (data.length != ROM_SIZE)
 				throw new Error('Wrong ROM ' + rom.key + ' size.');
 
-			if (useTypedArrays) {
-				memory[rom.key] = new Uint8Array(data);
-			}
-			else {
-				memory[rom.key] = data;
-			}
+			_memory[rom.key] = new Uint8Array(data);
 		});
 	}
 
-	var rom_trdos = false;
-	var rom_turbo = false;
-	var port_7ffd_value = 0x00;
-
-	function read_byte(address) {
-		if ( rom_trdos ) {
-			return memory.trdos[ address ];
+	function readByte(address) {
+		if (_rom_trdos) {
+			return _memory.trdos[address];
 		}
-		else if ( port_7ffd_value & 0x10 ) {
-			return rom_turbo ? memory.turbo[ address ] : memory.sos[ address ];
+		else if (_port_7ffd_value & 0x10) {
+			return _rom_turbo ? _memory.turbo[address] : _memory.sos[address];
 		}
 		else {
-			return memory.sos128[ address ];
+			return _memory.sos128[address];
 		}
 	}	
 
-	function read_instruction(address) {
+	function readInstruction(address) {
 		var data;
 
-		if (( address & 0xff00 ) == 0x3d00 && port_7ffd_value & 0x10) {
+		if (( address & 0xff00 ) == 0x3d00 && (_port_7ffd_value & 0x10) && !_rom_trdos) {
 			_bus.var_write('rom_trdos', true);
 		}
 
 		if ( address < 0x4000 ) {
-			data = read_byte(address);
+			// readByte(address) function is inlined for the sake of performance
+			// readByte begin
+			if (_rom_trdos) {
+				data = _memory.trdos[address];
+			}
+			else if (_port_7ffd_value & 0x10) {
+				data = _rom_turbo ? _memory.turbo[address] : _memory.sos[address];
+			}
+			else {
+				data = _memory.sos128[address];
+			}
+			// readByte end
 		}
 
-		if ( address & 0xc000 ) {
+		if (( address & 0xc000 ) && _rom_trdos) {
 			_bus.var_write('rom_trdos', false);
 		}
 
 		return data;
 	}
 
-	function read(address) {
-		return read_byte(address);
-	}
-
 	function var_write_port_7ffd_value(name, value) {
-		port_7ffd_value = value;
+		_port_7ffd_value = value;
 	}
 
 	function var_write_rom_trdos(name, value) {
-		rom_trdos = value;
+		_rom_trdos = value;
 	}
 
 	function var_write_rom_turbo(name, value) {
-		rom_turbo = value;
+		_rom_turbo = value;
 	}
 
 	function var_read_rom_trdos(name) {
-		return rom_trdos;
+		return _rom_trdos;
 	}
 
 	function var_read_rom_turbo(name) {
-		return rom_turbo;
+		return _rom_turbo;
 	}
 
 	function reset() {
 		_bus.var_write('rom_trdos', false);
 		_bus.var_write('rom_turbo', false);
-	}
-
-	function opt_useTypedArrays(name, value) {
-		if (useTypedArrays != value) {
-			useTypedArrays = value;
-
-			if (useTypedArrays) {
-				for (var key in memory) {
-					if (memory[key]) {
-						memory[key] = new Uint8Array(memory[key]);
-					}
-				}
-			}
-			else {
-				for (var key in memory) {
-					if (memory[key]) {
-						memory[key] = Array.prototype.slice.call(memory[key]);
-					}
-				}
-			}
-		}
 	}
 
 	this.get_ready$ = function () { 
@@ -125,14 +104,13 @@ function ZX_ROM() {
 
 	this.connect = function(bus) {
 		_bus = bus;
-		bus.on_instruction_read(read_instruction);
-		bus.on_mem_read(read, { range: { begin: 0x0000, end: 0x3FFF } });
+		bus.on_instruction_read(readInstruction);
+		bus.on_mem_read(readByte, { range: { begin: 0x0000, end: 0x3FFF } });
 		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
 		bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
 		bus.on_var_write(var_write_rom_turbo, 'rom_turbo');
 		bus.on_var_read(var_read_rom_trdos, 'rom_trdos');
 		bus.on_var_read(var_read_rom_turbo, 'rom_turbo');
 		bus.on_reset(reset);
-		bus.on_opt(opt_useTypedArrays, OPT_USE_TYPED_ARRAYS);
 	}
 }

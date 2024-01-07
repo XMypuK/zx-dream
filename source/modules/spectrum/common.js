@@ -3,7 +3,6 @@ var OPT_INTRQ_PERIOD = "INTRQ_PERIOD";
 var OPT_EXTENDED_MEMORY = "EXTENDED_MEMORY";
 var OPT_SEMICOLORS = "SEMICOLORS";
 var OPT_RENDERING_PARAMS = "RENDERING_PARAMS";
-var OPT_USE_TYPED_ARRAYS = "USE_TYPED_ARRAYS";
 
 var VAL_EXTENDED_MEMORY_OFF = 0;
 var VAL_EXTENDED_MEMORY_PENTAGON = 1;
@@ -283,10 +282,6 @@ function isWebGLSupported() {
 			return true;
 	} catch (e) { }
 	return false;
-}
-
-function isTypedArraysSupported() {
-	return ('ArrayBuffer' in window);
 }
 
 function isAudioContextSupported() {

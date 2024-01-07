@@ -115,10 +115,6 @@
 			</div>
 			<div class="settings__section settings-section" data-bind="css: { '-active': activeSection() == 'misc' }">
 				<table>
-					<tr>
-						<th>Использовать типизированные массивы</th>
-						<td><input type="checkbox" data-bind="checked: useTypedArrays, enable: isTypedArraysSupported()" /></td>
-					</tr>
 				</table>
 			</div>
 		</div>
@@ -198,7 +194,6 @@
 			{ value: 16384, text: '16384 сэмплов' }
 		]);
 		this.psgBufferSize = ko.observable(ZXContext.settings.get_psgBufferSize());
-		this.useTypedArrays = ko.observable(ZXContext.settings.get_useTypedArrays());
 		this.renderOnAnimationFrame = ko.observable(ZXContext.settings.get_renderOnAnimationFrame());
 
 		this.scaleTypeOptions.subscribe(function (options) {
@@ -217,8 +212,8 @@
 			{ value: 'bus', text: 'Шина' },
 			{ value: 'memory', text: 'Память' },
 			{ value: 'display', text: 'Дисплей' },
-			{ value: 'audio', text: 'Звук' },
-			{ value: 'misc', text: 'Другое' }
+			{ value: 'audio', text: 'Звук' }/*,
+			{ value: 'misc', text: 'Другое' }*/
 		]);
 		this.activeSection = ko.observable('bus');
 		this.onSectionClick = function (section) {
@@ -290,7 +285,6 @@
 			ZXContext.settings.set_psg(+model.psg());
 			ZXContext.settings.set_psgClock(+model.psgClock() || ZX_Settings.defaultValues.psgClock);
 			ZXContext.settings.set_psgBufferSize(+model.psgBufferSize());
-			ZXContext.settings.set_useTypedArrays(model.useTypedArrays());
 
 			if (openResult$) {
 				openResult$resolve(true);

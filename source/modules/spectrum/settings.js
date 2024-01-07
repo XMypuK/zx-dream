@@ -70,13 +70,6 @@ Object.assign(ZX_Settings.prototype, {
 	set_extendedMemory: function(value) {
 		this._container.extendedMemory = value;
 	},
-	// Включить/выключить использование типизированных массивов для эмуляции памяти и дисплея.
-	get_useTypedArrays: function() {
-		return this._container.useTypedArrays;
-	},
-	set_useTypedArrays: function(value) {
-		this._container.useTypedArrays = value;
-	},
 	// Включить/выключить отрисовку по событию requestAnimationFrame.
 	get_renderOnAnimationFrame: function() {
 		return this._container.renderOnAnimationFrame;
@@ -125,7 +118,6 @@ Object.assign(ZX_Settings.prototype, {
 		this.set_scaleType(ZX_Settings.defaultValues.scaleType);
 		this.set_scaleValue(ZX_Settings.defaultValues.scaleValue);
 		this.set_renderOnAnimationFrame(ZX_Settings.defaultValues.renderOnAnimationFrame);
-		this.set_useTypedArrays(ZX_Settings.defaultValues.useTypedArrays);
 		this.set_psg(ZX_Settings.defaultValues.psg);
 		this.set_psgClock(ZX_Settings.defaultValues.psgClock);
 		this.set_psgBufferSize(ZX_Settings.defaultValues.psgBufferSize);
@@ -141,7 +133,6 @@ ZX_Settings.defaultValues = {
 	turboMode: true,
 	intrqPeriod: 20.48,
 	extendedMemory: 1,
-	useTypedArrays: isTypedArraysSupported(),
 	renderOnAnimationFrame: false,
 	drive0: 'Deja Vu #A.trd',
 	drive1: '',
@@ -166,7 +157,6 @@ function ZX_StorableSettings() {
 		this._container.turboMode = this.readFromStorage('turboMode');
 		this._container.intrqPeriod = this.readFromStorage('intrqPeriod');
 		this._container.extendedMemory = this.readFromStorage('extendedMemory');
-		this._container.useTypedArrays = this.readFromStorage('useTypedArrays');
 		this._container.renderOnAnimationFrame = this.readFromStorage('renderOnAnimationFrame');
 		this._container.drive0 = this.readFromStorage('drive0');
 		this._container.drive1 = this.readFromStorage('drive1');
@@ -237,10 +227,6 @@ Object.assign(ZX_StorableSettings.prototype, {
 	set_extendedMemory: function(value) {
 		ZX_StorableSettings.superclass.set_extendedMemory.call(this, value);
 		this.writeToStorage('extendedMemory', value);
-	},
-	set_useTypedArrays: function(value) {
-		ZX_StorableSettings.superclass.set_useTypedArrays.call(this, value);
-		this.writeToStorage('useTypedArrays', value);
 	},
 	set_renderOnAnimationFrame: function(value) {
 		ZX_StorableSettings.superclass.set_renderOnAnimationFrame.call(this, value);
