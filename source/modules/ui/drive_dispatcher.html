@@ -175,7 +175,7 @@ function ZX_DriveDispatcher(toolbar) {
     function create(driveIndex, driveBox) {
         var dlg = new CreateImageDialog();
 		dlg.open().then(function (imageParams) {
-            if (imageParams)
+            if (!imageParams)
                 return;
 
             ZXContext.hw.drives[driveIndex].create(
