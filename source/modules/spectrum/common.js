@@ -33,32 +33,52 @@ function extend(Child, Parent) {
 }
 
 function ZXEvent() {
-	var handlers = [];
+	var _self = this;
+	var _handlers = [];
+	var _index = -1;
 
-	this.emit = function (args) {
-		for (var i = 0; i < handlers.length; i++) {
-			handlers[i](args);
+	function compile(args) {
+		if (_index < 0) {
+			_index = ZXEvent.next++;
 		}
+		var codeLines = [];
+		ZXEvent.g[_index] = {};
+		for (var i = 0; i < _handlers.length; i++) {
+			ZXEvent.g[_index][i] = _handlers[i];
+			codeLines.push('ZXEvent.g[' + _index + '][' + i + '](args);')
+		}
+		_self.emit = new Function('args', codeLines.join('\n'));
+		_self.emit(args);
 	}
 
+	function isEmpty() {
+		return _handlers.length === 0;
+	}
+
+	this.emit = compile;
 	this.pub = {
 		subscribe: function (handler) {
 			if (!(typeof handler === 'function'))
 				throw new Error('Argument error: Handler must be a function.');
 	
-			handlers.push(handler);
+			_handlers.push(handler);
+			_self.emit = compile;
 		},
-	
+		
 		unsubscribe: function (handler) {
-			for (var i = 0; i < handlers.length; i++) {
-				if (handlers[i] === handler) {
-					handlers.splice(i, 1);
+			for (var i = 0; i < _handlers.length; i++) {
+				if (_handlers[i] === handler) {
+					_handlers.splice(i, 1);
+					_self.emit = compile;
 					break;
 				}
 			}
 		}
-	};
+	},
+	this.isEmpty = isEmpty;
 }
+ZXEvent.g = {};
+ZXEvent.next = 0;
 
 function stringToBytes( str ) {
   	var ch;
