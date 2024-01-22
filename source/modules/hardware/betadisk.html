@@ -27,20 +27,23 @@ function ZX_BetaDisk() {
 	var _intrqPeriod = 20.48;
 
 	function connect(bus, clock, drives) {
+		// В Pentagon дешифрация портов ВГ93 осуществляется по
+		// линиям A0, A1, A5, A6, A7;
+		// дешифрация систменого порта - по линиям A0, A1, A7
 		_bus = bus;
 		_clock = clock;
 		_drives.push.apply(_drives, drives);
 		if (ZXContext.debugMode) {
-			_bus.on_io_read(dbg_io_read_vg93, { mask: 0x9F, value: 0x1F });
-			_bus.on_io_read(dbg_io_read_ff, { mask: 0xFF, value: 0xFF });
-			_bus.on_io_write(dbg_io_write_vg93, { mask: 0x9F, value: 0x1F });
-			_bus.on_io_write(dbg_io_write_ff, { mask: 0xFF, value: 0xFF });
+			_bus.on_io_read(dbg_io_read_vg93, { mask: 0x83, value: 0x03 });
+			_bus.on_io_read(dbg_io_read_ff, { mask: 0x83, value: 0x83 });
+			_bus.on_io_write(dbg_io_write_vg93, { mask: 0x83, value: 0x03 });
+			_bus.on_io_write(dbg_io_write_ff, { mask: 0x83, value: 0x83 });
 		}
 		else {
-			_bus.on_io_read(io_read_vg93, { mask: 0x9F, value: 0x1F });
-			_bus.on_io_read(io_read_ff, { mask: 0xFF, value: 0xFF });
-			_bus.on_io_write(io_write_vg93, { mask: 0x9F, value: 0x1F });
-			_bus.on_io_write(io_write_ff, { mask: 0xFF, value: 0xFF });
+			_bus.on_io_read(io_read_vg93, { mask: 0x83, value: 0x03 });
+			_bus.on_io_read(io_read_ff, { mask: 0x83, value: 0x83 });
+			_bus.on_io_write(io_write_vg93, { mask: 0x83, value: 0x03 });
+			_bus.on_io_write(io_write_ff, { mask: 0x83, value: 0x83 });
 		}
 		_bus.on_var_write(var_write_rom_trdos, 'rom_trdos');
 		_bus.on_opt(function (name, value) {
