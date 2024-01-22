@@ -220,10 +220,6 @@ Ayumi.prototype.configure = function(isYM, clockRate, sr) {
   this.step = clockRate / (sr * 8 * DECIMATE_FACTOR);
   this.dacTable = isYM ? YM_DAC_TABLE : AY_DAC_TABLE;
   this.noise = 1;
-  this.setEnvelope(1);
-  for(var i = 0; i < this.channels.length; i++) {
-    this.setTone(i, 1);
-  }
 }
 
 Ayumi.prototype.setPan = function(index, pan, isEqp) {
