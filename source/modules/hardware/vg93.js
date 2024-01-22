@@ -27,7 +27,7 @@ function VG93(clock) {
     var _floppy;
   
     var BYTES_PER_TRACK_MFM = 6312; // 6250
-    var BYTES_PER_TRACK_FM = 3156; // 5125
+    var BYTES_PER_TRACK_FM = 3156; // 3125
 
     var _timeFactor = 1;
     var _baseIntervals = {
@@ -314,10 +314,11 @@ function VG93(clock) {
     function write(address, value) {
         switch (address) {
             case 0x00: _command = value; processCommand(); break;
-            // case 0x01: _track = value; break;
-            // case 0x02: _sector = value; break;
-            case 0x01: if (!get_busy()) { _track = value; } break;
-            case 0x02: if (!get_busy()) { _sector = value; } break;
+            case 0x01: _track = value; break;
+            case 0x02: _sector = value; break;
+            // NOTE: unclear if we should check busy state.
+            // case 0x01: if (!get_busy()) { _track = value; } break;
+            // case 0x02: if (!get_busy()) { _sector = value; } break;
             case 0x03:
                 _data = value;
                 var writing = get_busy()
@@ -416,16 +417,20 @@ function VG93(clock) {
             if (_fImmediate) {
                 _intrq = 1;
             }
-            // It seems that we should not lock INTRQ once we get
+            // NOTE 1: It seems that we should not lock INTRQ once we get
             // 'Immediate' flag mixed with any other conditinal flag.
             // In this case 'CAT' command in TR-DOS fails on the
             // second time.
-            if (_fImmediate && !_fOnReadyOn && !_fOnReadyOff && !_fOnIndexPulse) {
-                _intrqLocked = 1;
-            }
-            if (_fNoInterrupt) {
-                _intrqLocked = 0;
-            }
+            // NOTE 2: It also seems that if we ever lock INTRQ we get
+            // some undesired behavior sometimes. Particullary, FORMAT command
+            // in TR-DOS does not work properly, if we have peformed, for example,
+            // LIST command before it. So it's commented for a while.
+            // if (_fImmediate && !_fOnReadyOn && !_fOnReadyOff && !_fOnIndexPulse) {
+            //     _intrqLocked = 1;
+            // }
+            // if (_fNoInterrupt) {
+            //     _intrqLocked = 0;
+            // }
         }
 
         function deferredInterrupt() {
