@@ -185,13 +185,6 @@ function ZX_Bus() {
 		}
 	}
 
-	function getBoostPath() {
-		return 'ZXContext._boost';
-	}
-	function getBoostObject() {
-		return (ZXContext._boost || (ZXContext._boost = {}));
-	}
-
 	this.on_instruction_read = onInstructionRead;
 	this.on_mem_read = onMemRead;
 	this.on_mem_write = onMemWrite;
