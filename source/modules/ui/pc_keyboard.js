@@ -172,6 +172,133 @@ function PCKeyboard() {
 				keys.push({ index: 0, bit: 0 });
 				keys.push({ index: 4, bit: 4 });
 				break;
+
+			case 0x2C: 
+				if (_rightShiftPressed) {
+					// < (Symbol Shift + R)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 2, bit: 3 });
+				}
+				else {
+					// , (Symbol Shift + N)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 7, bit: 3 });
+				}
+				break;
+
+			case 0x2D:
+				if (_rightShiftPressed) {
+					// _ (Symbol Shift + 0)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 4, bit: 0 });
+				}
+				else {
+					// - (Symbol Shift + J)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 6, bit: 3 });
+				}
+				break;
+
+			case 0x2E:
+				if (_rightShiftPressed) {
+					// > (Symbol Shift + T)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 2, bit: 4 });
+				}
+				else {
+					// . (Symbol Shift + M)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 7, bit: 2 });
+				}
+				break;
+			
+			case 0x2F:
+				if (_rightShiftPressed) {
+					// ? (Symbol Shift + C)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 0, bit: 3 });
+				}
+				else {
+					// / (Symbol Shift + V)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 0, bit: 4 });
+				}
+				break;
+
+			case 0x3B:
+				if (_rightShiftPressed) {
+					// : (Symbol Shift + Z)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 0, bit: 1 }); 
+				}
+				else {
+					// ; (Symbol Shift + O)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 5, bit: 1 });
+				}
+				break;
+
+			case 0x3D:
+				if (_rightShiftPressed) {
+					// + (Symbol Shift + K)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 6, bit: 2 });
+				}
+				else {
+					// = (Symbol Shift + L)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 6, bit: 1 });
+				}
+				break;
+
+			case 0x5E:
+				if (_rightShiftPressed) {
+					// " (Symbol Shift + P)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 5, bit: 0 });
+				}
+				else {
+					// ' (Symbol Shift + 7)
+					keys.push({ index: 7, bit: 1 });
+					keys.push({ index: 4, bit: 3 });
+				}
+				break;
+
+			case 0x60: keys.push({ index: 4, bit: 0 }); break; // 0
+			case 0x61: keys.push({ index: 3, bit: 0 }); break; // 1
+			case 0x62: keys.push({ index: 3, bit: 1 }); break; // 2
+			case 0x63: keys.push({ index: 3, bit: 2 }); break; // 3
+			case 0x64: keys.push({ index: 3, bit: 3 }); break; // 4
+			case 0x65: keys.push({ index: 3, bit: 4 }); break; // 5
+			case 0x66: keys.push({ index: 4, bit: 4 }); break; // 6
+			case 0x67: keys.push({ index: 4, bit: 3 }); break; // 7
+			case 0x68: keys.push({ index: 4, bit: 2 }); break; // 8
+			case 0x69: keys.push({ index: 4, bit: 1 }); break; // 9
+
+			case 0x6A:
+				// * (Symbol Shift + B)
+				keys.push({ index: 7, bit: 1 });
+				keys.push({ index: 7, bit: 4 });
+				break;
+
+			case 0x6B:
+				// + (Symbol Shift + K)
+				keys.push({ index: 7, bit: 1 });
+				keys.push({ index: 6, bit: 2 });
+				break;
+
+			case 0x6E:
+				// , (Symbol Shift + N)
+				keys.push({ index: 7, bit: 1 });
+				keys.push({ index: 7, bit: 3 });
+				break;
+
+			case 0x6F:
+				// / (Symbol Shift + V)
+				keys.push({ index: 7, bit: 1 });
+				keys.push({ index: 0, bit: 4 });
+				break;
+				
 		}
 
 		return keys;
