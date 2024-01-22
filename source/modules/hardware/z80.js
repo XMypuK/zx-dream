@@ -1,6 +1,6 @@
 function ZX_Z80 () {
     'use strict';
-    
+   
     var _bus;
 
     // счетчик тактов
@@ -83,11 +83,11 @@ function ZX_Z80 () {
     var index_offset_cache = 0;
 
     // запросы на прерывания
-    var nmi_request = false;
-    var int_request = false;
-    var int_request_data = 0xff;
-    var int_request_force = false;
-    var int_lock = false;
+    var nmi_request = 0;
+    var int_request = 0;
+    var int_request_data = 0xFF;
+    var int_request_force = 0;
+    var int_lock = 0;
 
     /////////////////////////////////////
     // фуикции чтения/записи регистров //
@@ -266,7 +266,7 @@ function ZX_Z80 () {
                 return;
         }
 
-        int_lock = false;
+        int_lock = 0;
 
         // считываем очередной код
         var opcode = read_opcode();
@@ -319,7 +319,7 @@ function ZX_Z80 () {
     }
 
     function process_nmi_request() {
-        nmi_request = false;
+        nmi_request = 0;
 
         // total: + 11 t-states
         set_iff1(false);
@@ -349,14 +349,12 @@ function ZX_Z80 () {
     }
 
     function process_int_request() {
-        int_request = false;
-
         // если маскируемые прерывания выключены
         // прерывание не обрабатывается
         if (!get_iff1() && !int_request_force)
             return false;
 
-        int_request_force = false;
+        int_request_force = 0;
         set_iff1(false);
         set_iff2(false);
 
@@ -374,14 +372,13 @@ function ZX_Z80 () {
 
         var emulate_iff2_copy_bug = false;
         var next_opcode = _bus.instruction_read(pc);
-        if ( next_opcode == 0xed ) {
-            next_opcode = _bus.instruction_read((pc + 1) & 0xffff);
-            emulate_iff2_copy_bug = ( next_opcode & 0xf7 ) == 0x57;
+        if ( next_opcode == 0xED ) {
+            next_opcode = _bus.instruction_read((pc + 1) & 0xFFFF);
+            emulate_iff2_copy_bug = ( next_opcode & 0xF7 ) == 0x57;
         }
 
         if (emulate_iff2_copy_bug) {
-            int_request = true;
-            int_request_force = true;
+            int_request_force = 1;
             return false;
         }
 
@@ -2099,7 +2096,7 @@ function ZX_Z80 () {
             var allow_int = !!(opcode & 0x08);
             set_iff1(allow_int);
             set_iff2(allow_int);
-            int_lock = true;
+            int_lock = 1;
             return;
         }
 
@@ -2646,24 +2643,19 @@ function ZX_Z80 () {
     // который будет обработан при следующем (или
     // после следующем) вызове метода process()
     function nmirq() {
-        nmi_request = true;
+        nmi_request = 1;
     }  
 
-    // intrq(data = 0xff);
-    // Ставит запрос на маскируемое прерывание.
-    // При следующем (или после следующем) вызо-
-    // ве метода process(), запрос будет либо
-    // удовлетворен, либо отклонен (если маскиру-
-    // емые прерывания запрещены в данный момент).
-    // Агрумент data - восьмибитное число на шине
-    // данных в момент прерывания. Оно использу-
-    // ется в режимах прерывания 0 и 2.    
-    function intrq(data) {
-        if ( data === undefined ) {
-            data = 0xff;
-        }
-        int_request = true;
-        int_request_data = data & 0xff;
+    // intrq(active);
+    // Переводит линию intrq в активное или неактивное
+    // состояние. Прерывание будет обработано только в
+    // том случае, если во время активности линии у
+    // процессора будет включена обработка маскируемых
+    // прерываний, а также, если этому не будут
+    // препятствовать выполняемые в настоящий момент
+    // инструкции. 
+    function intrq(active) {
+        int_request = active;
     }
 
     ////////////////////
@@ -2680,8 +2672,8 @@ function ZX_Z80 () {
     function reset() {
         set_iff1(false);
         set_iff2(false);
-        int_request = false;
-        nmi_request = false;
+        int_request = 0;
+        nmi_request = 0;
         pc = 0x0000;
         i = 0;
         r = 0;
@@ -2830,6 +2822,6 @@ function ZX_Z80 () {
         _bus = bus;
         _bus.on_reset(reset);
         _bus.on_var_write(function () { nmirq(); }, 'nmirq');
-        _bus.on_var_write(function () { intrq(0xFF); }, 'intrq');
+        _bus.on_var_write(function (name, value) { intrq(value); }, 'intrq');
     }
 }

@@ -17,12 +17,41 @@ var VAL_RENDERER_PUT_IMAGE_DATA = 1;
 var VAL_RENDERER_DRAW_IMAGE = 2;
 var VAL_RENDERER_WEB_GL = 3;
 
+var VAL_AUDIO_RENDERER_UNDEFINED = 0;
+var VAL_AUDIO_RENDERER_SPN = 1;
+var VAL_AUDIO_RENDERER_WLN = 2;
+
 var VAL_PSG_OFF = 0;
 var VAL_PSG_AY_3_891X = 1;
 var VAL_PSG_YM_2149 = 2;
 
-var VAL_EMUL_THREAD_MAIN = 0;
-var VAL_EMUL_THREAD_DEDICATED = 1;
+var VAL_TS_OFF = 0;
+var VAL_TS_NEDO_PC = 1;
+var VAL_TS_POWER_OF_SOUND = 2;
+var VAL_TS_QUADRO_AY = 3;
+var VAL_TS_AUTO = 4;
+
+var VAL_CHANNELS_ABC = 0;
+var VAL_CHANNELS_ACB = 1;
+
+var VAL_THREADING_SINGLE = 0;
+var VAL_THREADING_MULTIPLE = 1;
+
+var DiskImageFormat = {
+	FDI: 'FDI',
+	TRD: 'TRD',
+	SCL: 'SCL',
+	TD0: 'TD0',
+	UDI: 'UDI',
+	DSK: 'DSK',
+
+	getFromFileName: function(filename) {
+		var match = (/^[^\\\/]*\.(TRD|FDI|SCL|TD0|UDI|DSK)$/i).exec(filename);
+		if (!match)
+			throw new Error(ZX_Lang.ERR_IMAGE_FORMAT_NOT_SUPPORTED);
+		return match[1].toUpperCase();
+	}
+};
 
 function extend(Child, Parent) {
 	var F = function() { };
@@ -32,20 +61,20 @@ function extend(Child, Parent) {
 	Child.superclass = Parent.prototype;
 }
 
-function ZXEvent() {
+function ZX_Event() {
 	var _self = this;
 	var _handlers = [];
 	var _index = -1;
 
 	function compile(args) {
 		if (_index < 0) {
-			_index = ZXEvent.next++;
+			_index = ZX_Event.next++;
 		}
 		var codeLines = [];
-		ZXEvent.g[_index] = {};
+		ZX_Event.g[_index] = {};
 		for (var i = 0; i < _handlers.length; i++) {
-			ZXEvent.g[_index][i] = _handlers[i];
-			codeLines.push('ZXEvent.g[' + _index + '][' + i + '](args);')
+			ZX_Event.g[_index][i] = _handlers[i];
+			codeLines.push('ZX_Event.g[' + _index + '][' + i + '](args);')
 		}
 		_self.emit = new Function('args', codeLines.join('\n'));
 		_self.emit(args);
@@ -77,8 +106,8 @@ function ZXEvent() {
 	},
 	this.isEmpty = isEmpty;
 }
-ZXEvent.g = {};
-ZXEvent.next = 0;
+ZX_Event.g = {};
+ZX_Event.next = 0;
 
 function stringToBytes( str ) {
   	var ch;
@@ -166,8 +195,86 @@ function base64Decode( str ) {
 	return res;
 }
 
+function getDateTimeString(timeStamp) {
+	var dt = new Date(timeStamp);
+	return (
+		dt.getFullYear() 
+		+ '.' + ('0' + (dt.getMonth() + 1)).substr(-2)
+		+ '.' + ('0' + dt.getDate()).substr(-2)
+		+ ' ' + ('0' + dt.getHours()).substr(-2)
+		+ ':' + ('0' + dt.getMinutes()).substr(-2)
+		+ ':' + ('0' + dt.getSeconds()).substr(-2)
+	);
+}
+
+function getTimeString(timeStamp) {
+	var dt = new Date(timeStamp);
+	return (
+		('0' + dt.getHours()).substr(-2)
+		+ ':' + ('0' + dt.getMinutes()).substr(-2)
+		+ ':' + ('0' + dt.getSeconds()).substr(-2)
+	);
+}
+
+function getErrorOutput() {
+	if (!window.ZXContext) {
+		window.ZXContext = {};
+	}
+	if (!window.errorOutput) {
+		window.errorOutput = [];
+	}
+	return window.errorOutput;
+}
+
+function renderErrors() {
+	var errorOutput = getErrorOutput();
+	var errorsDiv = document.getElementById('errors');
+	var errorsListDiv = document.getElementById('errorList');
+	if (errorsDiv && errorsListDiv) {
+		var fragment = document.createDocumentFragment();
+		for ( var i = 0; i < errorOutput.length; i++ ) {
+			if (errorOutput[i].rendered)
+				continue;
+			var record = document.createElement('div');
+			var recordTimestamp = document.createElement('span');
+			var recordMessage = document.createElement('span');
+			recordTimestamp.textContent = getTimeString(errorOutput[i].timeStamp),
+			recordMessage.textContent = errorOutput[i].error;
+			record.classList.add('error');
+			recordTimestamp.classList.add('timestamp');
+			recordMessage.classList.add('message');
+			record.appendChild(recordTimestamp);
+			record.appendChild(recordMessage);
+			fragment.appendChild(record);
+			errorOutput[i].rendered = true;
+		}
+		errorsListDiv.appendChild(fragment);
+		if (!errorsDiv.classList.contains('-expanded')) {
+			errorsDiv.classList.add('-expanded');
+		}
+		errorsListDiv.scrollTop = errorsListDiv.scrollHeight;
+	}
+	else {
+		var lastError = errorOutput.length > 0 ? errorOutput[errorOutput.length - 1] : null;
+		alert(lastError);
+	}
+}
+
 function handleError(error) {
-	window.console && console.log && console.log(error);
+	if (typeof window !== 'undefined') {
+		var errorOutput = getErrorOutput();
+		errorOutput.push({
+			timeStamp: Date.now(),
+			error: error,
+			rendered: false
+		});
+		if (errorOutput.length > 100) {
+			errorOutput.splice(0, errorOutput.length - 100);
+		}
+		window.console && console.log && console.log(error);
+		renderErrors();
+	}
+	else throw error;
 }
 
 function doRequest(options) {
@@ -199,12 +306,12 @@ function loadLocalFile(fileinput) {
 	return new Promise(function (resolve, reject) {
 		try {
 			if (!fileinput)
-				throw new Error('Не указано поле ввода для загрузки.');
+				throw new Error('A file input element is not specified.');
 			if (typeof File !== 'undefined' && typeof FileReader !== 'undefined') {
 				// загрузка с диска напрямую
 				var reader = new FileReader();
 				reader.onload = function(e) { 
-					var data = stringToBytes(e.target.result);
+					var data = stringToBytes(e ? e.target.result : reader.content);
 					resolve(data); 
 				}
 				reader.onerror = function(e) { 
@@ -224,7 +331,7 @@ function loadLocalFile(fileinput) {
 				form.method = 'POST';
 				form.enctype = 'multipart/form-data';
 				form.target = 'file_load_frame';
-				form.append(fileinput);
+				form.appendChild(fileinput);
 
 				iframe.addEventListener('load', function (e) {
 					var base64 = (iframe.textContent || '').replace(/^\s+|\s+$/g, '');
@@ -237,8 +344,8 @@ function loadLocalFile(fileinput) {
 					reject(e);
 				});
 
-				document.body.append(iframe);
-				document.body.append(form);
+				document.body.appendChild(iframe);
+				document.body.appendChild(form);
 				form.submit();
 			}
 		}
@@ -251,7 +358,7 @@ function loadLocalFile(fileinput) {
 function loadServerFile(filename) {
 	return new Promise(function (resolve, reject) {
 		if (!filename) {
-			reject('Не указано имя файла.');
+			reject(ZX_Lang.ERR_FILENAME_NOT_SPECIFIED);
 			return;
 		}
 		var typeMatch = (/\.([^\.\\\/]+)$/).exec(filename);
@@ -320,7 +427,23 @@ function isWebGLSupported() {
 }
 
 function isAudioContextSupported() {
-	return !!(window.AudioContext || window.webkitAudioContext || window.audioContext);
+	return !!(typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined' || typeof audioContext !== 'undefined');
+}
+
+function areWebWorkersSupported() {
+	return typeof Worker !== 'undefined' && !isIE11();
+}
+
+function isAudioWorkletNodeSupported() {
+	return typeof AudioWorkletNode !== 'undefined';
+}
+
+function isScriptProcessorNodeSupported() {
+	return typeof ScriptProcessorNode !== 'undefined';
+}
+
+function isIE11() {
+	return typeof MSInputMethodContext !== 'undefined' && (typeof document === 'undefined' || !!document.documentMode);
 }
 
 function CRC16GEN(poly, init) {
@@ -734,7 +857,7 @@ function LZSSDecompressionStream(underlyingStream) {
 			do {
 				bitsBuf = _underlyingStream.read();
 				if (bitsBuf < 0)
-					throw new Error('An unexpected end of the underlying stream.');
+					throw new Error(ZX_Lang.ERR_UNEXPECTED_END_OF_STREAM);
 				var bitsRead = Math.min(nFromStream, 8);
 				value = (value << bitsRead) | (bitsBuf >> (8 - bitsRead) & bitsMask[bitsRead]);
 				nFromStream -= bitsRead;
@@ -922,32 +1045,3 @@ function LZSSDecompressionStream(underlyingStream) {
 
 	init();
 }
-
-ko.extenders.numeric = function(target, precision) {
-    //create a writable computed observable to intercept writes to our observable
-    var result = ko.pureComputed({
-        read: target,  //always return the original observables value
-        write: function(newValue) {
-            var current = target(),
-                roundingMultiplier = Math.pow(10, precision),
-                newValueAsNum = isNaN(newValue) ? 0 : +newValue,
-                valueToWrite = Math.round(newValueAsNum * roundingMultiplier) / roundingMultiplier;
- 
-            //only write if it changed
-            if (valueToWrite !== current) {
-                target(valueToWrite);
-            } else {
-                //if the rounded value is the same, but a different value was written, force a notification for the current field
-                if (newValue !== current) {
-                    target.notifySubscribers(valueToWrite);
-                }
-            }
-        }
-    }).extend({ notify: 'always' });
- 
-    //initialize with current value to make sure it is rounded appropriately
-    result(target());
- 
-    //return the new computed observable
-    return result;
-};

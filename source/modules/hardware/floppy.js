@@ -12,7 +12,7 @@ function ZX_Floppy() {
     var _cyl = 0;
     var _head = 0;
     var _motor = 0;
-    var _stateChangedEvent = new ZXEvent();
+    var _stateChangedEvent = new ZX_Event();
 
     this._debug_getRaw = function() {
         return _cylinders;
@@ -60,7 +60,7 @@ function ZX_Floppy() {
             0xFB // Data Marker
         );
         if (data.length - dataOffset < sectorSize)
-            throw new Error('Data block size must be ' + sectorSize + ' bytes. (not ' + (data.length - dataOffset) + ')');
+            throw new Error(ZX_Lang.ERR_WRONG_DATA_BLOCK_SIZE + ' ' + sectorSize + ' <> ' + (data.length - dataOffset) + '.');
         raw.push.apply(raw, data.slice(dataOffset, dataOffset + sectorSize));
         crc = new CRC16();
         crc.addArray(raw, raw.length - sectorSize - 4); // Starting with MFM Marker
@@ -117,7 +117,7 @@ function ZX_Floppy() {
     this.insertTRD = function (bin) {
         // UNDONE: имя диска из служебного сектора можно использовать как комментарий
         if ( !bin || !bin.length )
-            throw new Error('Wrong TRD data');
+            throw new Error(ZX_Lang.ERR_TRD_IMAGE_WRONG_DATA);
 
         var cylCount = 0;
         var headCount = 0;
@@ -136,7 +136,7 @@ function ZX_Floppy() {
                     case 163840: cylCount = 40; headCount = 1; break;
 
                     // если и размер нестандартный, то бросаем исключение
-                    default: throw new Error('Unknown TRD disk type');
+                    default: throw new Error(ZX_Lang.ERR_TRD_IMAGE_UNKNOWN_TYPE);
                 }
                 break;
         }
@@ -150,8 +150,16 @@ function ZX_Floppy() {
             var trackStream = new MemoryStream(track);
             var sectorSize = (0x0080 << SEC_LENGTH_0x0100);
             for ( var sec = 0; sec < 16; sec++) {
-                trackStream.writeMultiple(
-                    createTrDosSector(cylIndex, sec, sectorSize, bin, index));
+                if (index < bin.length) {
+                    trackStream.writeMultiple(
+                        createTrDosSector(cylIndex, sec, sectorSize, bin, index));
+                }
+                else {
+                    var emptyArr = new Array(sectorSize);
+                    emptyArr.fill(0);
+                    trackStream.writeMultiple(
+                        createTrDosSector(cylIndex, sec, sectorSize, emptyArr, 0));
+                }
                 index += sectorSize;
             }
         }
@@ -167,11 +175,11 @@ function ZX_Floppy() {
     this.insertSCL = function (bin) {
         var sclCatStream = new MemoryStream(bin);
         if (String.fromCharCode.apply(String, sclCatStream.readMultuple(8)) != 'SINCLAIR')
-            throw new Error('Wrong SCL data.');
+            throw new Error(ZX_Lang.ERR_SCL_IMAGE_WRONG_DATA);
             
         var fileCount = sclCatStream.read();
         if (fileCount < 0)
-            throw new Error('Wrong SCL data.');
+            throw new Error(ZX_Lang.ERR_SCL_IMAGE_WRONG_DATA);
 
         var sclStream = new MemoryStream(bin);
         sclStream.seek(9 + fileCount * 14, SeekOrigin.begin);
@@ -186,10 +194,10 @@ function ZX_Floppy() {
 
         for (var fileIndex = 0; fileIndex < fileCount; fileIndex++) {
             if (sclCatStream.get_position() >= (8 << 8))
-                throw new Error('Too many files.');
+                throw new Error(ZX_Lang.ERR_SCL_IMAGE_TOO_MANY_FILES);
             var fileHeader = sclCatStream.readMultuple(14);
             if (fileHeader.length != 14)
-                throw new Error('Wrong SCL data.');
+                throw new Error(ZX_Lang.ERR_SCL_IMAGE_WRONG_DATA);
             var fileSecCount = fileHeader[13];
             var trkIndex = trdStream.get_position() >> 12;
             var secIndex = (trdStream.get_position() - (trkIndex << 12)) >> 8;
@@ -230,7 +238,7 @@ function ZX_Floppy() {
             | (bin[bin.length - 3] << 8)
             | (bin[bin.length - 4]);
         if (crc != storedCrc) {
-            alert('Неверная контрольная сумма SCL. Возможно, диск поврежден.');
+            handleError(ZX_Lang.ERR_SCL_IMAGE_WRONG_CRC);
         }
 
         this.insertTRD(trdStream.get_buffer());
@@ -238,7 +246,7 @@ function ZX_Floppy() {
 
     this.insertFDI = function (bin) {
         if ( !bin || bin.length < 14 || bin[0] != 0x46 /*F*/ || bin[1] != 0x44 /*D*/ || bin[2] != 0x49 /*I*/ ) {
-            throw new Error('Wrong FDI data');
+            throw new Error(ZX_Lang.ERR_FDI_IMAGE_WRONG_DATA);
         }
     
         var isWriteProtected = ( bin[3] != 0 );
@@ -362,10 +370,10 @@ function ZX_Floppy() {
         var td0CrcStream = new CRCWrapper(td0Stream, CRC16GEN.poly_A097());
         var signature = String.fromCharCode.apply(String, td0CrcStream.readMultuple(2));
         if (signature != 'TD' && signature != 'td')
-            throw new Error('Wrong TD0 data.');
+            throw new Error(ZX_Lang.ERR_TD0_IMAGE_WRONG_DATA);
         var sequence = td0CrcStream.read();
         if (sequence != 0x00)
-            throw new Error('Wrong TD0 data.');
+            throw new Error(ZX_Lang.ERR_TD0_IMAGE_WRONG_DATA);
         var checkSequence = td0CrcStream.read();
         var tekediskVersion = td0CrcStream.read();
         var dataParams = td0CrcStream.read();
@@ -385,7 +393,7 @@ function ZX_Floppy() {
         var headCount = td0CrcStream.read() == 1 ? 1 : 2;
         var crc = td0CrcStream.readNoCrc() | (td0CrcStream.readNoCrc() << 8);
         if (crc != td0CrcStream.get_crc().get_value())
-            throw new Error("Wrong CRC in the header");
+            throw new Error(ZX_Lang.ERR_TD0_IMAGE_WRONG_HEADER_CRC);
 
         var compressed = signature == 'td';
         var formatStream;
@@ -422,7 +430,7 @@ function ZX_Floppy() {
                 }
             }
             if (cmtCrc != formatCrcStream.get_crc().get_value())
-                throw new Error('Wrong CRC in the Comment header.');
+                throw new Error(ZX_Lang.ERR_TD0_IMAGE_WRONG_COMMENT_HEADER_CRC);
         }
 
         // init floppy cylinders
@@ -440,7 +448,7 @@ function ZX_Floppy() {
             var trackDoubleDensity = !(headAndDensity & 0x80);
             var trackHeadrCrcLowByte = formatCrcStream.readNoCrc();
             if (trackHeadrCrcLowByte != (formatCrcStream.get_crc().get_value() & 0xFF))
-                throw new Error('Wrong CRC in a Track header.');
+                throw new Error(ZX_Lang.ERR_TD0_IMAGE_WRONG_TRACK_HEADER_CRC);
 
             // init floppy track
             var cyl = (cylinders[cylIndex] || (cylinders[cylIndex] = []));
@@ -505,7 +513,7 @@ function ZX_Floppy() {
                     var calcCrc = CRC16GEN.poly_A097();
                     calcCrc.addArray(sectorData);
                     if (sectorDataCrcLowByte != (calcCrc.get_value() & 0xFF))
-                        throw new Error('Wrong sector data CRC.');
+                        throw new Error(ZX_Lang.ERR_TD0_IMAGE_WRONG_SECTOR_DATA_CRC);
                 }
 
                 // GAP I
@@ -615,11 +623,11 @@ function ZX_Floppy() {
         bin = null;
         var signature = String.fromCharCode.apply(String, udiStream.readMultuple(4));
         if (signature != 'UDI!')
-            throw new Error('Wrong UDI data.');
+            throw new Error(ZX_Lang.ERR_UDI_IMAGE_WRONG_IMAGE_DATA);
         var fileSize = udiStream.read() | (udiStream.read() << 8) | (udiStream.read() << 16) | (udiStream.read() << 24);
         var version = udiStream.read();
         if (version != 0) 
-            throw new Error('Currently, UDI version 1.0 is supported only.');
+            throw new Error(ZX_Lang.ERR_UDI_IMAGE_VERSION_NOT_SUPPORTED);
         var cylCount = udiStream.read() + 1;
         var headCount = udiStream.read() + 1;
         var zero = udiStream.read();
@@ -652,7 +660,7 @@ function ZX_Floppy() {
         }
         var crc32 = udiRawStream.read() | (udiRawStream.read() << 8) | (udiRawStream.read() << 16) | (udiRawStream.read() << 24)
         if (crc32 != udiStream.get_crc().get_value()) {
-            alert('Неверная контрольная сумма UDI. Возможно диск поврежден.');
+            handleError(ZX_Lang.ERR_UDI_IMAGE_WRONG_CRC);
         }
 
         _cylinders = cylinders;
@@ -673,11 +681,11 @@ function ZX_Floppy() {
         switch (signature) {
             case 'MV - CPCEMU Disk-File\r\n': extendedFormat = false; break;
             case 'EXTENDED CPC DSK File\r\n': extendedFormat = true; break;
-            default: throw new Error('Invalid DSK data.');
+            default: throw new Error(ZX_Lang.ERR_DSK_IMAGE_WRONG_DATA);
         }
         var signature2 = String.fromCharCode.apply(String, dskStream.readMultuple(11));
         if (signature2 != 'Disk-Info\r\n')
-            throw new Error('Invalid DSK data.');
+            throw new Error(ZX_Lang.ERR_DSK_IMAGE_WRONG_DATA);
         var creatorName = String.fromCharCode.apply(String, dskStream.readMultuple(14));
         var cylCount = dskStream.read();
         var headCount = dskStream.read();
@@ -707,7 +715,7 @@ function ZX_Floppy() {
                     dskStream.seek(trackOffset, SeekOrigin.begin);
                     var trackSignature = String.fromCharCode.apply(String, dskStream.readMultuple(12));
                     if (trackSignature != 'Track-Info\r\n')
-                        throw new Error('Invalid DSK data.');
+                        throw new Error(ZX_Lang.ERR_DSK_IMAGE_WRONG_DATA);
                     dskStream.seek(4, SeekOrigin.current);
                     var trCylNum = dskStream.read();
                     var trHeadNum = dskStream.read();
@@ -799,7 +807,7 @@ function ZX_Floppy() {
                     dskStream.seek(trackOffset, SeekOrigin.begin);
                     var trackSignature = String.fromCharCode.apply(String, dskStream.readMultuple(12));
                     if (trackSignature != 'Track-Info\r\n')
-                        throw new Error('Invalid DSK data.');
+                        throw new Error(ZX_Lang.ERR_DSK_IMAGE_WRONG_DATA);
                     dskStream.seek(4, SeekOrigin.current);
                     var trCylNum = dskStream.read();
                     var trHeadNum = dskStream.read();

@@ -7,46 +7,47 @@
 	<div class="create-image-dialog">
 		<table>
 			<tr>
-				<td class="title">Количество сторон:</td>
-				<td class="data">
-					<select name="head_count">
-						<option value="1">1</option>
-						<option value="2" selected>2</option>
-					</select>
-				</td>
+				<td class="title" data-bind="text: ZX_Lang.CID_HEAD_COUNT"></td>
+				<td class="data"><select data-bind="options: headCountOptions, optionsValue: 'value', optionsText: 'text', value: headCount"></select></td>
 			</tr>
 			<tr>
-				<td class="title">Количество дорожек:</td>
-				<td class="data"><input type="text" name="cyl_count" style="width: 30px;" value="80" /></td>
+				<td class="title" data-bind="text: ZX_Lang.CID_CYL_COUNT"></td>
+				<td class="data"><input type="text" data-bind="value: cylCount" style="width: 30px;" /></td>
 			</tr>
 			<tr>
-				<td class="title">Форматирование TR-DOS:</td>
-				<td class="data"><input type="checkbox" name="trdos_format" checked /></td>
+				<td class="title" data-bind="text: ZX_Lang.CID_TRDOS_FORMAT"></td>
+				<td class="data"><input type="checkbox" data-bind="checked: trdosFormat" /></td>
 			</tr>
 		</table>
 	</div>
 </template>
 
 <script type="text/javascript">
+	function CreateImageKoModel() {
+		this.headCountOptions = ko.observableArray([
+			{ value: 1, text: '1' },
+			{ value: 2, text: '2' }
+		]);
+		this.headCount = ko.observable(2);
+		this.cylCount = ko.observable(80).extend({ numeric: 0 });
+		this.trdosFormat = ko.observable(true);
+	}
+
 	function CreateImageDialog () {
 		'use strict';
 		
 		var $dlg = null;
 		var openResult$ = null;
-		var openResult$resolve = null;
-		var openResult$reject = null;
+		var model = null;
 
 		this.open = open;
 
 		function open() {
 			if (!openResult$) {
-				openResult$ = new Promise(function (resolve, reject) { 
-					openResult$resolve = resolve;
-					openResult$reject = reject;
-				});
+				openResult$ = Promise.withResolvers();
 				init();
 			}
-			return openResult$;
+			return openResult$.promise;
 		}
 
 		function init() {
@@ -56,58 +57,62 @@
 			$dlg = $(temp_div).children('.create-image-dialog');
 			$dlg.dialog({
 				autoOpen: true,
-				title: 'Укажите параметры нового диска',
+				title: ZX_Lang.CID_TITLE,
 				modal: true,
 				width: 400,
 				height: 200,
 				buttons: [
-					{ text: 'Создать', click: create },
-					{ text: 'Отмена', click: cancel }
+					{ text: ZX_Lang.CID_CREATE_BUTTON, click: create },
+					{ text: ZX_Lang.CID_CANCEL_BUTTON, click: cancel }
 				],
 				close: function (e) { 
 					$(this).dialog('destroy'); 
 					$(this).remove(); 
 					if (openResult$) {
-						openResult$resolve();
+						openResult$.resolve();
 						openResult$ = null;
 					}
 				}
 			});
 			$dlg.on('keydown', function(e) { e.stopPropagation(); });
 			$dlg.on('keyup', function(e) { e.stopPropagation(); });
+
+			model = new CreateImageKoModel();
+			ko.applyBindings(model, $dlg[0]);
 		}
 
 		function create() {
-			var head_count = parseInt($dlg.find("[name=head_count]").val());
-			var cyl_count = parseInt($dlg.find("[name=cyl_count]").val());
-			var trdos_format = $dlg.find("[name=trdos_format]").prop('checked');
+			try {
+				if (typeof model.headCount() !== 'number') 
+					throw new Error(ZX_Lang.CID_INVALID_HEAD_COUNT);
 
-			if (isNaN(head_count)) {
-				alert('Количество сторон указано некорректно.');
-				return;
+				if (typeof model.cylCount() !== 'number') 
+					throw new Error(ZX_Lang.CID_INVALID_CYL_COUNT);
+
+				if (openResult$) {
+					openResult$.resolve({
+						cylCount: model.cylCount(),
+						headCount: model.headCount(),
+						trdosFormat: model.trdosFormat()
+					});
+					openResult$ = null;
+				}
 			}
-
-			if (isNaN(cyl_count)) {
-				alert('Количество дорожек указано некорректно.');
-				return;
+			catch (error) {
+				if (openResult$) {
+					openResult$.reject(error);
+					openResult$ = null;
+				}
 			}
-
-			if (openResult$) {
-				openResult$resolve({
-					cyl_count: cyl_count,
-					head_count: head_count,
-					trdos_format: trdos_format
-				});
-				openResult$ = null;
+			finally {
+				$dlg.dialog('close');
+				$dlg = null;
 			}
-
-			$dlg.dialog('close');
-			$dlg = null;
 		}
 
 		function cancel() {
 			if (openResult$) {
-				openResult$resolve();
+				openResult$.resolve();
 				openResult$ = null;
 			}			
 			$dlg.dialog('close');

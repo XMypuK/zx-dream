@@ -3,7 +3,7 @@ function PCKeyboard() {
 
     var _leftShiftPressed = false;
 	var _rightShiftPressed = false;
-	var _onKeysStateChanged = new ZXEvent();
+	var _onKeysStateChanged = new ZX_Event();
 
 	if (document.addEventListener) {
 		document.addEventListener('keydown', onkeydown, false);
@@ -90,7 +90,7 @@ function PCKeyboard() {
 				else if (keyId.location == 2)
 					keys.push({ index: 7, bit: 1 }); // Ctrl (Symbol Shift)
 				break;
-			case 0x5a: keys.push({ index: 0, bit: 1 }); break; // Z
+			case 0x5A: keys.push({ index: 0, bit: 1 }); break; // Z
 			case 0x58: keys.push({ index: 0, bit: 2 }); break; // X
 			case 0x43: keys.push({ index: 0, bit: 3 }); break; // C
 			case 0x56: keys.push({ index: 0, bit: 4 }); break; // V
@@ -120,15 +120,15 @@ function PCKeyboard() {
 			case 0x36: keys.push({ index: 4, bit: 4 }); break; // 6
 
 			case 0x50: keys.push({ index: 5, bit: 0 }); break; // P
-			case 0x4f: keys.push({ index: 5, bit: 1 }); break; // O
+			case 0x4F: keys.push({ index: 5, bit: 1 }); break; // O
 			case 0x49: keys.push({ index: 5, bit: 2 }); break; // I
 			case 0x55: keys.push({ index: 5, bit: 3 }); break; // U
 			case 0x59: keys.push({ index: 5, bit: 4 }); break; // Y
 
-			case 0x0d: keys.push({ index: 6, bit: 0 }); break; // Enter
-			case 0x4c: keys.push({ index: 6, bit: 1 }); break; // L
-			case 0x4b: keys.push({ index: 6, bit: 2 }); break; // K
-			case 0x4a: keys.push({ index: 6, bit: 3 }); break; // J
+			case 0x0D: keys.push({ index: 6, bit: 0 }); break; // Enter
+			case 0x4C: keys.push({ index: 6, bit: 1 }); break; // L
+			case 0x4B: keys.push({ index: 6, bit: 2 }); break; // K
+			case 0x4A: keys.push({ index: 6, bit: 3 }); break; // J
 			case 0x48: keys.push({ index: 6, bit: 4 }); break; // H
 
 			case 0x20: keys.push({ index: 7, bit: 0 }); break; // Space
@@ -138,8 +138,8 @@ function PCKeyboard() {
 				else if (keyId.location == 2)
 					keys.push({ index: 0, bit: 0 }); // Shift (Caps Shift)
 				break;
-			case 0x4d: keys.push({ index: 7, bit: 2 }); break; // M
-			case 0x4e: keys.push({ index: 7, bit: 3 }); break; // N
+			case 0x4D: keys.push({ index: 7, bit: 2 }); break; // M
+			case 0x4E: keys.push({ index: 7, bit: 3 }); break; // N
 			case 0x42: keys.push({ index: 7, bit: 4 }); break; // B
 
 			// расширение для более удобной работы
@@ -298,7 +298,7 @@ function PCKeyboard() {
 				keys.push({ index: 7, bit: 1 });
 				keys.push({ index: 0, bit: 4 });
 				break;
-				
+
 		}
 
 		return keys;

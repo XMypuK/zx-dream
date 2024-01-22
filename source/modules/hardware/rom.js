@@ -26,7 +26,7 @@ function ZX_ROM() {
 	function get_rom(rom) {
 		return loadServerFile(rom.name).then(function (data) {
 			if (data.length != ROM_SIZE)
-				throw new Error('Wrong ROM ' + rom.key + ' size.');
+				throw new Error(ZX_Lang.ERR_ROM_WRONG_SIZE + '(' + rom.key + ')');
 
 			_memory[rom.key] = new Uint8Array(data);
 		});

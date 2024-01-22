@@ -1,0 +1,68 @@
+<include includeType="embed" source="common.js" />
+<include includeType="embed" source="settings.js" />
+<include includeType="embed" source="snapshot.js" />
+<include includeType="embed" source="../hardware/hardware.html" />
+<include includeType="embed" source="hw_connector.js" />
+<include includeType="embed" source="hw_connector_common.js" />
+<include includeType="embed" source="hw_connector_dedicated.js" />
+
+<script type="text/javascript">
+
+importScripts('/js/ayumi.js');
+
+if (typeof ZXContext === 'undefined') {
+    var ZXContext = {};
+};
+Object.assign(ZXContext, {
+    settings: null,
+    hw: {},
+    debugMode: false,
+    hwConnector: null
+});
+
+ZXContext.hw.bus = new ZX_Bus();
+ZXContext.hw.clock = new ZX_Clock();
+ZXContext.hw.cpu = new ZX_Z80();
+ZXContext.hw.rom = new ZX_ROM();
+ZXContext.hw.ram = new ZX_RAM();
+ZXContext.hw.display = new ZX_Display();
+ZXContext.hw.port_fe = new ZX_PortFE();
+ZXContext.hw.port_7ffd = new ZX_Port7FFD();
+ZXContext.hw.keyboard = new ZX_Keyboard();
+ZXContext.hw.mouse = new ZX_Mouse();
+ZXContext.hw.drives = [
+    new ZX_Floppy(),
+    new ZX_Floppy(),
+    new ZX_Floppy(),
+    new ZX_Floppy()
+];
+ZXContext.hw.betadisk = new ZX_BetaDisk();
+ZXContext.hw.joystick = new ZX_Joystick();
+ZXContext.hw.dummyGS = new ZX_DummyGS();
+ZXContext.hw.psg = new ZX_PSG();
+
+ZXContext.hw.cpu.connect(ZXContext.hw.bus);
+ZXContext.hw.clock.connect(ZXContext.hw.bus, ZXContext.hw.cpu);
+ZXContext.hw.rom.connect(ZXContext.hw.bus);
+ZXContext.hw.ram.connect(ZXContext.hw.bus);
+ZXContext.hw.display.connect(ZXContext.hw.bus, ZXContext.hw.clock);
+ZXContext.hw.port_fe.connect(ZXContext.hw.bus);
+ZXContext.hw.port_7ffd.connect(ZXContext.hw.bus);
+ZXContext.hw.keyboard.connect(ZXContext.hw.bus);
+ZXContext.hw.mouse.connect(ZXContext.hw.bus);
+ZXContext.hw.betadisk.connect(ZXContext.hw.bus, ZXContext.hw.clock,	ZXContext.hw.drives);
+ZXContext.hw.joystick.connect(ZXContext.hw.bus);
+ZXContext.hw.dummyGS.connect(ZXContext.hw.bus);
+ZXContext.hw.psg.connect(ZXContext.hw.bus, ZXContext.hw.clock);
+ZXContext.hwConnector = new HWConnector();
+ZXContext.hwConnectorDedicated = new HWConnectorDedicated(self, ZXContext.hwConnector);
+ZXContext.hwConnectorDedicated.notifWorkerReady();
+
+Promise.all([
+    ZXContext.hwConnector.hwReady(),
+    ZXContext.hwConnectorDedicated.get_mainReady()
+]).then(function () {
+    ZXContext.hw.clock.run();
+});
+
+</script>

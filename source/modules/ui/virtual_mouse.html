@@ -69,8 +69,8 @@
 
 <script type="text/javascript">
 function VirtualMouse ( container ) {
-	var _onMove = new ZXEvent();
-	var _onKeyStateChanged = new ZXEvent();
+	var _onMove = new ZX_Event();
+	var _onKeyStateChanged = new ZX_Event();
 
 	this.get_onMove = function () { 
 		return _onMove.pub;
@@ -107,9 +107,9 @@ function VirtualMouse ( container ) {
 	var 
 		ball_canvas = $move_area.find('.ball')[0],
 		ball_context = ball_canvas.getContext('2d'),
-		ball_radius = 79,
-		ball_center_x = 80,
-		ball_center_y = 80,
+		ball_radius = 39,
+		ball_center_x = 40,
+		ball_center_y = 40,
 		ball = new Sphere(ball_radius);
 	
 	ball.draw(ball_context, ball_center_x, ball_center_y);
@@ -194,10 +194,10 @@ function VirtualMouse ( container ) {
 		this.rotate_over_y = rotate_over_y;
 		this.rotate_over_z = rotate_over_z;
 
-		var foregroundColor = [ 0x0C, 0x59, 0xCF, 0xC0 ];
-		var backgroundColor = [ 0x3D, 0x8A, 0xF7, 0xFF ];
-		//var foregroundColor = [ 0xA8, 0xA8, 0xA8, 0xFF ];
-		//var backgroundColor = [ 0xC0, 0xC0, 0xC0, 0xFF ];
+		//var foregroundColor = [ 0x0C, 0x59, 0xCF, 0xC0 ];
+		//var backgroundColor = [ 0x3D, 0x8A, 0xF7, 0xFF ];
+		var foregroundColor = [ 0xA8, 0xA8, 0xA8, 0xFF ];
+		var backgroundColor = [ 0xC0, 0xC0, 0xC0, 0xFF ];
 
 		var curves = [];
 

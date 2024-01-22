@@ -8,6 +8,8 @@ function ZX_Clock() {
 
 	// период запросов маскируемого прерывания в миллисекундах
 	var intrqPeriod = 20.48;
+	// продолжлительность сигнала прерывания в тактах процессора
+	var intrqDurationTstates = 32;
 	// количество выполняемых процессором тактов между маскируемыми прерываниями
 	var tstatesPerIntrq = 71680;
 	// количество выполняемых процессором тактов за одну миллисекунду
@@ -16,8 +18,10 @@ function ZX_Clock() {
 	var running = false;
 	// идентификатор интервала рабочего цикла
 	var intervalId;
-	// время запуска последней итерации рабочего цикла
-	var intervalTimestamp;
+	// точка отсчета работы тактового генератора в тактах
+	var baseTstates;
+	// точка отсчета работы тактового генератора
+	var baseTimestamp;
 	// время последнего вывода информации о производительности
 	var performanceTimestamp;
 	// счетчик тактов с последнего вывода информации о производительности
@@ -26,11 +30,15 @@ function ZX_Clock() {
 	var performanceFps;
 	// счетчик тактов с начала работы
 	var tstates = 0;
+	// максимальное ускорение (после временного спада производительности)
+	var maxBoostMs = 50.0;
+	var maxBoostTstates = maxBoostMs * tstatesPerMs;
 
 	var _bus;
 	var _cpu;
 	var _taskQueue = new TaskQueue(tstatesPerMs);
-	var _interruptTask = null;
+	var _interruptActiveTask = null;
+	var _interruptInactiveTask = null;
 	var _rescheduleTaskOnNextInterrupt = false;
 
 	var debug = false;
@@ -44,7 +52,8 @@ function ZX_Clock() {
 		running = true;
 		var now = Date.now();
 		intervalId = setInterval(process, 4);
-		intervalTimestamp = now;
+		baseTstates = tstates;
+		baseTimestamp = now;
 		performanceTimestamp = now;
 		performanceTstates = 0;
 		performanceFps = 0;
@@ -57,7 +66,8 @@ function ZX_Clock() {
 		running = true;
 		var now = Date.now();
 		intervalId = setInterval(processDebug, 4);
-		intervalTimestamp = now;
+		baseTstates = tstates;
+		baseTimestamp = now;
 		performanceTimestamp = now;
 		performanceTstates = 0;
 		performanceFps = 0;
@@ -80,18 +90,19 @@ function ZX_Clock() {
 	// 2. Если время из п.1 достигло секунды, то рассчитывается примерная частота работы 
 	//    процессора и количество фреймов (прерываний), выполненных за это время. После этого
 	//	  время и счетчики производительности начинают считаться заново.
-	// 3. Вычисляется количество миллисекунд, прошедших со времени запуска предыдущей итерации.
-	// 4. Вычисляется количество тактов процессора, которое должно было отработать за время из п.1.
-	//    При этом, если количество тактов процессора получилось слишком большое (превышает 
-	//    количество тактов между прерываниями), то в качестве значения берется количество тактов,
-	//    между двумя прерываниями. Это нужно для случаев, когда пользователь переключется со вкладки
-	//    эмулятора на дргие вкладки или в другие приложения. В этом случае рабочий цикл
-	//    приостанавливается и интервал между итерациями может оказаться таким большим, что попытка
-	//    обработать столько тактов за одну итерацию приведет к зависанию вкладки. 
-	// 5. Прерывания реализуются путем планирования в общей очереди событий. Время возникнования
+	// 3. Вычисляется количество прошедших реальных миллисекунд с точки отсчета (изначально это время запуска тактового генератора).
+	// 4. Вычисляется количество фактически выполненных тактов процессора с точки отсчета.
+	// 5. Учитывая текущие настройки тактового генератора вычисляется количество тактов, которое должно было быть выполнено за реально время из п.3.
+	// 6. Разница между значениями, полученными в п.5 и п.4, является количеством тактов, подлежащих выполнению в текущей итерации.
+	//    При этом, если количество тактов процессора получилось слишком большое (превышает maxBoostTstates), то точка отсчета сдвигается вперед
+	//	  таким образом, что будет выполнено только maxBoostTstates тактов, а дальше эмулация продолжится со штатной скоростью. Это нужно для случаев, 
+	//	  когда пользователь переключется со вкладки эмулятора на дргие вкладки или в другие приложения. В этом случае рабочий цикл
+	//    приостанавливается и интервал между итерациями может оказаться таким большим, что попытка обработать столько тактов за одну итерацию приведет
+	//    к зависанию вкладки. Аудио-буфер также будет переполняться до нормализации скорости эмуляции.
+	// 7. Прерывания реализуются путем планирования в общей очереди событий. Время возникнования
 	//    очередного запланированного события рассчитывается, исходя из количества выполненных тактов
 	//    процессора и его тактовой частоты.
-	// 6. В процессе выполнения итерации в нужных случаях корректируются счетчики производительности,
+	// 8. В процессе выполнения итерации в нужных случаях корректируются счетчики производительности,
 	//    тактов и т.п.
 	function process() {
 		// фиксация время запуска итерации
@@ -107,13 +118,19 @@ function ZX_Clock() {
 			performanceTstates = 0;
 			performanceFps = 0;
 		}
-		// расчет времени с запуска предыдущей итерации
-		var elapsed = now - intervalTimestamp;
-		intervalTimestamp = now;
-		// расчет количества тактов для выполнения
-		var plannedTstates = tstatesPerMs * elapsed;
-		if (plannedTstates > tstatesPerIntrq) {
-			plannedTstates = tstatesPerIntrq;
+		// время с точки отсчета
+		var elapsed = now - baseTimestamp;
+		// соответствие этого времени тактам
+		var elapsedTstates = tstatesPerMs * elapsed;
+		// количество тактов для выполнения в текущей итерации
+		var plannedTstates = elapsedTstates - (tstates - baseTstates);
+		if (plannedTstates > maxBoostTstates) {
+			// Если замедление более, чем максимально возможное компенсационное
+			// ускорение, то точка отсчета во времени сдвигается вперед так,
+			// что далее компенсируется только максимально возможное ускорение.
+			// Далее эмуляция пойдет со штатной скоростью.
+			baseTimestamp += (plannedTstates / tstatesPerMs - maxBoostMs);
+			plannedTstates = maxBoostTstates;
 		}
 		// сброс счетчика тактов процессора
 		_cpu.set_tstates(0);
@@ -146,13 +163,19 @@ function ZX_Clock() {
 			performanceTstates = 0;
 			performanceFps = 0;
 		}
-		// расчет времени с запуска предыдущей итереации
-		var elapsed = now - intervalTimestamp;
-		intervalTimestamp = now;
-		// расчет количества тактов для выполнения
-		var plannedTstates = tstatesPerMs * elapsed;
-		if (plannedTstates > tstatesPerIntrq) {
-			plannedTstates = tstatesPerIntrq;
+		// время с точки отсчета
+		var elapsed = now - baseTimestamp;
+		// соответствие этого времени тактам
+		var elapsedTstates = tstatesPerMs * elapsed;
+		// количество тактов для выполнения в текущей итерации
+		var plannedTstates = elapsedTstates - (tstates - baseTstates);
+		if (plannedTstates > maxBoostTstates) {
+			// Если замедление более, чем максимально возможное компенсационное
+			// ускорение, то точка отсчета во времени сдвигается вперед так,
+			// что далее компенсируется только максимально возможное ускорение.
+			// Далее эмуляция пойдет со штатной скоростью.
+			baseTimestamp += (plannedTstates / tstatesPerMs - maxBoostMs);
+			plannedTstates = maxBoostTstates;
 		}
 		// сброс счетчика тактов процессора
 		_cpu.set_tstates(0);
@@ -178,12 +201,14 @@ function ZX_Clock() {
 	}
 
 	var rescheduleInterruptTask = function() {
-		_interruptTask && (_interruptTask.cancelled = true);
-		_interruptTask = this.setInterval(onInterrupt, intrqPeriod, 0);
+		_interruptActiveTask && (_interruptActiveTask.cancelled = true);
+		_interruptInactiveTask && (_interruptInactiveTask.cancelled = true);
+		_interruptActiveTask = this.setInterval(onInterruptActive, intrqPeriod, 0);
+		_interruptInactiveTask = this.setInterval(onInterruptInactive, intrqPeriod, 0, intrqDurationTstates / tstatesPerMs);
 	}.bind(this);
 
-	function onInterrupt() {
-		_bus.var_write('intrq');
+	function onInterruptActive() {
+		_bus.var_write('intrq', 1);
 		performanceFps++;
 		if (_rescheduleTaskOnNextInterrupt) {
 			rescheduleInterruptTask();
@@ -191,9 +216,16 @@ function ZX_Clock() {
 		}
 	}
 
+	function onInterruptInactive() {
+		_bus.var_write('intrq', 0);
+	}
+
 	function updateTstatesPerMs() {
 		tstatesPerMs = tstatesPerIntrq / intrqPeriod;
 		_taskQueue.set_tstatesPerMs(tstatesPerMs);
+		maxBoostTstates = maxBoostMs * tstatesPerMs;
+		baseTstates = tstates;
+		baseTimestamp = Date.now();
 		_rescheduleTaskOnNextInterrupt = true;
 	}
 

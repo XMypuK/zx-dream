@@ -2,22 +2,6 @@
 
 <script type="text/javascript">
 
-var DiskImageFormat = {
-	FDI: 'FDI',
-	TRD: 'TRD',
-	SCL: 'SCL',
-	TD0: 'TD0',
-	UDI: 'UDI',
-	DSK: 'DSK',
-
-	getFromFileName: function(filename) {
-		var match = (/^[^\\\/]*\.(TRD|FDI|SCL|TD0|UDI|DSK)$/i).exec(filename);
-		if (!match)
-			throw new Error('Неподдерживаемый формат образа.');
-		return match[1].toUpperCase();
-	}
-}
-
 function ZX_DriveDispatcher(toolbar) {
     var DB_COMMAND_OPEN = 'open';
     var DB_COMMAND_OPEN_LOCAL = 'open-local';
@@ -45,15 +29,15 @@ function ZX_DriveDispatcher(toolbar) {
         var fragment = document.createDocumentFragment();
         var driveBox = new DriveBox(fragment, index, handler);
         driveBox.beginInit();
-        driveBox.addAction(DB_COMMAND_OPEN, 'открыть с сервера...');
-        driveBox.addAction(DB_COMMAND_OPEN_LOCAL, 'открыть с дикска...');
-        driveBox.addAction(DB_COMMAND_SAVE_LOCAL, 'сохранить на диск...');
-        driveBox.addAction(DB_COMMAND_CREATE, 'создать...');
-        driveBox.addAction(DB_COMMAND_EJECT, 'извлечь');
+        driveBox.addAction(DB_COMMAND_OPEN, ZX_Lang.DRIVE_MENU_OPEN_FORM_SERVER);
+        driveBox.addAction(DB_COMMAND_OPEN_LOCAL, ZX_Lang.DRIVE_MENU_OPEN_FORM_LOCAL);
+        driveBox.addAction(DB_COMMAND_SAVE_LOCAL, ZX_Lang.DRIVE_MENU_SAVE_TO_LOCAL);
+        driveBox.addAction(DB_COMMAND_CREATE, ZX_Lang.DRIVE_MENU_CREATE);
+        driveBox.addAction(DB_COMMAND_EJECT, ZX_Lang.DRIVE_MENU_EJECT);
         driveBox.endInit();
         $(toolbar).append(fragment);
         driveBoxes.push(driveBox);
-        ZXContext.hw.drives[index].get_onStateChanged().subscribe(function (state) {
+        ZXContext.hwConnector['get_onDrive' + index + 'StateChanged']().subscribe(function (state) {
             onDriveStateChanged(index, state);
         });
     }
@@ -80,18 +64,11 @@ function ZX_DriveDispatcher(toolbar) {
         browser.open().then(function (filename) {
             if (!filename)
                 return;
-                
+
             driveBox.set_status(DriveBoxStatus.loading);
             return loadServerFile(filename).then(function (data) {
-                var format = DiskImageFormat.getFromFileName(filename);
-                switch (format) {
-                    case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
-                    case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
-                    case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
-                    case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
-                    case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
-                    case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
-                }
+                return ZXContext.hwConnector.setDriveImage(driveIndex, filename, data);
+            }).then(function () {
                 driveBox.set_status(DriveBoxStatus.loaded);
                 driveBox.set_title(filename);
                 ZXContext.settings.set_drive(driveIndex, 'server:' + filename);
@@ -101,7 +78,7 @@ function ZX_DriveDispatcher(toolbar) {
         .catch(function (errorMessage) {
             if (errorMessage) {
                 driveBox.set_status(DriveBoxStatus.error);
-                alert(errorMessage);
+                handleError(errorMessage);
             }
         });
     }
@@ -116,23 +93,17 @@ function ZX_DriveDispatcher(toolbar) {
                 var format  = DiskImageFormat.getFromFileName(filename);
                 driveBox.set_status(DriveBoxStatus.loading);
                 return loadLocalFile($input[0]).then(function (data) {
-                    switch (format) {
-                        case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
-                        case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
-                        case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
-                        case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;                        
-                        case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
-                        case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
-                    }
-                    driveBox.set_status(DriveBoxStatus.loaded);
-                    driveBox.set_title(filename);
-                    ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
-                    createImageCache(driveIndex, filename, data);
+                    return ZXContext.hwConnector.setDriveImage(driveIndex, filename, data).then(function () {
+                        driveBox.set_status(DriveBoxStatus.loaded);
+                        driveBox.set_title(filename);
+                        ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
+                        createImageCache(driveIndex, filename, data);
+                    });
                 });
             }).catch(function (errorMessage) {
                 if (errorMessage) {
                     driveBox.set_status(DriveBoxStatus.error);
-                    alert(errorMessage);
+                    handleError(errorMessage);
                 }
             }).finally(function () {
                 $input.remove();
@@ -142,32 +113,19 @@ function ZX_DriveDispatcher(toolbar) {
     }
 
     function saveLocal(driveIndex, driveBox) {
-        var floppy = ZXContext.hw.drives[driveIndex];
-        if (!floppy.get_isReady()) {
-            alert('В приводе отсутствует диск.')
-            return;
-        }
-
-		var formats = floppy.getCompatibleFormats();
-		var dlg = new SaveImageDialog();
-		dlg.open(formats).then(function (format) {
-            if (!format)
-                return;
-
-            var data;
-            switch (format) {
-                case 'TRD': data = floppy.saveToTRD(); break;
-                case 'FDI': data = floppy.saveToFDI(); break;
-                case 'SCL': data = floppy.saveToSCL(); break;
-                case 'TD0': data = floppy.saveToTD0(); break;
-                case 'UDI': data = floppy.saveToUDI();break;
-                case 'DSK': throw new Error('Not implemented.'); break;
+        ZXContext.hwConnector.getDriveImageFormats(driveIndex).then(function (formats) {
+            if (!formats)
+                throw new Error(ZX_Lang.DRIVE_IS_EMPTY);
+            return (new SaveImageDialog()).open(formats);
+        }).then(function (format) {
+            if (format) {
+                return ZXContext.hwConnector.getDriveImage(driveIndex, format).then(function (data) {
+                    downloadBinaryData(data, 'custom_image.' + format);
+                });
             }
-            downloadBinaryData(data, 'custom_image.' + format);
-        })
-        .catch(function (errorMessage) {
+        }).catch(function (errorMessage) {
             if (errorMessage) {
-                alert(errorMessage);
+                handleError(errorMessage);
             }
         });
     }
@@ -178,28 +136,29 @@ function ZX_DriveDispatcher(toolbar) {
             if (!imageParams)
                 return;
 
-            ZXContext.hw.drives[driveIndex].create(
-                imageParams.cyl_count,
-                imageParams.head_count, 
-                imageParams.trdos_format);
-            driveBox.set_status(DriveBoxStatus.loaded);
-            driveBox.set_title('custom_image.fdi');
-            ZXContext.settings.set_drive(driveIndex, 'local:custom_image.fdi');
-            createImageCache(driveIndex, 'custom_image.fdi', ZXContext.hw.drives[driveIndex].saveToFDI());
+            ZXContext.hwConnector.createDriveImage(driveIndex, imageParams.cylCount, imageParams.headCount, imageParams.trdosFormat).then(function () {
+                return ZXContext.hwConnector.getDriveImage(driveIndex, 'FDI');
+            }).then(function (data) {
+                driveBox.set_status(DriveBoxStatus.loaded);
+                driveBox.set_title('custom_image.fdi');
+                ZXContext.settings.set_drive(driveIndex, 'local:custom_image.fdi');
+                createImageCache(driveIndex, 'custom_image.fdi', data);
+            });
         })
         .catch(function (errorMessage) {
             if (errorMessage) {
-                alert(errorMessage);
+                handleError(errorMessage);
             }
         });
     }
 
     function eject(driveIndex, driveBox) {
-        ZXContext.hw.drives[driveIndex].eject();
-        driveBox.set_status(DriveBoxStatus.empty);
-		driveBox.set_title('');
-        ZXContext.settings.set_drive(driveIndex, '');
-		clearImageCache(driveIndex);
+        ZXContext.hwConnector.clearDriveImage(driveIndex).then(function () {
+            driveBox.set_status(DriveBoxStatus.empty);
+            driveBox.set_title('');
+            ZXContext.settings.set_drive(driveIndex, '');
+            clearImageCache(driveIndex);
+        });
     }
 
     function preload(driveIndex) {
@@ -216,23 +175,16 @@ function ZX_DriveDispatcher(toolbar) {
                 ? loadImageCache(driveIndex).then(function (imageInfo) { return imageInfo.data; })
                 : loadServerFile(filename);
             return load.then(function (data) {
-                var format = DiskImageFormat.getFromFileName(filename);
-                switch (format) {
-                    case 'TRD': ZXContext.hw.drives[driveIndex].insertTRD(data); break;
-                    case 'SCL': ZXContext.hw.drives[driveIndex].insertSCL(data); break;
-                    case 'FDI': ZXContext.hw.drives[driveIndex].insertFDI(data); break;
-                    case 'TD0': ZXContext.hw.drives[driveIndex].insertTD0(data); break;
-                    case 'UDI': ZXContext.hw.drives[driveIndex].insertUDI(data); break;
-                    case 'DSK': ZXContext.hw.drives[driveIndex].insertDSK(data); break;
-                }                    
+                return ZXContext.hwConnector.setDriveImage(driveIndex, filename, data);
+            }).then(function () {
                 driveBox.set_status(DriveBoxStatus.loaded);
                 driveBox.set_title(filename);
-            })
+            });
         })
         .catch(function (errorMessage) {
             if (errorMessage) {
                 driveBox.set_status(DriveBoxStatus.error);
-                alert(errorMessage);
+                handleError(errorMessage);
             }
         });
 	}
@@ -240,17 +192,17 @@ function ZX_DriveDispatcher(toolbar) {
     function loadImageCache(driveIndex) {
         return new Promise(function (resolve, reject) {
             if (!localStorage) {
-                reject('Local Storage is not supported by browser.');
+                reject(ZX_Lang.ERR_LOCAL_STORAGE_NOT_SUPPORTED);
                 return;
             }
 
 			var cacheKey = 'drive' + driveIndex + "_cache";
 			var cacheData = localStorage[cacheKey];
 			if (!cacheData) 
-				throw new Error('Кэш не содержит образа.');
+				throw new Error(ZX_Lang.ERR_LOCAL_STORAGE_HAS_NO_IMAGE);
 			var dataSeparator = cacheData.indexOf(':');
 			if (dataSeparator <= 0 || dataSeparator == cacheData.length - 1)
-				throw new Error('Кэш содержит некорректные данные образа.');
+				throw new Error(ZX_Lang.ERR_LOCAL_STORAGE_HAS_INVALID_IMAGE);
 			var filename = cacheData.substr(0, dataSeparator);
 			var base64Data = cacheData.substr(dataSeparator + 1);
 			var data = base64Decode(base64Data);

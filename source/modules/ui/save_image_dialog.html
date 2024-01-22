@@ -6,11 +6,9 @@
 	<div class="save-image-dialog">
 		<table>
 			<tr>
-				<td class="title">Формат:</td>
-				<td class="data">
-					<label><input type="radio" name="format" value="TRD" />&nbsp;TRD</label>
-					<label><input type="radio" name="format" value="SCL" />&nbsp;SCL</label>
-					<label><input type="radio" name="format" value="FDI" />&nbsp;FDI</label>
+				<td class="title" data-bind="text: ZX_Lang.SID_FORMAT"></td>
+				<td class="data" data-bind="foreach: formatOptions">
+					<label><input type="radio" data-bind="checked: $parent.format, checkedValue: $data" /> <span data-bind="text: $data"></span></label>
 				</td>
 			</tr>
 		</table>
@@ -18,50 +16,48 @@
 </template>
 
 <script type="text/javascript">
+	function SaveImageKoModel(formats) {
+		this.formatOptions = ko.observableArray(formats);
+		this.format = ko.observable(null);
+	}
+
 	function SaveImageDialog () {
 		'use strict';
 		
 		var $dlg = null;
 		var openResult$ = null;
-		var openResult$resolve = null;
-		var openResult$reject = null;
-		var formats = null;
+		var model = null;
 
 		this.open = open;
 
-		function open(compatible_formats) {
+		function open(compatibleFormats) {
 			if (!openResult$) {
-				openResult$ = new Promise(function (resolve, reject) {
-					openResult$resolve = resolve;
-					openResult$reject = reject; 
-				});
-				formats = compatible_formats;
-				formats.sort();
-				init();
+				openResult$ = Promise.withResolvers();
+				init(compatibleFormats);
 			}
-			return openResult$;
+			return openResult$.promise;
 		}
 
-		function init() {
+		function init(formats) {
 			var temp_div = document.createElement('div');
 			temp_div.innerHTML = "<?=save-image-dialog?>";
 
 			$dlg = $(temp_div).children('.save-image-dialog');
 			$dlg.dialog({
 				autoOpen: true,
-				title: 'Выберите целевой формат образа',
+				title: ZX_Lang.SID_TITLE,
 				modal: true,
 				width: 400,
 				height: 120,
 				buttons: [
-					{ text: 'Сохранить', click: save },
-					{ text: 'Отмена', click: cancel }
+					{ text: ZX_Lang.SID_SAVE, click: save },
+					{ text: ZX_Lang.SID_CANCEL, click: cancel }
 				],
 				close: function (e) { 
 					$(this).dialog('destroy');
 					$(this).remove(); 
 					if (openResult$) {
-						openResult$resolve();
+						openResult$.resolve();
 						openResult$ = null;
 					}
 				}
@@ -69,22 +65,19 @@
 			$dlg.on('keydown', function(e) { e.stopPropagation(); });
 			$dlg.on('keyup', function(e) { e.stopPropagation(); });
 
-			var $data = $dlg.find('.data');
-			$data.empty();
-			for (var i = 0; i < formats.length; i++) {
-				$data.append('<label><input type="radio" name="format" value="' + formats[i] + '" />&nbsp;' + formats[i] + '</label>');
-			}
+			formats.sort();
+			model = new SaveImageKoModel(formats);
+			ko.applyBindings(model, $dlg[0]);
 		}
 
 		function save() {
-			var $format = $dlg.find('[name=format]:checked');
-			if (!$format.length) {
-				alert('You have to choice an image format.')
+			if (!model.format()) {
+				alert(ZX_Lang.SID_FORMAT_NOT_SELECTED)
 				return;
 			}
 
 			if (openResult$) {
-				openResult$resolve($format.val());
+				openResult$.resolve(model.format());
 				openResult$ = null;
 			}
 			$dlg.dialog('close');
@@ -93,7 +86,7 @@
 
 		function cancel() {
 			if (openResult$) {
-				openResult$resolve();
+				openResult$.resolve();
 				openResult$ = null;
 			}			
 			$dlg.dialog('close');

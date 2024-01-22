@@ -18,7 +18,7 @@
 function ZX_Display () {
 	'use strict';
 	
-	var _emulThread = VAL_EMUL_THREAD_MAIN;
+	var _threading = VAL_THREADING_SINGLE;
 	var _borderWidth = 16;
 	var _scale = 2;
 	var _scaleType = VAL_SCALE_METHOD_RENDER;
@@ -50,7 +50,7 @@ function ZX_Display () {
 			case VAL_RENDERER_WEB_GL: _renderer = new WebGLRenderer(_borderWidth, _scale, _scaleType); break;
 			default: _renderer = new NullRenderer(_borderWidth, _scale, _scaleType); break;
 		}
-		_renderer.set_emulThread(_emulThread);
+		_renderer.set_threading(_threading);
 	}
 
 	function bind(canvases) {
@@ -88,12 +88,14 @@ function ZX_Display () {
 		}
 	}
 
-	function beginRedraw() {
+	function beginRedraw(intrqVar, intrqActive) {
+		if (!intrqActive)
+			return;
 		var layer = +!!(_port_7ffd_value & 0x08);
 		var data = layer ? _screen7Data : _screen5Data;
 		var dirty = layer ? _screen7Dirty : _screen5Dirty;
 
-		if (_emulThread == VAL_EMUL_THREAD_MAIN) {
+		if (_threading == VAL_THREADING_SINGLE) {
 			if (_renderOnAnimationFrame) {
 				// (копирование буферов понижает производительность)
 				_deferredData.set(data);
@@ -255,6 +257,12 @@ function ZX_Display () {
 	}
 
 	this.bind = bind;
+	this.get_threading = function () {
+		return _threading;
+	}
+	this.set_threading = function (value) {
+		_threading = value;
+	}
 }
 Object.assign(ZX_Display, {
 	getColor: function (bright, r, g, b) {
@@ -309,7 +317,7 @@ Object.assign(ZX_Display, {
 */
 
 function RendererBase(borderWidth, scale, scaleType) {
-	this._emulThread = VAL_EMUL_THREAD_MAIN;
+	this._threading = VAL_THREADING_SINGLE;
 	this._scale = scale;
 	this._scaleType = scaleType;
 	this._borderWidth = borderWidth;
@@ -324,11 +332,11 @@ function RendererBase(borderWidth, scale, scaleType) {
 	this._buildSamples();
 }
 Object.assign(RendererBase.prototype, {
-	get_emulThread: function () {
-		return this._emulThread;
+	get_threading: function () {
+		return this._threading;
 	},
-	set_emulThread: function (value) {
-		this._emulThread = value;
+	set_threading: function (value) {
+		this._threading = value;
 	},
 	_createCanvas: function (width, height) {
 		if (typeof OffscreenCanvas !== 'undefined') {
@@ -341,7 +349,7 @@ Object.assign(RendererBase.prototype, {
 			return canvas;
 		}
 		else
-			throw new Error('Cannot create a rendering canvas.');
+			throw new Error(ZX_Lang.ERR_CANNOT_CREATE_CANVAS);
 	},
 	_buildSamples: function () {
 
@@ -349,7 +357,7 @@ Object.assign(RendererBase.prototype, {
 	bind: function (canvases) {
 		this._border = canvases[0];
 		this._borderCtx = this._border.getContext('2d', { alpha: false });
-		if (this._emulThread == VAL_EMUL_THREAD_DEDICATED) {
+		if (this._threading == VAL_THREADING_MULTIPLE) {
 			this._screen = canvases[1];
 			this._screenCtx = this._screen.getContext('2d', { alpha: false });
 			this._layer0 = this._createCanvas(this._screen.width, this._screen.height);
@@ -698,9 +706,7 @@ Object.assign(WebGLRenderer.prototype, {
 		"}"
 	].join('\r\n'),
 	_fragmentShaderSource: [
-		"#ifdef GL_ES",
-	    "precision mediump float;",
-	    "#endif",
+	    "precision lowp float;",
         "uniform sampler2D u_samples;",
         "varying vec2 v_sampleCoords;",
 	    
@@ -792,7 +798,7 @@ Object.assign(WebGLRenderer.prototype, {
 		this._layer0Ctx = this._glGetContext(this._layer0, { preserveDrawingBuffer: true, alpha: false });
 		this._layer1Ctx = this._glGetContext(this._layer1, { preserveDrawingBuffer: true, alpha: false });
 		if ( !this._layer0Ctx || !this._layer1Ctx )
-			throw new Error('Не удается создать холст. Вы можете попробовать выбрать другой метод отрисовки.');
+			throw new Error(ZX_Lang.ERR_CANNOT_CREATE_CANVAS);
 
 		this._glInitWebGLContext(this._layer0Ctx);
 		this._glInitWebGLContext(this._layer1Ctx);
@@ -839,6 +845,7 @@ Object.assign(WebGLRenderer.prototype, {
 			if (glBufferIndex) {
 				ctx.bufferData(ctx.ARRAY_BUFFER, this._glBuffer, ctx.STATIC_DRAW);
 				ctx.drawArrays(ctx.TRIANGLES, 0, glBufferIndex >> 2);
+				ctx.flush();
 			}
 		}
 	}

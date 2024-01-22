@@ -1,6 +1,7 @@
 <include includeType="embed" source="common.js" />
 <include includeType="embed" source="settings.js" />
 <include includeType="embed" source="snapshot.js" />
+<include includeType="embed" source="hw_connector.js" />
 
 <include includeType="embed" source="../hardware/hardware.html" />
 <include includeType="embed" source="../debug/debug.html" />
@@ -9,15 +10,17 @@
 <script type="text/javascript">
 
 $(window).load(function() {
-	window.ZXContext = {
+	if (!window.ZXContext) {
+		window.ZXContext = {};
+	};
+	Object.assign(window.ZXContext, {
 		settings: new ZX_StorableSettings(),
 		hw: {},
 		ui: {},
-		debugMode: (/(\&|\?)debug=?/).test(window.location.search)
-	};
+		debugMode: (/(\&|\?)debug=?/).test(window.location.search),
+		hwConnector: null
+	});
 
-	ZXContext.ui.workspace = new ZX_Workspace();
-	
 	ZXContext.hw.bus = new ZX_Bus();
 	ZXContext.hw.clock = new ZX_Clock();
 	ZXContext.hw.cpu = new ZX_Z80();
@@ -51,22 +54,13 @@ $(window).load(function() {
 	ZXContext.hw.betadisk.connect(ZXContext.hw.bus, ZXContext.hw.clock,	ZXContext.hw.drives);
 	ZXContext.hw.joystick.connect(ZXContext.hw.bus);
 	ZXContext.hw.dummyGS.connect(ZXContext.hw.bus);
-	ZXContext.hw.psg.get_onStateChanged().subscribe(function (state) {
-		$(document.body).toggleClass('-sound_on', state == 'running');
-	});
 	ZXContext.hw.psg.connect(ZXContext.hw.bus, ZXContext.hw.clock);
+	ZXContext.hwConnector = new HWConnector();
 
+	ZXContext.ui.workspace = new ZX_Workspace();
 	ZXContext.ui.workspace.init();
 	
-	// ждем загрузки ПЗУ и инициализации аудио
-	Promise.all([
-		ZXContext.hw.rom.get_ready$().catch(function (error) {
-			alert('Не удалось загрузить ПЗУ: ' + error);
-		}),
-		ZXContext.hw.psg.get_ready$()
-	]).then(function () {
-		start();
-	});
+	ZXContext.hwConnector.hwReady().then(start);
 
 	function start() {
 		if ( ZXContext.debugMode ) {

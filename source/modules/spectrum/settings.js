@@ -86,6 +86,20 @@ Object.assign(ZX_Settings.prototype, {
 			return;
 		this._container['drive' + index] = value;
 	},
+	// бипер
+	get_beeper: function () {
+		return this._container.beeper;
+	},
+	set_beeper: function (value) {
+		this._container.beeper = value;
+	},
+	// Громкость бипера
+	get_beeperVolume: function () {
+		return this._container.beeperVolume;
+	},
+	set_beeperVolume: function (value) {
+		this._container.beeperVolume = value;
+	},
 	// Музыкальный сорпроцессор
 	get_psg: function() {
 		return this._container.psg;
@@ -100,12 +114,53 @@ Object.assign(ZX_Settings.prototype, {
 	set_psgClock: function(value) {
 		this._container.psgClock = value;
 	},
-	// Размер выходного буфера воспроизведения аудио
-	get_psgBufferSize: function() {
-		return this._container.psgBufferSize;
+	// Размер пакета сэмплов, передающихся в выходной буфер за раз
+	get_psgPacketSize: function () {
+		return this._container.psgPacketSize;
 	},
-	set_psgBufferSize: function(value) {
-		this._container.psgBufferSize = value;
+	set_psgPacketSize: function (value) {
+		this._container.psgPacketSize = value;
+	},
+	// Turbo Sound
+	get_psgTurboSound: function () {
+		return this._container.psgTurboSound;
+	},
+	set_psgTurboSound: function (value) {
+		this._container.psgTurboSound = value;
+	},
+	// Распределение каналов
+	get_psgChannelLayout: function () {
+		return this._container.psgChannelLayout;
+	},
+	set_psgChannelLayout: function (value) {
+		this._container.psgChannelLayout = value;
+	},
+	// Громкость сопроцессора
+	get_psgVolume: function () {
+		return this._container.psgVolume;
+	},
+	set_psgVolume: function (value) {
+		this._container.psgVolume = value;
+	},
+	// Способ вывода звука
+	get_audioRenderer: function () {
+		return this._container.audioRenderer;
+	},
+	set_audioRenderer: function(value) {
+		this._container.audioRenderer = value;
+	},
+	// Размер выходного буфера воспроизведения аудио
+	get_audioBufferSize: function() {
+		return this._container.audioBufferSize;
+	},
+	set_audioBufferSize: function(value) {
+		this._container.audioBufferSize = value;
+	},
+	get_threading: function () {
+		return this._container.threading;
+	},
+	set_threading: function(value) {
+		this._container.threading = value;
 	},
 	reset: function () {
 		this.set_tstatesPerIntrq(ZX_Settings.defaultValues.tstatesPerIntrq);
@@ -118,9 +173,17 @@ Object.assign(ZX_Settings.prototype, {
 		this.set_scaleType(ZX_Settings.defaultValues.scaleType);
 		this.set_scaleValue(ZX_Settings.defaultValues.scaleValue);
 		this.set_renderOnAnimationFrame(ZX_Settings.defaultValues.renderOnAnimationFrame);
+		this.set_beeper(ZX_Settings.defaultValues.beeper);
+		this.set_beeperVolume(ZX_Settings.defaultValues.beeperVolume);
 		this.set_psg(ZX_Settings.defaultValues.psg);
 		this.set_psgClock(ZX_Settings.defaultValues.psgClock);
-		this.set_psgBufferSize(ZX_Settings.defaultValues.psgBufferSize);
+		this.set_psgPacketSize(ZX_Settings.defaultValues.psgPacketSize);
+		this.set_psgTurboSound(ZX_Settings.defaultValues.psgTurboSound);
+		this.set_psgChannelLayout(ZX_Settings.defaultValues.psgChannelLayout);
+		this.set_psgVolume(ZX_Settings.defaultValues.psgVolume);
+		this.set_audioRenderer(ZX_Settings.defaultValues.audioRenderer);
+		this.set_audioBufferSize(ZX_Settings.defaultValues.audioBufferSize);
+		this.set_threading(ZX_Settings.defaultValues.threading);
 	}
 });
 ZX_Settings.defaultValues = {
@@ -138,9 +201,17 @@ ZX_Settings.defaultValues = {
 	drive1: '',
 	drive2: '',
 	drive3: '',
-	psg: 0,
+	beeper: true,
+	beeperVolume: 0.25,
+	psg: VAL_PSG_YM_2149,
 	psgClock: 1773400,
-	psgBufferSize: 0
+	psgPacketSize: 0,
+	psgTurboSound: VAL_TS_AUTO,
+	psgChannelLayout: VAL_CHANNELS_ABC,
+	psgVolume: 0.5,
+	audioRenderer: (isScriptProcessorNodeSupported() ? VAL_AUDIO_RENDERER_SPN : (isAudioWorkletNodeSupported() ? VAL_AUDIO_RENDERER_WLN : VAL_AUDIO_RENDERER_UNDEFINED)),
+	audioBufferSize: 0,
+	threading: VAL_THREADING_SINGLE
 };
 
 function ZX_StorableSettings() {
@@ -162,9 +233,17 @@ function ZX_StorableSettings() {
 		this._container.drive1 = this.readFromStorage('drive1');
 		this._container.drive2 = this.readFromStorage('drive2');
 		this._container.drive3 = this.readFromStorage('drive3');
+		this._container.beeper = this.readFromStorage('beeper');
+		this._container.beeperVolume = this.readFromStorage('beeperVolume');
 		this._container.psg = this.readFromStorage('psg');
 		this._container.psgClock = this.readFromStorage('psgClock');
-		this._container.psgBufferSize = this.readFromStorage('psgBufferSize');
+		this._container.psgPacketSize = this.readFromStorage('psgPacketSize');
+		this._container.psgTurboSound = this.readFromStorage('psgTurboSound');
+		this._container.psgChannelLayout = this.readFromStorage('psgChannelLayout');
+		this._container.psgVolume = this.readFromStorage('psgVolume');
+		this._container.audioRenderer = this.readFromStorage('audioRenderer');
+		this._container.audioBufferSize = this.readFromStorage('audioBufferSize');
+		this._container.threading = this.readFromStorage('threading');
 	};
 }
 extend(ZX_StorableSettings, ZX_Settings);
@@ -238,6 +317,14 @@ Object.assign(ZX_StorableSettings.prototype, {
 			return;
 			this.writeToStorage('drive' + index, value);
 	},
+	set_beeper: function (value) {
+		ZX_StorableSettings.superclass.set_drive.call(this, value);
+		this.writeToStorage('beeper', value);
+	},
+	set_beeperVolume: function (value) {
+		ZX_StorableSettings.superclass.set_beeperVolume.call(this, value);
+		this.writeToStorage('beeperVolume', value);
+	},
 	set_psg: function(value) {
 		ZX_StorableSettings.superclass.set_psg.call(this, value);
 		this.writeToStorage('psg', value);
@@ -246,8 +333,32 @@ Object.assign(ZX_StorableSettings.prototype, {
 		ZX_StorableSettings.superclass.set_psgClock.call(this, value);
 		this.writeToStorage('psgClock', value);
 	},
-	set_psgBufferSize: function(value) {
-		ZX_StorableSettings.superclass.set_psgBufferSize.call(this, value);
-		this.writeToStorage('psgBufferSize', value);
+	set_psgPacketSize: function(value) {
+		ZX_StorableSettings.superclass.set_psgPacketSize.call(this, value);
+		this.writeToStorage('psgPacketSize', value);
+	},
+	set_psgTurboSound: function (value) {
+		ZX_StorableSettings.superclass.set_psgTurboSound.call(this, value);
+		this.writeToStorage('psgTurboSound', value);
+	},
+	set_psgChannelLayout: function (value) {
+		ZX_StorableSettings.superclass.set_psgChannelLayout.call(this, value);
+		this.writeToStorage('psgChannelLayout', value);
+	},
+	set_psgVolume: function (value) {
+		ZX_StorableSettings.superclass.set_psgVolume.call(this, value);
+		this.writeToStorage('psgVolume', value);
+	},
+	set_audioRenderer: function(value) {
+		ZX_StorableSettings.superclass.set_audioRenderer.call(this, value);
+		this.writeToStorage('audioRenderer', value);
+	},
+	set_audioBufferSize: function(value) {
+		ZX_StorableSettings.superclass.set_audioBufferSize.call(this, value);
+		this.writeToStorage('audioBufferSize', value);
+	},
+	set_threading: function(value) {
+		ZX_StorableSettings.superclass.set_threading.call(this, value);
+		this.writeToStorage('threading', value);
 	}
 });

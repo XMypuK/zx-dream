@@ -1,0 +1,26 @@
+<include includeType="embed" source="common.js" />
+<include includeType="embed" source="settings.js" />
+<include includeType="embed" source="../ui/workspace.html" />
+<include includeType="embed" source="hw_connector_common.js" />
+<include includeType="embed" source="hw_connector_proxy.js" />
+
+<script type="text/javascript">
+
+if (!window.ZXContext) {
+    window.ZXContext = {};
+};
+Object.assign(window.ZXContext, {
+    settings: new ZX_StorableSettings(),
+    ui: {},
+    debugMode: (/(\&|\?)debug=?/).test(window.location.search),
+    hwConnector: new HWConnectorProxy(new Worker(ZX_Lang.WORKER_JS))
+});
+Promise.all([
+    ZXContext.hwConnector.get_workerReady()
+]).then(function () {
+	ZXContext.ui.workspace = new ZX_Workspace();
+	ZXContext.ui.workspace.init();
+    ZXContext.hwConnector.notifyMainReady();
+});
+
+</script>

@@ -1,5 +1,5 @@
 function VirtualDisplay(container) {
-	this._emulThread = VAL_EMUL_THREAD_MAIN;
+	this._threading = VAL_THREADING_SINGLE;
 	this._borderWidth = 16;
 	this._scale = 2;
 	this._scaleType = VAL_SCALE_METHOD_RENDER;
@@ -9,14 +9,14 @@ function VirtualDisplay(container) {
 	this._border = null;
 	this._screen5 = null;
 	this._screen7 = null;
-	this._onInitialized = new ZXEvent();
+	this._onInitialized = new ZX_Event();
 }
 Object.assign(VirtualDisplay.prototype, {
-	get_emulThread: function () {
-		return this._emulThread;
+	get_threading: function () {
+		return this._threading;
 	},
-	set_emulTrhead: function (value) {
-		this._emulThread = value;
+	set_threading: function (value) {
+		this._threading = value;
 	},
 	get_borderWidth: function () {
 		return this._borderWidth;
@@ -66,7 +66,7 @@ Object.assign(VirtualDisplay.prototype, {
 				scale: this._scale,
 				scaleType: this._scaleType,
 				rendererType: this._rendererType,
-				canvases: this._emulThread == VAL_EMUL_THREAD_MAIN
+				canvases: this._threading == VAL_THREADING_SINGLE
 					? [this._border, this._screen5, this._screen7]
 					: [this._border, this._screen5]
 			});
@@ -99,7 +99,7 @@ Object.assign(VirtualDisplay.prototype, {
 			this._screen5 = this._createCanvas(this._borderWidth, this._borderWidth, 256, 192, pixelScale, cssScale);
 			this._screen5.setAttribute('ref', 'screen5');
 		}
-		if (!this._screen7 && this._emulThread == VAL_EMUL_THREAD_MAIN) {
+		if (!this._screen7 && this._threading == VAL_THREADING_SINGLE) {
 			this._screen7 = this._createCanvas(this._borderWidth, this._borderWidth, 256, 192, pixelScale, cssScale);
 			this._screen7.setAttribute('ref', 'screen7')
 		}

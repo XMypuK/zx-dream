@@ -1,0 +1,26 @@
+<script type="text/javascript">
+
+(function (window) {
+    var VAL_THREADING_SINGLE = 0;
+    var VAL_THREADING_MULTIPLE = 1;
+
+    if (typeof Promise === 'undefined') {
+        document.write('<script type="text/javascript" src="/js/ie11.js"><' + '/script>');
+    }
+
+    var threading = typeof Worker !== 'undefined' ? VAL_THREADING_MULTIPLE : VAL_THREADING_SINGLE;
+    var defaultMode = /(\?|&)default=?(&|$)/.test(location.search);
+    if (!defaultMode && typeof localStorage !== 'undefined' && localStorage['opt_threading'] !== undefined) {
+        threading = +localStorage['opt_threading'];
+    }
+
+    if (threading === VAL_THREADING_MULTIPLE) {
+        document.write('<script type="text/javascript" src="/js/spectrum_ui.min.js"><' + '/script>');
+    }
+    else {
+        document.write('<script type="text/javascript" src="/js/ayumi.js"><' + '/script>');
+        document.write('<script type="text/javascript" src="/js/spectrum.min.js"><' + '/script>');
+    }
+})(window);
+
+</script>

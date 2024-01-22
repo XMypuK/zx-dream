@@ -145,27 +145,22 @@
 		
 		var $dlg = $("<?=server-browser?>");
 		var openResult$ = null;
-		var openResult$resolve = null;
-		var openResult$reject = null;
 		var model;
 
 		this.open = open;
 
 		function open() {
 			if (!openResult$) {
-				openResult$ = new Promise(function (resolve, reject) {
-					openResult$resolve = resolve;
-					openResult$reject = reject;
-				});
+				openResult$ = Promise.withResolvers();
 				init();
 			}
-			return openResult$;
+			return openResult$.promise;
 		}
 
 		function init() {
 			$dlg.dialog({
 				autoOpen: true,
-				title: 'Выберите образ TRD, FDI или SCL',
+				title: ZX_Lang.SB_TITLE,
 				modal: true,
 				width: 600,
 				height: 400,
@@ -174,7 +169,7 @@
 					$(this).remove(); 
 
 					if (openResult$) {
-						openResult$resolve();
+						openResult$.resolve();
 						openResult$ = null;
 					}
 				}
@@ -190,7 +185,7 @@
 				responseType: 'json'
 			}).then(function (data) {
 				if (!data || typeof data.length === 'undefined')
-					throw new Error('Неожиданный ответ от сервера.');
+					throw new Error(ZX_Lang.SB_UNEXPECTED_SERVER_RESONSE);
 				var files = data;
 				files.sort(function (file1, file2) {
 					if (file1.name < file2.name)
@@ -204,7 +199,7 @@
 
 		function onFileSelected(file) {
 			if (openResult$) {
-				openResult$resolve(file.name);
+				openResult$.resolve(file.name);
 				openResult$ = null;
 			}
 

@@ -22,9 +22,20 @@ function ZX_Snapshot () {
 	this.border = 0;
 	this.port_7ffd = 0;
 	this.trdos = 0;
+	this.psg = {
+		psg0: {
+			address: 0,
+			registers: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+		},
+		psg1: {
+			address: 0,
+			registers: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+		},
+		activePsg: 0
+	};
 }
 
-ZX_Snapshot.take = function (bus, cpu) {
+ZX_Snapshot.take = function (bus, cpu, psg) {
 	var snapshot = new ZX_Snapshot();
 	var cpuState = cpu.get_state();
 	snapshot.cpuState.af = cpuState.af;
@@ -62,10 +73,16 @@ ZX_Snapshot.take = function (bus, cpu) {
 		snapshot.memory[page] = memory_page;
 	}
 	bus.var_write('port_7ffd_value', port_7ffd);
+	var psgState = psg.getState();
+	snapshot.psg.psg0.address = psgState.psg0.address;
+	snapshot.psg.psg0.registers = psgState.psg0.registers.slice();
+	snapshot.psg.psg1.address = psgState.psg1.address;
+	snapshot.psg.psg1.registers = psgState.psg1.registers.slice();
+	snapshot.psg.activePsg = psgState.activePsg;
 	return snapshot;
 }
 
-ZX_Snapshot.restore = function (snapshot, bus, cpu) {
+ZX_Snapshot.restore = function (snapshot, bus, cpu, psg) {
 	bus.reset();
 	for ( var page = 0; page < 8; page++ ) {
 		if (snapshot.memory[page]) {
@@ -101,6 +118,18 @@ ZX_Snapshot.restore = function (snapshot, bus, cpu) {
 		prefix_cb: false
 	};
 	cpu.set_state(cpuState);
+	var psgState = { 
+		psg0: {
+			address: snapshot.psg.psg0.address,
+			registers: snapshot.psg.psg0.registers.slice()
+		}, 
+		psg1: {
+			address: snapshot.psg.psg1.address,
+			registers: snapshot.psg.psg1.registers.slice()
+		}, 
+		activePsg: snapshot.psg.activePsg
+	};
+	psg.setState(psgState);
 }
 
 ZX_Snapshot.createFromSNA48 = function ( sna_data ) {
@@ -154,7 +183,7 @@ ZX_Snapshot.createFromSNA48 = function ( sna_data ) {
 
 	function get_mem_byte( address ) {
 		if ( address < 0x4000 ) {
-			throw new Error('Incorrect RAM address');
+			throw new Error(ZX_Lang.ERR_INCORRECT_RAM_ADDRESS);
 		}
 		else if ( address < 0x8000 ) {
 			return snapshot.memory[5][address & 0x3fff];
@@ -234,7 +263,7 @@ ZX_Snapshot.createFromSNA = function( sna_data ) {
 			return ZX_Snapshot.createFromSNA128( sna_data );
 
 		default:
-			throw new Error('Неподдерживаемая длина файла');
+			throw new Error(ZX_Lang.ERR_SNAPSHOT_FILE_LENGTH_NOT_SUPPORTED);
 	}
 }
 
@@ -380,7 +409,7 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 	snapshot.border = (flags1 >> 1) & 0x07;
 	var samRomBasicMode = !!(flags1 & 0x10);
 	if (samRomBasicMode)
-		throw new Error('SamRom snapshots are not supported.');
+		throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_SAMROM_NOT_SUPPORTED);
 	snapshot.cpuState.de = stream.read() | (stream.read() << 8);
 	snapshot.cpuState.bc_ = stream.read() | (stream.read() << 8);
 	snapshot.cpuState.de_ = stream.read() | (stream.read() << 8);
@@ -410,7 +439,7 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 		case 23: ver = 2; break;
 		case 54:
 		case 55: ver = 3; break;
-		default: throw new Error('This version of Z80 snapshot is not supported. (Additional Header Length = ' + extraHeaderLength + '.)');
+		default: throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_VERSION_NOT_SUPPORTED + extraHeaderLength);
 	}
 	var memPageCount = 3;
 	var port_7ffd = 0x10;
@@ -432,20 +461,21 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 						break;
 	
 					case Z80_V2_HARDWARE_MODE.SCORPION_256:
-						memPageCount = 16; // port #1ffd is not supported though yet
+						memPageCount = 16; // port #1FFD is not supported though yet
 						port_7ffd = stream.read();
 						break;
 	
 					case Z80_V2_HARDWARE_MODE.SAM_RAM:
-						throw new Error('Currently, this hardware is not supported.');
+						throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_HARDWARE_NOT_SUPPORTED);
 	
 					default:
 						stream.seek(1, SeekOrigin.current); // skip port value
 						break;
 				}
 				stream.seek(1, SeekOrigin.current); // skip emulation flags
-				stream.seek(1, SeekOrigin.current); // skip port #FFFD value
-				stream.seek(16, SeekOrigin.current); // skip AY registers
+				snapshot.psg.psg0.address = stream.read();
+				snapshot.psg.psg0.registers = stream.readMultuple(16);
+				snapshot.psg.activePsg = 0;
 				break;
 	
 			case 3:
@@ -468,7 +498,7 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 						break;
 	
 					case Z80_V3_HARDWARE_MODE.SAM_RAM:
-						throw new Error('Currently, this hardware is not supported.');
+						throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_HARDWARE_NOT_SUPPORTED);
 	
 					default:
 						stream.seek(1, SeekOrigin.current); // skip port value
@@ -476,7 +506,7 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 				}
 				var ifIromPaged = stream.read();
 				if (ifIromPaged == 0xFF)
-					throw new Error('Currently, Interface I ROM is not supported.');
+					throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_INTERFACE_I_ROM_NOT_SUPPORTED);
 				stream.seek(1, SeekOrigin.current); // skip emulation flags
 				stream.seek(1, SeekOrigin.current); // skip port #FFFD value
 				stream.seek(16, SeekOrigin.current); // skip AY registers
@@ -484,14 +514,14 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 				stream.seek(1, SeekOrigin.current); // skip Spectator emulator flag
 				var mgtRom = stream.read();
 				if (mgtRom == 0xFF)
-					throw new Error('Currently, MGT ROM is not supported.');
+					throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_MGT_ROM_NOT_SUPPORTED);
 				var multifaceRom = stream.read();
 				if (mgtRom == 0xFF)
-					throw new Error('Currently, Multiface ROM is not supported.');
+					throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_MULTIFACE_ROM_NOT_SUPPORTED);
 				var rom_0000_1FFF = stream.read() == 0xFF;
 				var rom_2000_3FFF = stream.read() == 0xFF;
 				if (!rom_0000_1FFF || !rom_2000_3FFF)
-					throw new Error('Currently, RAM in the range #0000..#3FFF is not supported.');
+					throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_RAM_0000_3FFF_NOT_SUPPORTED);
 				stream.seek(20, SeekOrigin.current); // skip keyboard -> joystick key mappings
 				stream.seek(3, SeekOrigin.current); // skip MGT-related flags
 				if (extraHeaderLength == 55) {
@@ -513,7 +543,7 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 				var page = pages[i];
 				var pageData = stream.readMultuple(0x4000);
 				if (pageData.length < 0x4000)
-					throw new Error('Unexpected end of the file.');
+					throw new Error(ZX_Lang.ERR_UNEXPECTED_END_OF_STREAM);
 				snapshot.memory[page] = pageData;
 			}
 			break;
@@ -533,21 +563,21 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 						case 0:
 						case 1: 
 						case 2: 
-						case 11: throw new Error('Currently, no ROM loading is supported.');
+						case 11: throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_ROM_LOADING_NOT_SUPPORTED);
 						case 4: page = 2; break;
 						case 5: page = 0; break;
 						case 8: page = 5; break;
-						default: throw new Error('Page code ' + pageCode + ' is not supported in 48KB snapshot.');
+						default: throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_INVALID_RAM_PAGE_FOR_48K + pageCode);
 					}
 				}
 				else {
 					switch (pageCode) {
 						case 0:
 						case 1: 
-						case 2: throw new Error('Currently, no ROM loading is supported.');
+						case 2: throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_ROM_LOADING_NOT_SUPPORTED);
 						case 11: 
 							if (memPageCount <= 8) 
-								throw new Error('Currently, no ROM loading is supported.');
+								throw new Error(ZX_Lang.ERR_Z80_SNAPSHOT_ROM_LOADING_NOT_SUPPORTED);
 							page = pageCode - 3;
 							break;
 						default: 
@@ -557,7 +587,7 @@ ZX_Snapshot.createFromZ80 = function( z80_data ) {
 				}
 				var pageData = blockStream.readMultuple(0x4000);
 				if (pageData.length < 0x4000)
-					throw new Error('Unexpected end of the file.');
+					throw new Error(ZX_Lang.ERR_UNEXPECTED_END_OF_STREAM);
 				snapshot.memory[page] = pageData;
 			}
 			break;

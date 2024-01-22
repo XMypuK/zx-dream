@@ -62,12 +62,12 @@
 	}
 	.drive-box .status.error {
 		display: inline-block;
-		background-image: url('../images/error.png');
+		background-image: url('../img/error.png');
 		color: transparent;
 	}
 	.drive-box .status.loading {
 		display: inline-block;
-		background-image: url('../images/process.gif');
+		background-image: url('../img/process.gif');
 		color: transparent;
 	}
 
@@ -222,7 +222,7 @@
 
 			$letter.text(String.fromCharCode(0x41 + driveIndex));
 			if (status == DriveBoxStatus.empty) {
-				$title.text('<пусто>');
+				$title.text(ZX_Lang.DRIVE_EMPTY);
 			}
 			else {
 				$title.text(title);

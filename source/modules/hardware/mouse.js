@@ -4,7 +4,7 @@ function ZX_Mouse () {
 	var scrollPos = 0x0F; // 0 - 15
 	var x = 1; // 0 - 255
 	var y = 2; // 0 - 255
-	var _onAction = new ZXEvent();
+	var _onAction = new ZX_Event();
 	
 	function io_read_buttons(address) {
 		return ( scrollPos << 4 ) | buttons;

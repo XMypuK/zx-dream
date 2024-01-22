@@ -2,7 +2,7 @@ function ZX_Keyboard() {
 	"use strict";
 	
 	var _keyStates = [ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff ];
-	var _onKeysStateChanged = new ZXEvent();
+	var _onKeysStateChanged = new ZX_Event();
 
 	function switchKeys(keys, pressed) {
 		for ( var i = 0; i < keys.length; i++ ) {

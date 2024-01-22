@@ -1,10 +1,12 @@
+<include source="common.js" includeType="embed" />
+<include source="pc_keyboard.js" includeType="embed" />
+<include source="virtual_display.js" includeType="embed" />
+<include source="audio_output.js" includeType="embed" />
 <include source="drive_dispatcher.html" includeType="embed" />
 <include source="settings_dialog.html" includeType="embed" />
 <include source="create_image_dialog.html" includeType="embed" />
 <include source="save_image_dialog.html" includeType="embed" />
 <include source="server_browser.html" includeType="embed" />
-<include source="pc_keyboard.js" includeType="embed" />
-<include source="virtual_display.js" includeType="embed" />
 <include source="virtual_keyboard.html" includeType="embed" />
 <include source="virtual_mouse.html" includeType="embed" />
 <include source="about_dialog.html" includeType="embed" />
@@ -69,6 +71,52 @@
 		display: none;
 		width: 970px;
 	}
+
+    #errors {
+        display: block;
+        position: fixed;
+        right: 0;
+        bottom: 38px;
+        width: 23px;
+        height: 150px;
+        border: 3px solid #cccccc;
+        background-color: white;
+        overflow: hidden;
+        border-radius: 20px 0 0 20px;
+    }
+
+    #errors > .expander {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 20px;
+        background-color: #cccccc;
+        border-right: 3px solid #cccccc;
+        -ms-writing-mode: tb-rl;
+        writing-mode: tb;
+        text-orientation: upright;
+        text-align: center;
+        color: #444444;
+        cursor: pointer;
+        font-size: 0.9em;
+    }
+
+    #errors > #errorList {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 343px;
+        overflow-y: scroll;
+        display: none;
+        padding: 2px;
+    }
+
+    #errors.-expanded { width: 370px; }
+    #errors.-expanded > #errorList { display: block; }
+    #errorList > .error { font-size: 0.8em; color: red; margin-bottom: 1em; }
+    #errorList > .error > .timestamp { display: inline-block; margin-right: 0.5em; }
 </style>
 
 <template id="workspace">
@@ -94,12 +142,17 @@
 		<div id="debug_container">
 			<div id="debug"></div>
 		</div>
+        <div id="errors"><div class="expander"></div><div id="errorList"></div></div>
 	</div>
 </template>
 
 <script type="text/javascript">
     function ZX_Workspace() {
         var $workspace = $("<?=workspace?>");
+        var $errors = $workspace.find('#errors');
+        $errors.children('.expander').text(ZX_Lang.WORKSPACE_LOG).click(function () {
+            $errors.toggleClass('-expanded');
+        });
         var $display = $workspace.find('#display');
         var $vkeyb = $workspace.find('#vkeyb');
         var $vmouse = $workspace.find('#vmouse');
@@ -145,6 +198,7 @@
             initVirtualKeyboard();
             initVirtualMouse();
             initVirtualDisplay();
+            initAudioOutput();
             applySettings();
         }
 
@@ -156,17 +210,17 @@
         function initKeyboard() {
             ZXContext.ui.keyboard = new PCKeyboard();
             ZXContext.ui.keyboard.get_onKeysStateChanged().subscribe(function (args) {
-                ZXContext.hw.keyboard.switchKeys(args.keys, args.pressed);
+                ZXContext.hwConnector.switchKeyboardKeys(args.keys, args.pressed);
             });
         }
 
         function initVirtualKeyboard() {
 	        // подключение виртуальной клавиатуры
-            ZXContext.ui.vkeyboard = new VirtualKeyboard(control);
+            ZXContext.ui.vkeyboard = new VirtualKeyboard(vkeyb);
             ZXContext.ui.vkeyboard.get_onKeysStateChanged().subscribe(function (args) {
-                ZXContext.hw.keyboard.switchKeys(args.keys, args.pressed);
+                ZXContext.hwConnector.switchKeyboardKeys(args.keys, args.pressed);
             });
-            ZXContext.hw.keyboard.get_onKeysStateChanged().subscribe(function ( args ) {
+            ZXContext.hwConnector.get_onKeyboardKeysStateChanged().subscribe(function (args) {
                 for ( var i = 0; i < args.keys.length; i++ ) {
                     ZXContext.ui.vkeyboard.updateKeyState(args.keys[i], args.pressed);
                 }
@@ -175,15 +229,14 @@
 
         function initVirtualMouse() {
             // подключение виртуальной мыши
-            ZXContext.ui.vmouse = new VirtualMouse(control);
+            ZXContext.ui.vmouse = new VirtualMouse(vmouse);
             ZXContext.ui.vmouse.get_onKeyStateChanged().subscribe(function (args) {
-                ZXContext.hw.mouse.switchButton(args.key, args.pressed);
+                ZXContext.hwConnector.switchMouseButton(args.key, args.pressed);
             });
             ZXContext.ui.vmouse.get_onMove().subscribe(function (args) {
-                args.offsetX && ZXContext.hw.mouse.moveX(args.offsetX);
-                args.offsetY && ZXContext.hw.mouse.moveY(args.offsetY);
+                ZXContext.hwConnector.moveMouse(args.offsetX, args.offsetY);
             });
-            ZXContext.hw.mouse.get_onAction().subscribe(function (state) {
+            ZXContext.hwConnector.get_onMouseAction().subscribe(function (state) {
                 if (state.type == 'key') {
                     ZXContext.ui.vmouse.refreshKeyState(state.num, state.pressed);
                 }
@@ -193,7 +246,18 @@
         function initVirtualDisplay() {
             ZXContext.ui.vdisplay = new VirtualDisplay($display[0]);
             ZXContext.ui.vdisplay.get_onInitialized().subscribe(function (args) {
-                ZXContext.hw.display.bind(args.canvases);
+                ZXContext.hwConnector.bindVirtualDisplay(args.canvases);
+            });
+        }
+
+        function initAudioOutput() {
+            ZXContext.ui.audioOutput = new AudioOutput();
+            ZXContext.ui.audioOutput.get_onStateChanged().subscribe(function (state) {
+                $(document.body).toggleClass('-sound_on', state === AudioOutput.STATE.RUNNING);
+            });
+            ZXContext.ui.audioOutput.init();
+            ZXContext.hwConnector.get_onPsgDataReady().subscribe(function (args) {
+                ZXContext.ui.audioOutput.writeData(args.left, args.right, args.sampleCount);
             });
         }
 
@@ -227,7 +291,7 @@
         }
 
         function reset() {
-            ZXContext.hw.bus.reset();
+            ZXContext.hwConnector.reset();
         }
 
         function openSnapshot() {
@@ -238,22 +302,17 @@
                     return;
 
                 Promise.all([]).then(function () {
-                    var format = ((/\.(SNA|Z80)/i).exec(filename)[1] || '').toUpperCase();
-                    if (format != 'SNA' && format != 'Z80')
-                        throw new Error('Неподдерживаемый формат файла.');
+                    var formatMatch = (/\.(SNA|Z80)/i).exec(filename);
+                    var format = formatMatch && formatMatch[1].toUpperCase();
+                    if (format !== 'SNA' && format !== 'Z80')
+                        throw new Error(ZX_Lang.ERR_SNAPSHOT_FORMAT_NOT_SUPPORTED);
+
                     return loadLocalFile($input[0]).then(function (data) {
-                        var snapshot = null;
-                        switch (format) {
-                            case 'SNA': snapshot = ZX_Snapshot.createFromSNA(data); break;
-                            case 'Z80': snapshot = ZX_Snapshot.createFromZ80(data); break;
-                        }
-                        if (snapshot) {
-                            ZX_Snapshot.restore(snapshot, ZXContext.hw.bus, ZXContext.hw.cpu);
-                        }
+                        return ZXContext.hwConnector.restoreSnapshot(format, data);
                     })
                 }).catch(function (errorMessage) {
                     if (errorMessage) {
-                        alert(errorMessage);
+                        handleError(errorMessage);
                     }
                 });
             });
@@ -261,18 +320,39 @@
         }
 
         function saveSnapshot() {
-            var snapshot = ZX_Snapshot.take(ZXContext.hw.bus, ZXContext.hw.cpu);
-            var data = ZX_Snapshot.saveToSNA(snapshot);
-		    downloadBinaryData(data, 'snapshot.sna');
+            ZXContext.hwConnector.takeSnapshot().then(function (data) {
+                downloadBinaryData(data, 'snapshot.sna');
+            });
         }
 
         function openProperties() {
+            var threading = ZXContext.settings.get_threading();
             var dlg = new SettingsDialog();
             dlg.open().then(function (settingsChanged) {
                 if (settingsChanged) {
                     applySettings();
+                    if (ZXContext.settings.get_threading() !== threading) {
+                        window.location.reload();
+                    }
                 }
             });
+        }
+
+        function toggleSound() {
+            try {
+                if (!AudioOutput.isSupported())
+                    throw new Error(ZX_Lang.ERR_AUDIO_NOT_SUPPORTED);
+
+                var state = ZXContext.ui.audioOutput.get_state();
+                switch (state) {
+                    case AudioOutput.STATE.SUSPENDED: ZXContext.ui.audioOutput.set_state(AudioOutput.STATE.RUNNING); break;
+                    case AudioOutput.STATE.RUNNING: ZXContext.ui.audioOutput.set_state(AudioOutput.STATE.SUSPENDED); break;
+                    default: throw new Error(ZX_Lang.ERR_AUDIO_INVALID_STATE);
+                }
+            }
+            catch (error) {
+                handleError(error);
+            }
         }
 
         function about() {
@@ -280,27 +360,18 @@
         }
 
         function applySettings() {
-            var s = ZXContext.settings;
-            ZXContext.hw.bus.opt(OPT_TSTATES_PER_INTRQ, s.get_turboMode() ? s.get_tstatesPerIntrqTurbo() : s.get_tstatesPerIntrq());
-            ZXContext.hw.bus.opt(OPT_INTRQ_PERIOD, s.get_intrqPeriod());
-            ZXContext.hw.bus.opt(OPT_EXTENDED_MEMORY, s.get_extendedMemory());
-            ZXContext.hw.bus.opt(OPT_SEMICOLORS, s.get_semicolors());
-            ZXContext.hw.bus.opt(OPT_RENDERING_PARAMS, {
-                scale: s.get_scaleValue(),
-                scaleType: s.get_scaleType(),
-                rendererType: s.get_rendererType(),
-                renderOnAnimationFrame: s.get_renderOnAnimationFrame()
-            });
-            ZXContext.hw.psg.applySettings(
-                s.get_psg(),
-                s.get_psgClock(),
-                s.get_psgBufferSize()
-            );
+            ZXContext.hwConnector.propagateSettings(ZXContext.settings);
+            ZXContext.ui.vdisplay.set_threading(ZXContext.settings.get_threading());
             ZXContext.ui.vdisplay.init(
                 16, 
                 ZXContext.settings.get_scaleValue(), 
                 ZXContext.settings.get_scaleType(), 
                 ZXContext.settings.get_rendererType());
+            ZXContext.ui.audioOutput.set_rendererType(ZXContext.settings.get_audioRenderer());
+            ZXContext.ui.audioOutput.set_bufferSize(ZXContext.settings.get_audioBufferSize());
+            if (AudioOutput.isSupported()) {
+                ZXContext.ui.audioOutput.set_state(AudioOutput.STATE.RUNNING);
+            }
         }
     }
 </script>
