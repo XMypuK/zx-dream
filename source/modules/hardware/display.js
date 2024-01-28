@@ -357,7 +357,7 @@ Object.assign(RendererBase.prototype, {
 	bind: function (canvases) {
 		this._border = canvases[0];
 		this._borderCtx = this._border.getContext('2d', { alpha: false });
-		if (this._threading == VAL_THREADING_MULTIPLE) {
+		if (this._threading === VAL_THREADING_MULTIPLE) {
 			this._screen = canvases[1];
 			this._screenCtx = this._screen.getContext('2d', { alpha: false });
 			this._layer0 = this._createCanvas(this._screen.width, this._screen.height);
@@ -647,6 +647,7 @@ function WebGLRenderer() {
 		height: 1
 	};
 	this._glBuffer = new Float32Array(0x1800 * 24);
+	this._copyTexture = null;
 	WebGLRenderer.superclass.constructor.apply(this, arguments);
 }
 extend(WebGLRenderer, RendererBase);
@@ -693,19 +694,43 @@ Object.assign(WebGLRenderer.prototype, {
 
 		return program;
 	},
-	_vertexShaderSource: [
+	_copyVertexShaderSource: [
+		'attribute vec2 a_position;',
+		'varying vec2 v_coords;',
+
+		'void main() {',
+		'	vec2 clipCoords = (a_position * 2.0 - 1.0) * vec2(1.0, -1.0);',
+		'	gl_Position = vec4(clipCoords, 0.0, 1.0);',
+		'	v_coords = a_position;',
+		'}'
+	].join('\r\n'),
+	_copyFragmentShaderSource: [
+		'precision lowp float;',
+		'uniform sampler2D u_source;',
+		'varying vec2 v_coords;',
+
+		'void main() {',
+		'	gl_FragColor = texture2D(u_source, v_coords);',
+		'}'
+	].join('\r\n'),
+	_renderVertexShaderSource: [
 		"attribute vec4 a_params;",
+		"attribute vec2 a_sampleDimensions;",
+		"attribute float a_renderScale;",
+		"attribute float a_sampleScale;",
 		"attribute vec2 a_canvasResolution;",
 		"attribute vec2 a_samplesResolution;",
 		"varying vec2 v_sampleCoords;",
 
 		"void main() {",
-		"	vec2 clipCoords = (( a_params.xy / a_canvasResolution ) * 2.0 - 1.0) * vec2(1.0, -1.0);",
+		"   vec2 xy = a_params.xy * a_sampleDimensions * a_renderScale / a_canvasResolution;",
+		"   vec2 pq = a_params.pq * a_sampleDimensions * a_sampleScale / a_samplesResolution;",
+		"	vec2 clipCoords = (xy * 2.0 - 1.0) * vec2(1.0, -1.0);",
 		"	gl_Position = vec4(clipCoords, 0.0, 1.0);",
-		"	v_sampleCoords = a_params.pq / a_samplesResolution;",
+		"	v_sampleCoords = pq;",
 		"}"
 	].join('\r\n'),
-	_fragmentShaderSource: [
+	_renderFragmentShaderSource: [
 	    "precision lowp float;",
         "uniform sampler2D u_samples;",
         "varying vec2 v_sampleCoords;",
@@ -715,17 +740,29 @@ Object.assign(WebGLRenderer.prototype, {
 	    "}"
 	].join('\r\n'),
 	_glInitWebGLContext: function ( glContext ) {
-		var vertexShader = this._glCreateShader(glContext, glContext.VERTEX_SHADER, this._vertexShaderSource);
-		var fragmentShader = this._glCreateShader(glContext, glContext.FRAGMENT_SHADER, this._fragmentShaderSource);
+		var vertexShader = this._glCreateShader(glContext, glContext.VERTEX_SHADER, this._renderVertexShaderSource);
+		var fragmentShader = this._glCreateShader(glContext, glContext.FRAGMENT_SHADER, this._renderFragmentShaderSource);
 		var program = this._glCreateAndLinkProgram(glContext, [vertexShader, fragmentShader]);
 		glContext.useProgram(program);
 
 	    var buffer = glContext.createBuffer();
 	    glContext.bindBuffer(glContext.ARRAY_BUFFER, buffer);
 
+		glContext.bindAttribLocation(program, 0, 'a_params');
 		var paramsLocation = glContext.getAttribLocation(program, 'a_params');
 		glContext.enableVertexAttribArray(paramsLocation);
 		glContext.vertexAttribPointer(paramsLocation, 4, glContext.FLOAT, false, 0, 0);
+
+		var sampleDimensionsLocation = glContext.getAttribLocation(program, "a_sampleDimensions");
+		glContext.vertexAttrib2f(sampleDimensionsLocation, 8, 1);
+
+		var renderScaleLocation = glContext.getAttribLocation(program, 'a_renderScale');
+		var renderScale = ( this._scaleType == VAL_SCALE_METHOD_PRE || this._scaleType == VAL_SCALE_METHOD_RENDER ) ? this._scale : 1;
+		glContext.vertexAttrib1f(renderScaleLocation, renderScale);
+
+		var sampleScaleLocation = glContext.getAttribLocation(program, "a_sampleScale");
+		var sampleScale = ( this._scaleType == VAL_SCALE_METHOD_PRE ) ? this._scale : 1;
+		glContext.vertexAttrib1f(sampleScaleLocation, sampleScale);
 
 		var canvasResolutionLocation = glContext.getAttribLocation(program, 'a_canvasResolution');
 		glContext.vertexAttrib2f(canvasResolutionLocation, glContext.canvas.width, glContext.canvas.height);
@@ -734,6 +771,7 @@ Object.assign(WebGLRenderer.prototype, {
 		glContext.vertexAttrib2f(samplesResolutionLocation, this._samples.width, this._samples.height);
 
 	    var texture = glContext.createTexture();
+		glContext.activeTexture(glContext.TEXTURE0);
 	    glContext.bindTexture(glContext.TEXTURE_2D, texture);
 	    glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_S, glContext.CLAMP_TO_EDGE);
 	    glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_T, glContext.CLAMP_TO_EDGE);    
@@ -794,7 +832,40 @@ Object.assign(WebGLRenderer.prototype, {
 		}		
 	},
 	bind: function (canvases) {
-		WebGLRenderer.superclass.bind.call(this, canvases);
+		if (this._threading === VAL_THREADING_MULTIPLE) {
+			this._border = canvases[0];
+			this._borderCtx = this._border.getContext('2d', { alpha: false });
+
+			this._screen = canvases[1];
+			this._screenCtx = this._glGetContext(this._screen, { alpha: false });
+			var gl = this._screenCtx;
+			var copyVertexShader = this._glCreateShader(gl, gl.VERTEX_SHADER, this._copyVertexShaderSource);
+			var copyFragmentShader = this._glCreateShader(gl, gl.FRAGMENT_SHADER, this._copyFragmentShaderSource);
+			var copyProgram = this._glCreateAndLinkProgram(gl, [copyVertexShader, copyFragmentShader]);
+			gl.useProgram(copyProgram);
+
+			var positionBuffer = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0]), gl.STATIC_DRAW);
+
+			gl.bindAttribLocation(copyProgram, 0, 'a_position');
+			gl.enableVertexAttribArray(0);
+			gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+			this._copyTexture = gl.createTexture();
+			gl.activeTexture(gl.TEXTURE0);
+			gl.bindTexture(gl.TEXTURE_2D, this._copyTexture);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);    
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+			this._layer0 = this._createCanvas(this._screen.width, this._screen.height);
+			this._layer1 = this._createCanvas(this._screen.width, this._screen.height);
+		}
+		else {
+			WebGLRenderer.superclass.bind.call(this, canvases);
+		}
 		this._layer0Ctx = this._glGetContext(this._layer0, { preserveDrawingBuffer: true, alpha: false });
 		this._layer1Ctx = this._glGetContext(this._layer1, { preserveDrawingBuffer: true, alpha: false });
 		if ( !this._layer0Ctx || !this._layer1Ctx )
@@ -805,10 +876,6 @@ Object.assign(WebGLRenderer.prototype, {
 	},
 	drawData: function (layer, data, dirty, flashInversion, semicolors) {
 		var 
-			renderScale = ( this._scaleType == VAL_SCALE_METHOD_PRE || this._scaleType == VAL_SCALE_METHOD_RENDER ) ? this._scale : 1,
-			sampleParams = this._sampleParams,
-			dw = 8 * renderScale,
-			dh = 1 * renderScale,
 			semicolorsMask = semicolors ? 0x00 : 0x40,
 			flashInversionMask = flashInversion ? 0xFF : 0x7F,
 			ctx = layer ? this._layer1Ctx : this._layer0Ctx;
@@ -818,26 +885,26 @@ Object.assign(WebGLRenderer.prototype, {
 			for (var address = 0; address < 0x1800; address++) {
 				if (dirty[address]) {
 					var 
-						x = (address & 0x1F) << 3, // 0, 8, 16, ..., 240
+						x = (address & 0x1F), // 0, 1, 2, ..., 31
 						y = ((address >> 5) & 0xC0) | ((address >> 2) & 0x38) | ((address >> 8) & 0x07), // 0, 1, 2, ..., 191
 						attr = ZX_Display.inversionTable[data[0x1800 | ((address >> 3) & 0x0300) | (address & 0xFF)] & flashInversionMask | semicolorsMask],
-						dl = x * renderScale,
-						dr = dl + dw,
-						dt = y * renderScale,
-						db = dt + dh,
-						sl = data[address] * sampleParams.width,
-						sr = sl + sampleParams.width,
-						st = attr * sampleParams.height,
-						sb = st + sampleParams.height;
+						p = x+1,
+						q = y+1,
+						sx = data[address],
+						sp = sx+1,
+						sy = attr
+						sq = sy+1,
+						glData = [
+							x, y, sx, sy,
+							p, y, sp, sy,
+							p, q, sp, sq,
+							x, y, sx, sy,
+							x, q, sx, sq,
+							p, q, sp, sq
+						];
 
-					this._glBuffer.set([
-						dl, dt, sl, st,
-						dr, dt, sr, st,
-						dr, db, sr, sb,
-						dl, dt, sl, st,
-						dl, db, sl, sb,
-						dr, db, sr, sb
-					], glBufferIndex);
+					this._glBuffer.set(glData, glBufferIndex);
+					glData.length = 0;
 					glBufferIndex += 24;
 					dirty[address] = 0;
 				}
@@ -846,7 +913,13 @@ Object.assign(WebGLRenderer.prototype, {
 				ctx.bufferData(ctx.ARRAY_BUFFER, this._glBuffer, ctx.STATIC_DRAW);
 				ctx.drawArrays(ctx.TRIANGLES, 0, glBufferIndex >> 2);
 				ctx.flush();
+				ctx.finish();
 			}
 		}
+	},
+	copyLayerToScreen: function (layer) {
+		var gl = this._screenCtx;
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, layer ? this._layer1 : this._layer0);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 	}
 });
