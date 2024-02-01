@@ -17,7 +17,7 @@ DasmRecord.prototype = {
     },
 
     get_fullMnemonics: function () {
-        return fullMnemonics = this.mn.replace(/(addr|val16)|(val8|port)|(?:\+\s*offs)/gi, function (m, val16, val8, offs) {
+        return this.mn.replace(/(addr|val16)|(val8|port)|(?:\+\s*offs)/gi, function (m, val16, val8, offs) {
             var operands = this.operands;
             if (val16)
                 return DebugUtils.wordToString(operands[val16]);

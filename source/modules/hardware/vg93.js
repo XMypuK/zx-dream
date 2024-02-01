@@ -884,6 +884,7 @@ function VG93(clock) {
         var _opStage = null;
         var _idCrc = null;
         var _rwCounter = 0;
+        var _crc = null;
         var _dataMarkerMaxDistance = null;
         var _dataBytesLength = 0;
         var _dataCrc = null;
@@ -968,7 +969,6 @@ function VG93(clock) {
                     if (marker && marker >= 0xFC && marker <= 0xFF) {
                         _opStage = OP_STAGE.READ_ID;
                         _rwCounter = 0;
-                        _id = new Array(6);
                         _crc = new CRC16();
                         _doubleDensity && _crc.addArray([0xA1, 0xA1, 0xA1]);
                         _crc.add(nextByte);
@@ -1101,6 +1101,7 @@ function VG93(clock) {
         var _opStage = null;
         var _idCrc = null;
         var _rwCounter = 0;
+        var _crc = null;
         var _dataBytesLength = 0;
         var _indexPulsesEncountered = 0;
         var _fmSync = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
@@ -1195,7 +1196,6 @@ function VG93(clock) {
                         if (marker && marker >= 0xFC && marker <= 0xFF) {
                             _opStage = OP_STAGE.READ_ID;
                             _rwCounter = 0;
-                            _id = new Array(6);
                             _crc = new CRC16();
                             _doubleDensity && _crc.addArray([0xA1, 0xA1, 0xA1]);
                             _crc.add(nextByte);
@@ -1446,7 +1446,6 @@ function VG93(clock) {
                 if (marker && marker >= 0xFC && marker <= 0xFF) {
                     _idDetected = 1;
                     _rwCounter = 0;
-                    _id = new Array(6);
                     _crc = new CRC16();
                     _doubleDensity && _crc.addArray([0xA1, 0xA1, 0xA1]);
                     _crc.add(nextByte);
@@ -1621,7 +1620,6 @@ function VG93(clock) {
                 if (marker && marker >= 0xFC && marker <= 0xFF) {
                     _idDetected = 1;
                     _rwCounter = 0;
-                    _id = new Array(6);
                     _crc = new CRC16();
                     _doubleDensity && _crc.addArray([0xA1, 0xA1, 0xA1]);
                     _crc.add(nextByte);

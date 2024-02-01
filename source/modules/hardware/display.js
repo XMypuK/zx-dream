@@ -892,7 +892,7 @@ Object.assign(WebGLRenderer.prototype, {
 						q = y+1,
 						sx = data[address],
 						sp = sx+1,
-						sy = attr
+						sy = attr,
 						sq = sy+1,
 						glData = [
 							x, y, sx, sy,

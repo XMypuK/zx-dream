@@ -157,7 +157,7 @@ function base64Encode( data ) {
 			}
 		}
 
-		for ( c = 0; c < count; c++ ) {
+		for ( var c = 0; c < count; c++ ) {
 			res += abc.charAt(( buf >> (( 3 - c ) * 6 )) & 0x3f );
 		}
 	}
