@@ -216,7 +216,7 @@ ZX_Settings.defaultValues = {
 
 function ZX_StorableSettings() {
 	ZX_StorableSettings.superclass.constructor.apply(this, arguments);
-	this._defaultMode = /(\?|&)default=?(&|$)/.test(window.location.search);
+	this._defaultMode = /(\?|&)default=?(&|$)/.test(location.search);
 
 	if (!this._defaultMode) {
 		this._container.semicolors = this.readFromStorage('semicolors');
