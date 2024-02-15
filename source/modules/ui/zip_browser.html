@@ -1,0 +1,94 @@
+<style>
+    .zip-browser { }
+    .zip-browser > .zip-entries { list-style-type: none; margin: 0; padding: 0; }
+    .zip-browser > .zip-entries > .zip-file { margin: 0; padding: 0; }
+    .zip-browser > .zip-entries > .zip-file > a { display: block; padding: 2px 5px; cursor: pointer; }
+    .zip-browser > .zip-entries > .zip-file > a:hover { background-color: #0088ff; color: #ffffff; }
+    .ui-dialog .zip-browser {
+		border-radius: 0 0 10px 10px;
+		-moz-border-radius: 0 0 10px 10px;
+		-webkit-border-radius: 0 0 10px 10px;
+		padding: 0.5em;
+	}
+</style>
+
+<template id="zip-browser">
+    <div class="zip-browser">
+        <!-- ko if: entries().length > 0 -->
+        <ul class="zip-entries" data-bind="foreach: entries">
+            <li class="zip-file"><a data-bind="text: filename, click: $parent.onFileClick"></a></li>
+        </ul>
+        <!-- /ko -->
+        <!-- ko if: entries().length == 0 -->
+        <span data-bind="text: ZX_Lang.ZB_NO_SUITABLE_IMAGES"></span>
+        <!-- /ko -->
+    </div>
+</template>
+
+<script type="text/javascript">
+    function ZipBrowser() {
+        this.entries = ko.observableArray([]);
+
+        this._zipData = null;
+        this._supportedExtensions = [];
+        this._$dlg = $("<?=zip-browser?>");
+        this._openResult$ = null;
+        this.open = function (zipData, supportedExtensions) {
+            this._openResult$ = Promise.withResolvers();
+            this._$dlg.dialog({
+                autoOpen: true,
+                title: ZX_Lang.ZB_TITLE,
+                modal: true,
+                width: 600,
+                height: 400,
+                close: function (e) {
+                    $(this).dialog('destroy').remove();
+                    if (this._openResult$) {
+                        this._openResult$.resolve();
+                        this._openResult$ = null;
+                    }
+                }.bind(this)
+            });
+            this._$dlg.on('keydown', function (e) { e.stopPropagation(); });
+            this._$dlg.on('keyup', function (e) { e.stopPropagation(); });
+            ko.applyBindings(this, this._$dlg[0]);
+
+            this._zipData = new Uint8Array(zipData);
+            this._supportedExtensions = supportedExtensions;
+            this.displayFiles();
+
+            return this._openResult$.promise;
+        };
+
+        this.displayFiles = function () {
+            if (!this._zipData)
+                return;
+
+            var zipReader = new zip.ZipReader(new zip.Uint8ArrayReader(this._zipData));
+            zipReader.getEntries({ filenameEncoding: 'utf-8' }).then(function (entries) {
+                var extensions = this._supportedExtensions.map(function (ext) { return ext.toLowerCase(); });
+                this.entries(entries.filter(function (entry) { 
+                    if (entry.directory)
+                        return false;
+                    var extMatch = /\.[^\.]+$/.exec(entry.filename);
+                    var ext = extMatch && extMatch[0].toLowerCase() || '';
+                    return extensions.indexOf(ext) >= 0;
+                }));
+            }.bind(this)).catch(handleError);
+        }
+
+        this.onFileClick = function (entry) {
+            entry.getData(new zip.Uint8ArrayWriter(), {}).then(function (data) {
+                if (this._openResult$) {
+                    this._openResult$.resolve({
+                        filename: /(?<=^|\\|\/)[^\\\/]+$/.exec(entry.filename)[0],
+                        data: data
+                    });
+                    this._openResult$ = null;
+                    this._$dlg.dialog('close');
+                    this._$dlg = null;
+                }
+            }.bind(this));
+        }.bind(this);
+    }
+</script>

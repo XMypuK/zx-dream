@@ -1,6 +1,7 @@
 # ZX-Dream
 [Русский](#russian)  
-[English](#english)  
+[English](#english)
+[Lincense](#license)
 
 ----------
 
@@ -106,6 +107,7 @@ This project is under [MIT License](LICENSE)
 
 <table>
     <tr><th><a href='https://github.com/alexanderk23/ayumi-js'>ayumi-js</a></th><td>Author: Peter Sovietov<br />Javascript version: Alexander Kovalenko</td><td><a href='https://raw.githubusercontent.com/alexanderk23/ayumi-js/master/LICENSE'>MIT license</a></td></tr>
+    <tr><th><a href="https://gildas-lormeau.github.io/zip.js/">zip.js</a></th><td>Copyright (c) 2023, Gildas Lormeau</td><td><a href="https://raw.githubusercontent.com/gildas-lormeau/zip.js/master/LICENSE">BSD 3-Clause License</a></td></tr>
     <tr><th><a href='https://knockoutjs.com/'>Knockout</a></th><td>Copyright (c) 2010 Steven Sanderson, the Knockout.js team, and other contributors</td><td><a href='https://raw.githubusercontent.com/knockout/knockout/master/LICENSE'>MIT license</a></td></tr>
     <tr><th><a href='https://jquery.com/'>jQuery</a></th><td>Copyright OpenJS Foundation and other contributors</td><td><a href='https://raw.githubusercontent.com/jquery/jquery/main/LICENSE.txt'>MIT license</a></td></tr>
 </table>

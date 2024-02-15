@@ -84,21 +84,40 @@ function ZX_DriveDispatcher(toolbar) {
     }
 
     function openLocal(driveIndex, driveBox) {
-        var $input = $('<input type="file" accept=".trd,.scl,.fdi,.td0,.udi,.dsk" style="visibility: hidden;" />').appendTo(document.body);
+        var supportedExtensions = ['.trd', '.scl', '.fdi', '.td0', '.udi', '.dsk'];
+        var $input = $('<input type="file" accept="' + supportedExtensions.join(',') + ',.zip" style="visibility: hidden;" />').appendTo(document.body);
         $input.on('change', function (e) {
             var filename = ($input.val() || '').replace(/^.*[\\\/]/, '');
             if (!filename)
                 return;
+            var driveBoxOriginalStatus = driveBox.get_status();
             Promise.all([]).then(function () {
-                var format  = DiskImageFormat.getFromFileName(filename);
                 driveBox.set_status(DriveBoxStatus.loading);
-                return loadLocalFile($input[0]).then(function (data) {
-                    return ZXContext.hwConnector.setDriveImage(driveIndex, filename, data).then(function () {
-                        driveBox.set_status(DriveBoxStatus.loaded);
-                        driveBox.set_title(filename);
-                        ZXContext.settings.set_drive(driveIndex, 'local:' + filename);
-                        createImageCache(driveIndex, filename, data);
+                if (/\.zip$/i.test(filename)) {
+                    return loadLocalFile($input[0]).then(function (data) {
+                        var zipBrowser = new ZipBrowser();
+                        return zipBrowser.open(data, supportedExtensions);
                     });
+                }
+                else {
+                    var format = DiskImageFormat.getFromFileName(filename);
+                    return loadLocalFile($input[0]).then(function (data) {
+                        return {
+                            filename: filename, 
+                            data: data
+                        };
+                    });
+                }
+            }).then(function (imageInfo) {
+                if (!imageInfo) {
+                    driveBox.set_status(driveBoxOriginalStatus);
+                    return;
+                }
+                return ZXContext.hwConnector.setDriveImage(driveIndex, imageInfo.filename, imageInfo.data).then(function () {
+                    driveBox.set_status(DriveBoxStatus.loaded);
+                    driveBox.set_title(imageInfo.filename);
+                    ZXContext.settings.set_drive(driveIndex, 'local:' + imageInfo.filename);
+                    createImageCache(driveIndex, imageInfo.filename, imageInfo.data);
                 });
             }).catch(function (errorMessage) {
                 if (errorMessage) {

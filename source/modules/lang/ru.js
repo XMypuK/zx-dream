@@ -62,6 +62,9 @@ var ZX_Lang = {
     SB_TITLE: 'Выберите образ TRD, FDI, SCL, UDI, TD0',
     SB_UNEXPECTED_SERVER_RESONSE: 'Неожиданный ответ от сервера.',
 
+    ZB_TITLE: 'Выберите образ TRD, FDI, SCL, UDI, TD0',
+    ZB_NO_SUITABLE_IMAGES: 'Архив не содержит поддерживаемых образов.',
+
     DRIVE_EMPTY: '<пусто>',
     DRIVE_MENU_OPEN_FORM_SERVER: 'открыть с сервера...',
     DRIVE_MENU_OPEN_FORM_LOCAL: 'открыть с дикска...',
