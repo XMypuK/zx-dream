@@ -1,7 +1,7 @@
 # ZX-Dream
 [Русский](#russian)  
-[English](#english)
-[Lincense](#license)
+[English](#english)  
+[License](#license)
 
 ----------
 
