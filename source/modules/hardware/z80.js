@@ -26,6 +26,9 @@ function ZX_Z80 () {
     var f_ = new Flags();
     var regs_ = new RegSet();
 
+    var q = 0;
+    var memptr = 0;
+
     function Flags() {
         var self = this;
 
@@ -342,7 +345,9 @@ function ZX_Z80 () {
         sp = ( sp - 2 ) & 0xffff;
         write_mem_word(sp, pc);
         pc = 0x0066;
+        memptr = pc;
 
+        q = 0;
         ts_cnt += 5;
 
         return true;
@@ -423,7 +428,9 @@ function ZX_Z80 () {
                 sp = ( sp - 2 ) & 0xffff;
                 write_mem_word(sp, pc);
                 pc = hnd_addr;
+                memptr = pc;
 
+                q = 0;
                 ts_cnt += 1;
 
                 break;
@@ -442,8 +449,15 @@ function ZX_Z80 () {
                 // LD R, A
                 var subcode = (opcode >> 3) & 0x03;
                 switch (subcode) {
-                    case 0x00: i = a; break;
-                    case 0x01: r = a; break;
+                    case 0x00: 
+                        i = a; 
+                        q = 0;
+                        break;
+
+                    case 0x01: 
+                        r = a; 
+                        q = 0;
+                        break;
 
                     case 0x02: 
                         a = i;
@@ -454,6 +468,7 @@ function ZX_Z80 () {
                         f.x = a & 0x08;
                         f.p = get_iff2();
                         f.n = 0;
+                        q = 1;
                         break;
 
                     case 0x03: 
@@ -465,6 +480,7 @@ function ZX_Z80 () {
                         f.x = a & 0x08;
                         f.p = get_iff2();
                         f.n = 0;
+                        q = 1;
                         break;
                 }
 
@@ -502,7 +518,8 @@ function ZX_Z80 () {
                     }
                     write_mem_word(addr, value);
                 }
-
+                q = 0;
+                memptr = (addr + 1) & 0xFFFF;
                 return;
             }
 
@@ -544,11 +561,17 @@ function ZX_Z80 () {
                 f.x = ( _undoc_support & 0x08 );
                 f.p = cur_bc; // != 0
                 f.n = 0;
+                q = 1;
 
                 ts_cnt += 2;
 
                 if ( repeat && cur_bc ) {
                     pc = ( pc - 2 ) & 0xffff;
+                    // https://spectrumcomputing.co.uk/forums/viewtopic.php?t=6102
+                    // https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags
+                    f.y = pc & 0x2000;
+                    f.x = pc & 0x0800;
+                    memptr = (pc + 1) & 0xFFFF;
                     ts_cnt += 5;
                 }
 
@@ -574,9 +597,11 @@ function ZX_Z80 () {
 
                 if (increment) {
                     cur_hl = (cur_hl + 1) & 0xffff;
+                    memptr = (memptr + 1) & 0xFFFF;
                 }
                 else {
                     cur_hl = (cur_hl - 1) & 0xffff;
+                    memptr = (memptr - 1) & 0xFFFF;
                 }
 
                 cur_bc = (cur_bc - 1) & 0xffff;
@@ -592,11 +617,17 @@ function ZX_Z80 () {
                 f.x = ( _undoc_support & 0x08 );
                 f.p = cur_bc; // != 0
                 f.n = 1;
+                q = 1;
 
                 ts_cnt += 5;
 
                 if ( repeat && cur_bc && cmp_res ) {
                     pc = ( pc - 2 ) & 0xffff;
+                    // https://spectrumcomputing.co.uk/forums/viewtopic.php?t=6102
+                    // https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags
+                    f.y = pc & 0x2000;
+                    f.x = pc & 0x0800;
+                    memptr = (pc + 1) & 0xFFFF;
                     ts_cnt += 5;
                 }
 
@@ -618,7 +649,8 @@ function ZX_Z80 () {
                 f.x = a & 0x08;
                 f.p = old_a == 0x80;
                 f.n = 1;
-                f.c = !old_a;
+                f.c = !!old_a;
+                q = 1;
 
                 return;
             }
@@ -632,7 +664,7 @@ function ZX_Z80 () {
 
                 set_imfa(!!(opcode & 0x10));
                 set_imfb(!!(opcode & 0x08));
-
+                q = 0;
                 return;
             }
 
@@ -689,6 +721,8 @@ function ZX_Z80 () {
                     f.n = 1;
                     f.c = borrow;
                 }
+                q = 1;
+                memptr = (current + 1) & 0xFFFF;
 
                 ts_cnt += 7;
 
@@ -714,7 +748,8 @@ function ZX_Z80 () {
                     a = ( a & 0xf0 ) | temp;
                 }
 
-                write_mem_byte(get_hl(), cur_mem);
+                var addr = get_hl();
+                write_mem_byte(addr, cur_mem);
                 f.s = a & 0x80;
                 f.z = !a;
                 f.y = a & 0x20;
@@ -723,6 +758,8 @@ function ZX_Z80 () {
                 f.p = get_parity(a);
                 f.n = 0;
 
+                q = 1;
+                memptr = (addr + 1) & 0xFFFF;
                 ts_cnt += 4;
 
                 return;
@@ -739,7 +776,8 @@ function ZX_Z80 () {
                 if (!(opcode & 0x08)) {
                     set_iff1(get_iff2());
                 }
-
+                q = 0;
+                memptr = pc;
                 return;
             }
 
@@ -753,9 +791,10 @@ function ZX_Z80 () {
                 var r1 = (opcode >> 3) & 0x07;
                 var cmd_in = !(opcode & 0x01);
 
+                var addr = get_bc();
                 if (cmd_in) {
                     // IN
-                    var value = read_io_byte(get_bc());
+                    var value = read_io_byte(addr);
                     switch (r1) {
                         case 0x00: regs.b = value; break;
                         case 0x01: regs.c = value; break;
@@ -773,6 +812,7 @@ function ZX_Z80 () {
                     f.x = value & 0x08;
                     f.p = get_parity(value);
                     f.n = 0;
+                    q = 1;
                 }
                 else {
                     // OUT
@@ -787,8 +827,10 @@ function ZX_Z80 () {
                         case 0x07: value = a; break;
                     }
 
-                    write_io_byte(get_bc(), value);
+                    write_io_byte(addr, value);
+                    q = 0;
                 }
+                memptr = (addr + 1) & 0xFFFF;
 
                 return;
             }
@@ -817,10 +859,12 @@ function ZX_Z80 () {
                 if (cmd_in) {
                     data = read_io_byte(( new_b << 8 ) | regs.c ); // именно new_b
                     write_mem_byte(cur_hl, data);
+                    memptr = (((old_b << 8) | regs.c) + (increment ? 1 : -1)) & 0xFFFF;
                 }
                 else {
                     data = read_mem_byte(cur_hl);
                     write_io_byte(( regs.b << 8 ) | regs.c, data);
+                    memptr = (((new_b << 8) | regs.c) + (increment ? 1 : -1)) & 0xFFFF;
                 }
 
                 regs.b = new_b;
@@ -834,21 +878,34 @@ function ZX_Z80 () {
                 f.x = regs.b & 0x08;
                 f.n = data & 0x80;
 
-                var _undoc_support;
+                var temp;
                 if ( cmd_in ) {
-                    _undoc_support = cur_hl + (( regs.c + ( increment ? 1 : -1 )) & 0xff );
+                    temp = data + (( regs.c + ( increment ? 1 : -1 )) & 0xFF);
                 }
                 else {
-                    _undoc_support = data + ( cur_hl & 0xff );
+                    temp = data + ( new_hl & 0xFF );
                 }
-                f.h = _undoc_support > 255;
-                f.c = _undoc_support > 255;
-                f.p = ( _undoc_support & 7 ) ^ old_b;                
+                f.h = temp > 255;
+                f.c = temp > 255;
+                var pv = ( temp & 7 ) ^ regs.b;
+                f.p = get_parity(pv);
 
+                q = 1;
                 ts_cnt += 1;
 
                 if ( repeat && regs.b ) {
                     pc = ( pc - 2 ) & 0xffff;
+                    // https://spectrumcomputing.co.uk/forums/viewtopic.php?t=6102
+                    // https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags
+                    f.y = pc & 0x2000;
+                    f.x = pc & 0x0800;
+                    var temp2 = regs.b;
+                    if (f.c) {
+                        temp2 = (temp2 + (f.n ? -1 : 1)) & 0xFF;
+                        f.h = (temp2 ^ regs.b) & 0x10;
+                    }
+                    pv ^= (temp2 & 7);
+                    f.p = get_parity(pv);
                     ts_cnt += 5;
                 }
 
@@ -987,13 +1044,15 @@ function ZX_Z80 () {
                 }
 
                 if (prefix_ix) {
-                    write_mem_byte((ix + index_offset_cache) & 0xffff, result);
-
+                    var index_address = (ix + index_offset_cache) & 0xFFFF;
+                    write_mem_byte(index_address, result);
+                    memptr = index_address;
                     ts_cnt += 6;
                 }
                 else if (prefix_iy) {
-                    write_mem_byte((iy + index_offset_cache) & 0xffff, result);   
-
+                    var index_address = (iy + index_offset_cache) & 0xFFFF;
+                    write_mem_byte(index_address, result);   
+                    memptr = index_address;
                     ts_cnt += 6;
                 }
 
@@ -1023,6 +1082,7 @@ function ZX_Z80 () {
                 f.p = get_parity(result);
                 f.n = 0;
                 f.c = extra;
+                q = 1;
 
                 return;
             }
@@ -1039,15 +1099,15 @@ function ZX_Z80 () {
                 var value;
                 var index_address;
                 if (prefix_ix) {
-                    index_address = ( ix + index_offset_cache ) & 0xffff;
+                    index_address = ( ix + index_offset_cache ) & 0xFFFF;
                     value = read_mem_byte(index_address);
-
+                    memptr = index_address;
                     ts_cnt += 6;
                 }
                 else if (prefix_iy) {
-                    index_address = ( iy + index_offset_cache ) & 0xffff;
+                    index_address = ( iy + index_offset_cache ) & 0xFFFF;
                     value = read_mem_byte(index_address);
-
+                    memptr = index_address;
                     ts_cnt += 6;
                 }
                 else {
@@ -1071,14 +1131,24 @@ function ZX_Z80 () {
                 var mask = 0x01 << bit;
                 var res = value & mask;
 
-                // не реализованы недокументированные эффекты команды BIT b, (HL) на флаги x и y
-                f.s = res & 0x80;   
+                f.s = (res & 0x80);
                 f.z = !res; 
-                f.y = ( prefix_ix || prefix_iy ) ? ( index_address & 0x2000 ) : ( res & 0x20 ); 
                 f.h = 1;    
-                f.x = ( prefix_ix || prefix_iy ) ? ( index_address & 0x0800 ) : ( res & 0x08 ); 
                 f.p = !res; 
                 f.n = 0;    
+                if ( prefix_ix || prefix_iy ) {
+                    f.y = index_address & 0x2000;
+                    f.x = index_address & 0x0800;
+                }
+                else if (r_dst == 0x06) {
+                    f.y = memptr & 0x2000;
+                    f.x = memptr & 0x0800;
+                }
+                else {
+                    f.y = value & 0x20;
+                    f.x = value & 0x08;
+                }
+                q = 1;
 
                 return;
             }
@@ -1131,13 +1201,15 @@ function ZX_Z80 () {
                 }
 
                 if (prefix_ix) {
-                    write_mem_byte(( ix + index_offset_cache ) & 0xffff, value);
-
+                    var index_address = ( ix + index_offset_cache ) & 0xFFFF;
+                    write_mem_byte(index_address, value);
+                    memptr = index_address;
                     ts_cnt += 6;
                 }
                 else if (prefix_iy) {
-                    write_mem_byte(( iy + index_offset_cache ) & 0xffff, value);
-
+                    var index_address = ( iy + index_offset_cache ) & 0xFFFF;
+                    write_mem_byte(index_address, value);
+                    memptr = index_address;
                     ts_cnt += 6;
                 }
 
@@ -1158,7 +1230,7 @@ function ZX_Z80 () {
 
                     case 0x07: a = value; break;
                 }
-
+                q = 0;
                 return;
             }
 
@@ -1168,7 +1240,7 @@ function ZX_Z80 () {
 
         if (opcode == 0) {
             // NOP                  ( 4 )
-
+            q = 0;
             return;
         }
 
@@ -1192,7 +1264,7 @@ function ZX_Z80 () {
                 pc = ( pc - 1 ) & 0xffff;
 
                 // ( 4 )
-
+                q = 0;
                 return;
             }
 
@@ -1231,13 +1303,13 @@ function ZX_Z80 () {
                     if (prefix_ix) {
                         var offset = byte_to_svalue(read_operand_byte());
                         addr = (ix + offset) & 0xffff;
-
+                        memptr = addr;
                         ts_cnt += 5;
                     }
                     else if (prefix_iy) {
                         var offset = byte_to_svalue(read_operand_byte());
                         addr = (iy + offset) & 0xffff;
-
+                        memptr = addr;
                         ts_cnt += 5;
                     }
                     else {
@@ -1283,13 +1355,13 @@ function ZX_Z80 () {
                     if (prefix_ix) {
                         var offset = byte_to_svalue(read_operand_byte());
                         addr = (ix + offset) & 0xffff;
-
+                        memptr = addr;
                         ts_cnt += 5;
                     }
                     else if (prefix_iy) {
                         var offset = byte_to_svalue(read_operand_byte());
                         addr = (iy + offset) & 0xffff;
-
+                        memptr = addr;
                         ts_cnt += 5;
                     }
                     else {
@@ -1300,7 +1372,7 @@ function ZX_Z80 () {
 
                 case 0x07: a = value; break;
             }
-
+            q = 0;
             return;
         }
 
@@ -1348,13 +1420,13 @@ function ZX_Z80 () {
                     if (prefix_ix) {
                         var offset = byte_to_svalue(read_operand_byte());
                         addr = (ix + offset) & 0xffff;
-
+                        memptr = addr;
                         ts_cnt += 5;
                     }
                     else if (prefix_iy) {
                         var offset = byte_to_svalue(read_operand_byte());
                         addr = (iy + offset) & 0xffff;
-
+                        memptr = addr;
                         ts_cnt += 5;
                     }
                     else {
@@ -1365,7 +1437,7 @@ function ZX_Z80 () {
 
                 case 0x07: a = read_operand_byte(); break;
             }
-
+            q = 0;
             return;
         }
 
@@ -1389,20 +1461,23 @@ function ZX_Z80 () {
             var r_code = (opcode >> 4) & 0x03;
 
             if (to_reg) {
+                var addr;
                 switch (r_code) {
                     case 0x00: 
                         // A, (BC)
-                        a = read_mem_byte(get_bc());
+                        addr = get_bc();
+                        a = read_mem_byte(addr);
                         break;
 
                     case 0x01:
                         // A, (DE)
-                        a = read_mem_byte(get_de());
+                        addr = get_de();
+                        a = read_mem_byte(addr);
                         break;
 
                     case 0x02:
                         // HL, (nn)
-                        var addr = read_operand_word();
+                        addr = read_operand_word();
                         var value = read_mem_word(addr);
                         if (prefix_ix) {
                             ix = value;
@@ -1417,21 +1492,26 @@ function ZX_Z80 () {
 
                     case 0x03:
                         // A, (nn)
-                        var addr = read_operand_word();
+                        addr = read_operand_word();
                         a = read_mem_byte(addr);
                         break;
                 }
+                memptr = (addr + 1) & 0xFFFF;
             }
             else {
                 switch (r_code) {
                     case 0x00:
                         // (BC), A
-                        write_mem_byte(get_bc(), a);
+                        var addr = get_bc();
+                        write_mem_byte(addr, a);
+                        memptr = (a << 8) | ((addr + 1) & 0xFF);
                         break;
 
                     case 0x01:
                         // (DE), A
-                        write_mem_byte(get_de(), a);
+                        var addr = get_de();
+                        write_mem_byte(addr, a);
+                        memptr = (a << 8) | ((addr + 1) & 0xFF);
                         break;
 
                     case 0x02:
@@ -1449,16 +1529,18 @@ function ZX_Z80 () {
 
                         var addr = read_operand_word();
                         write_mem_word(addr, value);
+                        memptr = (addr + 1) & 0xFFFF;
                         break;
 
                     case 0x03:
                         // (nn), A
                         var addr = read_operand_word();
                         write_mem_byte(addr, a);
+                        memptr = (a << 8) | ((addr + 1) & 0xFF);
                         break;
                 }
             }
-
+            q = 0;
             return;
         }
 
@@ -1488,7 +1570,7 @@ function ZX_Z80 () {
 
                 case 0x03: sp = value; break;
             }
-
+            q = 0;
             return;
         }
 
@@ -1554,7 +1636,7 @@ function ZX_Z80 () {
 
                 ts_cnt += 1;
             }
-
+            q = 0;
             return;
         }
 
@@ -1575,7 +1657,7 @@ function ZX_Z80 () {
             }
 
             ts_cnt += 2;
-
+            q = 0;
             return;
         }
 
@@ -1584,6 +1666,7 @@ function ZX_Z80 () {
             var value = get_hl();
             set_hl(get_de());
             set_de(value);
+            q = 0;
             return;
         }
 
@@ -1596,6 +1679,7 @@ function ZX_Z80 () {
             t = f;
             f = f_;
             f_ = t;
+            q = 0;
             return;
         }
 
@@ -1604,6 +1688,7 @@ function ZX_Z80 () {
             var t = regs;
             regs = regs_;
             regs_ = t;
+            q = 0;
             return;
         }
 
@@ -1626,6 +1711,8 @@ function ZX_Z80 () {
                 set_hl(value);
             }
 
+            q = 0;
+            memptr = value;
             ts_cnt += 3;
 
             return;
@@ -1715,14 +1802,16 @@ function ZX_Z80 () {
                     case 0x06:
                         if (prefix_ix) {
                             var offset = byte_to_svalue(read_operand_byte()); // (IX + d)
-                            operand = read_mem_byte((ix + offset) & 0xffff);
-
+                            var index_address = (ix + offset) & 0xFFFF;
+                            operand = read_mem_byte(index_address);
+                            memptr = index_address;
                             ts_cnt += 5;
                         }
                         else if (prefix_iy) {
                             var offset = byte_to_svalue(read_operand_byte()); // (IY + d)
-                            operand = read_mem_byte((iy + offset) & 0xffff);
-
+                            var index_address = (iy + offset) & 0xFFFF;
+                            operand = read_mem_byte(index_address);
+                            memptr = index_address;
                             ts_cnt += 5;
                         }
                         else {
@@ -1797,44 +1886,42 @@ function ZX_Z80 () {
                 }
             }
             else { // arithmetic
-                var care_case = !!(opcode & 0x08);
-                if (care_case && f.c) {
-                    operand++;
-                }
+                var carry_op = !!(opcode & 0x08);
+                var add_op = !(opcode & 0x10);
+                var carry_value = carry_op && f.c ? 1 : 0;
+                var old_a = a;
 
-                var addition = !(opcode & 0x10);
-
-                if (addition) {
-                    var old_a = a;
-                    a += operand;
+                if (add_op) {
+                    a += (operand + carry_value);
                     var care = a & 0x100;
                     a &= 0xff;
 
                     f.s = a & 0x80;
                     f.z = !a;
                     f.y = a & 0x20;
-                    f.h = ((old_a & 0x0f) + (operand & 0x0f)) & 0x10;
+                    f.h = ((old_a & 0x0f) + (operand & 0x0f) + carry_value) & 0x10;
                     f.x = a & 0x08;
                     f.p = get_byte_sum_overflow(old_a, operand, a);
                     f.n = 0;
                     f.c = care;
                 }
                 else { // subtraction
-                    var old_a = a;
-                    a -= operand;
+                    a -= (operand + carry_value);
                     var borrow = a < 0;
                     a &= 0xff;
 
                     f.s = a & 0x80;
                     f.z = !a;
                     f.y = a & 0x20;
-                    f.h = (old_a & 0x0f) - (operand & 0x0f) < 0;
+                    f.h = (old_a & 0x0f) - (operand & 0x0f) - carry_value < 0;
                     f.x = a & 0x08;
                     f.p = get_byte_diff_overflow(old_a, operand, a);
                     f.n = 1;
                     f.c = borrow;
                 }
             }
+
+            q = 1;
             return;
         }
 
@@ -1931,13 +2018,13 @@ function ZX_Z80 () {
                         if (prefix_ix) {
                             // (IX + d)
                             addr = ( ix + byte_to_svalue(read_operand_byte()) ) & 0xffff;
-
+                            memptr = addr;
                             ts_cnt += 6;
                         }
                         else if (prefix_iy) {
                             // (IY + d)
                             addr = ( iy + byte_to_svalue(read_operand_byte()) ) & 0xffff;
-
+                            memptr = addr;
                             ts_cnt += 6;
                         }
                         else {
@@ -2047,13 +2134,13 @@ function ZX_Z80 () {
                         if (prefix_ix) {
                             // (IX + d)
                             addr = ( ix + byte_to_svalue(read_operand_byte()) ) & 0xffff;
-
+                            memptr = addr;
                             ts_cnt += 6;
                         }
                         else if (prefix_iy) {
                             // (IY + d)
                             addr = ( iy + byte_to_svalue(read_operand_byte()) ) & 0xffff;
-
+                            memptr = addr;
                             ts_cnt += 6;
                         }
                         else {
@@ -2084,7 +2171,7 @@ function ZX_Z80 () {
                 f.p = operand == 0x80;
                 f.n = 1;
             }
-
+            q = 1;
             return;
         }
 
@@ -2097,66 +2184,49 @@ function ZX_Z80 () {
             set_iff1(allow_int);
             set_iff2(allow_int);
             int_lock = 1;
+            q = 0;
             return;
         }
 
         // 00100111
         if ( opcode == 0x27 ) {
             // DAA          ( 4 )
+            // https://stackoverflow.com/questions/8119577/z80-daa-instruction/57837042#57837042
+            
+            var t = 0;
+            if (f.h || (a & 0x0F) > 0x09) {
+                t++;
+            }
+            if (f.c || a > 0x99) {
+                t += 2;
+                f.c = 1;
+            }
 
-            var a_l = a & 0x0f;
-            var a_h = a >> 4;
-
-            if ( f.n ) {
-                // after subtraction
-                if ( f.h || a_l > 9 ) {
-                    a_l -= 6;
-                    if ( a_l < 0 ) {
-                        f.h = 1;
-                        a_l &= 0x0f;
-                        a_h -= 1;
-                    }
-                }
-
-                if ( f.c || a_h > 9 || a_h < 0 ) {
-                    a_h -= 6;
-                    if ( a_h < 0 ) {
-                        f.c = 1;
-                        a_h &= 0x0f;
-                    }
-                }
+            if (f.n && !f.h) {
+                f.h = 0;
+            }
+            else if (f.n && f.h) {
+                f.h = (a & 0x0F) < 0x06;
             }
             else {
-                // after addition
-                if ( f.h || a_l > 9 ) {
-                    a_l += 6;
-                    if ( a_l & 0x10 ) {
-                        f.h = 1;
-                        a_l &= 0x0f;
-                        a_h += 1;
-                    }
-                }
-
-                if ( f.c || a_h > 9 ) {
-                    a_h += 6;
-                    if ( a_h & 0x10 ) {
-                        f.c = 1;
-                        a_h &= 0x0f;
-                    }
-                }
+                f.h = (a & 0x0F) > 0x09;
             }
 
-            a = ( a_h << 4 ) | a_l;
+            switch (t) {
+                case 1: a = (a + (f.n ? 0xFA : 0x06)) & 0xFF; break;
+                case 2: a = (a + (f.n ? 0xA0 : 0x60)) & 0xFF; break;
+                case 3: a = (a + (f.n ? 0x9A : 0x66)) & 0xFF; break;
+            }
 
             f.s = a & 0x80;
             f.z = !a;
             f.y = a & 0x20;
             f.x = a & 0x08;
             f.p = get_parity(a);
-
+            q = 1;
             return;
         }
-
+        
         // 00101111
         if ( opcode == 0x2f ) {
             // CPL          ( 4 )
@@ -2166,6 +2236,7 @@ function ZX_Z80 () {
             f.h = 1;
             f.x = a & 0x08;
             f.n = 1;
+            q = 1;
             return;
         }
 
@@ -2173,11 +2244,18 @@ function ZX_Z80 () {
         if ( opcode == 0x3f ) {
             // CCF          ( 4 )
 
-            f.y = a & 0x20;
             f.h = f.c;
-            f.x = a & 0x08;
             f.n = 0;
             f.c = !f.c;
+            if (q) {
+                f.y = a & 0x20;
+                f.x = a & 0x08;
+            }
+            else {
+                f.y |= a & 0x20;
+                f.x |= a & 0x08;
+            }
+            q = 1;
             return;
         }
 
@@ -2185,11 +2263,18 @@ function ZX_Z80 () {
         if ( opcode == 0x37 ) {
             // SCF          ( 4 )
 
-            f.y = a & 0x20;
             f.h = 0;
-            f.x = a & 0x08;
             f.n = 0;
             f.c = 1;
+            if (q) {
+                f.y = a & 0x20;
+                f.x = a & 0x08;
+            }
+            else {
+                f.y |= a & 0x20;
+                f.x |= a & 0x08;
+            }
+            q = 1;
             return;
         }
 
@@ -2249,6 +2334,8 @@ function ZX_Z80 () {
             f.x = result & 0x0800;
             f.n = 0;
             f.c = care;
+            q = 1;
+            memptr = (current + 1) & 0xFFFF;
 
             ts_cnt += 7;
 
@@ -2306,8 +2393,8 @@ function ZX_Z80 () {
                 }
             }
 
+            q = 0;
             ts_cnt += 2;
-
             return;
         }
 
@@ -2342,6 +2429,7 @@ function ZX_Z80 () {
             f.x = a & 0x08;
             f.n = 0;
             f.c = extra;
+            q = 1;
 
             return;
         }
@@ -2352,6 +2440,8 @@ function ZX_Z80 () {
 
             var addr = read_operand_word();
             pc = addr;
+            q = 0;
+            memptr = pc;
             return;
         }
 
@@ -2377,7 +2467,8 @@ function ZX_Z80 () {
             if ( condition ) {
                 pc = addr;
             }
-
+            q = 0;
+            memptr = addr;
             return;
         }
 
@@ -2412,9 +2503,10 @@ function ZX_Z80 () {
             var offset = byte_to_svalue(read_operand_byte());
             if ( condition ) {
                 pc = ( pc + offset ) & 0xffff;
+                memptr = pc;
                 ts_cnt += 5;
             }
-
+            q = 0;
             return;
         }
 
@@ -2434,7 +2526,7 @@ function ZX_Z80 () {
             else {
                 pc = get_hl();
             }
-
+            q = 0;
             return;
         }
 
@@ -2448,8 +2540,9 @@ function ZX_Z80 () {
             write_mem_word(sp, pc);
             pc = addr;
 
+            q = 0;
+            memptr = pc;
             ts_cnt += 1;
-
             return;
         }
 
@@ -2480,7 +2573,8 @@ function ZX_Z80 () {
 
                 ts_cnt += 1;
             }
-
+            q = 0;
+            memptr = addr;
             return;
         }
 
@@ -2490,6 +2584,8 @@ function ZX_Z80 () {
 
             pc = read_mem_word(sp);
             sp = ( sp + 2 ) & 0xffff;
+            q = 0;
+            memptr = pc;
             return;
         }
 
@@ -2514,10 +2610,10 @@ function ZX_Z80 () {
             if ( condition ) {
                 pc = read_mem_word(sp);
                 sp = ( sp + 2 ) & 0xffff;
+                memptr = pc;
             }
-
+            q = 0;
             ts_cnt += 1;
-
             return;
         }
 
@@ -2531,9 +2627,9 @@ function ZX_Z80 () {
             sp = ( sp - 2 ) & 0xffff;
             write_mem_word(sp, pc);
             pc = addr;
-
+            q = 0;
+            memptr = pc;
             ts_cnt += 1;
-
             return;
         }
 
@@ -2549,13 +2645,15 @@ function ZX_Z80 () {
             var cmd_in = !!(opcode & 0x08);
             if (cmd_in) {
                 // IN
+                memptr = ((a << 8) + port_low + 1) & 0xFFFF;
                 a = read_io_byte(port);
             }
             else {
                 // OUT
                 write_io_byte(port, a);
+                memptr = (a << 8) | ((port_low + 1) & 0xFF);
             }
-
+            q = 0;
             return;
         }        
     }
