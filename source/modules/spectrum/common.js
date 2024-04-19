@@ -294,6 +294,9 @@ function doRequest(options) {
 					reject(req.statusText);
 			}
 		}
+		req.onerror = function (event) {
+			reject('Unspecified error.');
+		}
 		req.open(options.method || 'GET', options.url, !options.sync);
 		// 'responseType' and 'timeout' properties should be set after calling 'open' method.
 		// Otherwise, 'Invalid state error' is produced in IE11.
