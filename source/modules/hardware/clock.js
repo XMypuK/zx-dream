@@ -7,80 +7,82 @@ function ZX_Clock() {
 	 */
 
 	// период запросов маскируемого прерывания в миллисекундах
-	var intrqPeriod = 20.48;
+	var _intrqPeriod = 20.48;
 	// продолжлительность сигнала прерывания в тактах процессора
-	var intrqDurationTstates = 32;
+	var _intrqDurationTstates = 32;
 	// количество выполняемых процессором тактов между маскируемыми прерываниями
-	var tstatesPerIntrq = 71680;
+	var _tstatesPerIntrq = 71680;
 	// количество выполняемых процессором тактов за одну миллисекунду
-	var tstatesPerMs = 3500;
+	var _tstatesPerMs = 1;
+	// коэффициент ускорение при загрузке с магнитной ленты
+	var _tapeBoostFactor = 1;
 	// флаг работы рабочего цикла
-	var running = false;
+	var _running = false;
 	// идентификатор интервала рабочего цикла
-	var intervalId;
+	var _intervalId;
 	// точка отсчета работы тактового генератора в тактах
-	var baseTstates;
+	var _baseTstates;
 	// точка отсчета работы тактового генератора
-	var baseTimestamp;
+	var _baseTimestamp;
 	// время последнего вывода информации о производительности
-	var performanceTimestamp;
+	var _performanceTimestamp;
 	// счетчик тактов с последнего вывода информации о производительности
-	var performanceTstates;
+	var _performanceTstates;
 	// счетчик фреймов (прерываний) с последнего вывода инфорамции о производительности
-	var performanceFps;
+	var _performanceFps;
 	// счетчик тактов с начала работы
-	var tstates = 0;
+	var _tstates = 0;
 	// максимальное ускорение (после временного спада производительности)
-	var maxBoostMs = 50.0;
-	var maxBoostTstates = maxBoostMs * tstatesPerMs;
+	var _maxBoostMs = 50.0;
+	var _maxBoostTstates = _maxBoostMs * _tstatesPerMs;
 
 	var _bus;
 	var _cpu;
-	var _taskQueue = new TaskQueue(tstatesPerMs);
+	var _taskQueue = new TaskQueue(_tstatesPerMs);
 	var _interruptActiveTask = null;
 	var _interruptInactiveTask = null;
 	var _rescheduleTaskOnNextInterrupt = false;
 
-	var debug = false;
+	var _debug = false;
 	var _checkBreakConditionCallback = function (state) { return false; }
 	var _stopCallback = function () { }
 
 	function run() {
-		if ( running || !_bus || !_cpu )
+		if ( _running || !_bus || !_cpu )
 			return;
-		debug = false;
-		running = true;
+		_debug = false;
+		_running = true;
 		var now = Date.now();
-		intervalId = setInterval(process, 4);
-		baseTstates = tstates;
-		baseTimestamp = now;
-		performanceTimestamp = now;
-		performanceTstates = 0;
-		performanceFps = 0;
+		_intervalId = setInterval(process, 4);
+		_baseTstates = _tstates;
+		_baseTimestamp = now;
+		_performanceTimestamp = now;
+		_performanceTstates = 0;
+		_performanceFps = 0;
 	}
 
 	function runDebug(checkBreakConditionCallback, stopCallback) {
-		if ( running || !_bus || !_cpu)
+		if ( _running || !_bus || !_cpu)
 			return;
-		debug = true;
-		running = true;
+		_debug = true;
+		_running = true;
 		var now = Date.now();
-		intervalId = setInterval(processDebug, 4);
-		baseTstates = tstates;
-		baseTimestamp = now;
-		performanceTimestamp = now;
-		performanceTstates = 0;
-		performanceFps = 0;
+		_intervalId = setInterval(processDebug, 4);
+		_baseTstates = _tstates;
+		_baseTimestamp = now;
+		_performanceTimestamp = now;
+		_performanceTstates = 0;
+		_performanceFps = 0;
 		_checkBreakConditionCallback = checkBreakConditionCallback;
 		_stopCallback = stopCallback;
 	}
 
 	function stop() {
-		if ( !running )
+		if ( !_running )
 			return;
-		running = false;
-		clearInterval(intervalId);
-		if (debug) {
+		_running = false;
+		clearInterval(_intervalId);
+		if (_debug) {
 			_stopCallback();
 		}
 	}
@@ -108,29 +110,29 @@ function ZX_Clock() {
 		// фиксация время запуска итерации
 		var now = Date.now();
 		// проверка на необходимость вывода информации о производительности.
-		var performanceElapsed = now - performanceTimestamp
+		var performanceElapsed = now - _performanceTimestamp
 		if ( performanceElapsed >= 1000 ) {
 			_bus.var_write('performance', {
-				frequency: performanceTstates / (performanceElapsed * 1000),
-				fps: performanceFps * 1000 / performanceElapsed
+				frequency: _performanceTstates / (performanceElapsed * 1000),
+				fps: _performanceFps * 1000 / performanceElapsed
 			});
-			performanceTimestamp = now;
-			performanceTstates = 0;
-			performanceFps = 0;
+			_performanceTimestamp = now;
+			_performanceTstates = 0;
+			_performanceFps = 0;
 		}
 		// время с точки отсчета
-		var elapsed = now - baseTimestamp;
+		var elapsed = now - _baseTimestamp;
 		// соответствие этого времени тактам
-		var elapsedTstates = tstatesPerMs * elapsed;
+		var elapsedTstates = _tstatesPerMs * elapsed;
 		// количество тактов для выполнения в текущей итерации
-		var plannedTstates = elapsedTstates - (tstates - baseTstates);
-		if (plannedTstates > maxBoostTstates) {
+		var plannedTstates = elapsedTstates - (_tstates - _baseTstates);
+		if (plannedTstates > _maxBoostTstates) {
 			// Если замедление более, чем максимально возможное компенсационное
 			// ускорение, то точка отсчета во времени сдвигается вперед так,
 			// что далее компенсируется только максимально возможное ускорение.
 			// Далее эмуляция пойдет со штатной скоростью.
-			baseTimestamp += (plannedTstates / tstatesPerMs - maxBoostMs);
-			plannedTstates = maxBoostTstates;
+			_baseTimestamp += (plannedTstates / _tstatesPerMs - _maxBoostMs);
+			plannedTstates = _maxBoostTstates;
 		}
 		// сброс счетчика тактов процессора
 		_cpu.set_tstates(0);
@@ -138,44 +140,44 @@ function ZX_Clock() {
 		var curTstates;
 		// работа процессора
 		while ((curTstates = _cpu.get_tstates()) < plannedTstates) {
-			tstates += (curTstates - lastTstates);
+			_tstates += (curTstates - lastTstates);
 			lastTstates = curTstates;
-			_taskQueue.process(tstates);
+			_taskQueue.process(_tstates);
 			_cpu.process();
 		}
 		// корректировка счетчиков
-		tstates += (curTstates - lastTstates);
+		_tstates += (curTstates - lastTstates);
 		lastTstates = curTstates;
-		performanceTstates += curTstates;
+		_performanceTstates += curTstates;
 	}
 	
 	function processDebug() {
 		// фиксация время запуска итерации
 		var now = Date.now();
 		// проверка на необходимость вывода информации о производительности.
-		var performanceElapsed = now - performanceTimestamp
+		var performanceElapsed = now - _performanceTimestamp
 		if ( performanceElapsed >= 1000 ) {
 			_bus.var_write('performance', {
-				frequency: performanceTstates / (performanceElapsed * 1000),
-				fps: performanceFps * 1000 / performanceElapsed
+				frequency: _performanceTstates / (performanceElapsed * 1000),
+				fps: _performanceFps * 1000 / performanceElapsed
 			});
-			performanceTimestamp = now;
-			performanceTstates = 0;
-			performanceFps = 0;
+			_performanceTimestamp = now;
+			_performanceTstates = 0;
+			_performanceFps = 0;
 		}
 		// время с точки отсчета
-		var elapsed = now - baseTimestamp;
+		var elapsed = now - _baseTimestamp;
 		// соответствие этого времени тактам
-		var elapsedTstates = tstatesPerMs * elapsed;
+		var elapsedTstates = _tstatesPerMs * elapsed;
 		// количество тактов для выполнения в текущей итерации
-		var plannedTstates = elapsedTstates - (tstates - baseTstates);
-		if (plannedTstates > maxBoostTstates) {
+		var plannedTstates = elapsedTstates - (_tstates - _baseTstates);
+		if (plannedTstates > _maxBoostTstates) {
 			// Если замедление более, чем максимально возможное компенсационное
 			// ускорение, то точка отсчета во времени сдвигается вперед так,
 			// что далее компенсируется только максимально возможное ускорение.
 			// Далее эмуляция пойдет со штатной скоростью.
-			baseTimestamp += (plannedTstates / tstatesPerMs - maxBoostMs);
-			plannedTstates = maxBoostTstates;
+			_baseTimestamp += (plannedTstates / _tstatesPerMs - _maxBoostMs);
+			plannedTstates = _maxBoostTstates;
 		}
 		// сброс счетчика тактов процессора
 		_cpu.set_tstates(0);
@@ -183,9 +185,9 @@ function ZX_Clock() {
 		var curTstates;
 		// работа процессора
 		while ((curTstates = _cpu.get_tstates()) < plannedTstates) {
-			tstates += (curTstates - lastTstates);
+			_tstates += (curTstates - lastTstates);
 			lastTstates = curTstates;
-			_taskQueue.process(tstates);
+			_taskQueue.process(_tstates);
 			var state = _cpu.get_state();
 			if (_checkBreakConditionCallback(state)) {
 				stop();
@@ -195,21 +197,21 @@ function ZX_Clock() {
 		}
 		// корректировка счетчиков
 		var processedTstates = (curTstates = _cpu.get_tstates());
-		tstates += (curTstates - lastTstates);
+		_tstates += (curTstates - lastTstates);
 		lastTstates = curTstates;
-		performanceTstates += processedTstates;
+		_performanceTstates += processedTstates;
 	}
 
 	var rescheduleInterruptTask = function() {
 		_interruptActiveTask && (_interruptActiveTask.cancelled = true);
 		_interruptInactiveTask && (_interruptInactiveTask.cancelled = true);
-		_interruptActiveTask = this.setInterval(onInterruptActive, intrqPeriod, 0);
-		_interruptInactiveTask = this.setInterval(onInterruptInactive, intrqPeriod, 0, intrqDurationTstates / tstatesPerMs);
+		_interruptActiveTask = this.setInterval(onInterruptActive, _intrqPeriod, 0);
+		_interruptInactiveTask = this.setInterval(onInterruptInactive, _intrqPeriod, 0, _intrqDurationTstates / _tstatesPerMs);
 	}.bind(this);
 
 	function onInterruptActive() {
 		_bus.var_write('intrq', 1);
-		performanceFps++;
+		_performanceFps++;
 		if (_rescheduleTaskOnNextInterrupt) {
 			rescheduleInterruptTask();
 			_rescheduleTaskOnNextInterrupt = false;
@@ -221,12 +223,15 @@ function ZX_Clock() {
 	}
 
 	function updateTstatesPerMs() {
-		tstatesPerMs = tstatesPerIntrq / intrqPeriod;
-		_taskQueue.set_tstatesPerMs(tstatesPerMs);
-		maxBoostTstates = maxBoostMs * tstatesPerMs;
-		baseTstates = tstates;
-		baseTimestamp = Date.now();
-		_rescheduleTaskOnNextInterrupt = true;
+		var tstatesPerMs = _tapeBoostFactor * _tstatesPerIntrq / _intrqPeriod;
+		if (_tstatesPerMs != tstatesPerMs) {
+			_tstatesPerMs = tstatesPerMs;
+			_taskQueue.set_tstatesPerMs(_tstatesPerMs);
+			_maxBoostTstates = _maxBoostMs * _tstatesPerMs;
+			_baseTstates = _tstates;
+			_baseTimestamp = Date.now();
+			_rescheduleTaskOnNextInterrupt = true;
+		}
 	}
 
 	/********************/
@@ -235,31 +240,36 @@ function ZX_Clock() {
 	this.run = run;
 	this.runDebug = runDebug;
 	this.stop = stop;
-	this.get_running = function () { return running; }
-	this.get_tstates = function () { return tstates; }
-	this.get_ms = function () { return tstates / tstatesPerMs; }
+	this.get_running = function () { return _running; }
+	this.get_tstates = function () { return _tstates; }
+	this.get_ms = function () { return _tstates / _tstatesPerMs; }
 	this.connect = function (bus, cpu) {
 		_bus = bus;
 		_cpu = cpu;
 
 		_bus.on_opt(function (name, value) {
-			tstatesPerIntrq = value;
+			_tstatesPerIntrq = value;
 			updateTstatesPerMs();
 		}, OPT_TSTATES_PER_INTRQ);
 	
 		_bus.on_opt(function (name, value) {
-			intrqPeriod = value; 
+			_intrqPeriod = value; 
 			updateTstatesPerMs();
 		}, OPT_INTRQ_PERIOD);
+
+		_bus.on_opt(function (name, value) {
+			_tapeBoostFactor = value;
+			updateTstatesPerMs();
+		}, OPT_TAPE_BOOST_FACTOR);
 
 		rescheduleInterruptTask();
 	}
 	this.setTimeout = function(func, ms) {
-		return _taskQueue.enqueue(tstates, ms, func);
+		return _taskQueue.enqueue(_tstates, ms, func);
 	}
 	this.setInterval = function (func, interval, count, firstInterval) {
 		var firstInterval = (firstInterval !== undefined) ? firstInterval : interval;
-		return _taskQueue.enqueue(tstates, firstInterval, func, count, interval);
+		return _taskQueue.enqueue(_tstates, firstInterval, func, count, interval);
 	}
 }
 

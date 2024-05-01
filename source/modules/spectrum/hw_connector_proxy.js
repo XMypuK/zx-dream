@@ -128,6 +128,27 @@ Object.assign(HWConnectorProxy.prototype, {
     clearDriveImage: function (driveIndex) {
         return this._rpc('clearDriveImage', [driveIndex]);
     },
+    insertTape: function (index, filename, data) {
+        return this._rpc('insertTape', [index, filename, data]);
+    },
+    ejectTape: function (index) {
+        return this._rpc('ejectTape', [index]);
+    },
+    playTape: function (index) {
+        return this._rpc('playTape', [index]);
+    },
+    pauseTape: function (index) {
+        return this._rpc('pauseTape', [index]);
+    },
+    stopTape: function (index) {
+        return this._rpc('stopTape', [index]);
+    },
+    getTapeStructure: function (index) {
+        return this._rpc('getTapeStructure', [index]);
+    },
+    selectTapeBlock: function (index, blockIndex) {
+        return this._rpc('selectTapeBlock', [index, blockIndex]);
+    },
     run: function () {
         return this._rpc('run', []);
     },
@@ -157,6 +178,12 @@ Object.assign(HWConnectorProxy.prototype, {
     },
     get_onPsgDataReady: function () {
         return this._getEventProxy('get_onPsgDataReady').pub;
+    },
+    get_onTape0StateChanged: function () {
+        return this._getEventProxy('get_onTape0StateChanged').pub;
+    },
+    get_onTape0TapeEvent: function () {
+        return this._getEventProxy('get_onTape0TapeEvent').pub;
     },
     get_workerReady: function () {
         return this._workerReadyPromise.promise;

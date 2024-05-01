@@ -15,13 +15,14 @@
 - ПЗУ с переключением страниц 48/Turbo/128/TR-DOS
 - ОЗУ общим объемом 512 Кб, реализованное по схеме Pentagon (через порт #7FFD)
 - интерфейс Beta Disk
+- кассетный проигрыватель
 - дисплей с возможностью переключения отображения из 5 или 7 страницы памяти (через порт #7FFD)
 - 40-клавишная клавиатура
 - Kempston-мышка (с виртуальным управлением)
 - Музыкальный сопроцессор AY-3-891x/YM2149 (+ Бипер, + Turbo Sound) (Требуется производительная система. Рекомендуются Edge или Chrome.)
 
 Другие возможности:
-
+- загрузка с форматов лент TZX (включая большинство нестандартных загрузчиков) и TAP (и ему подобных) 
 - открытие и сохранение образов в форматах TRD, FDI, SCL, TD0, UDI
 - открытие снимков SNA, Z80
 - сохранение снимков SNA
@@ -63,13 +64,14 @@ The next hardware emulation was implemented:
 - ROM with page switching 48/Turbo/128/TR-DOS
 - RAM with the total amount of 512 KB. Implemented according to the Pentagon scheme (via the port #7FFD)
 - Beta Disk interface
+- Tape player
 - display with the capability to switch the source memory page: 5 or 7 (via the port #7FFD)
 - 40-key keyboard
 - Kempston-mouse (virtual control)
 - Programmable sound generator AY-3-891x/YM2149 (+ Beeper, + Turbo Sound) (Requires high performance system. Edge or Chrome are recommended.)
 
 Other capabilities:
-
+- loading TZX (including most of non-standard loaders) and TAP (and similar) tape formats 
 - open and save images in TRD, FDI, SCL, TD0, UDI formats
 - open SNA, Z80 snapshots
 - save SNA snapshots
@@ -108,6 +110,7 @@ This project is under [MIT License](LICENSE)
 <table>
     <tr><th><a href='https://github.com/alexanderk23/ayumi-js'>ayumi-js</a></th><td>Author: Peter Sovietov<br />Javascript version: Alexander Kovalenko</td><td><a href='https://raw.githubusercontent.com/alexanderk23/ayumi-js/master/LICENSE'>MIT license</a></td></tr>
     <tr><th><a href="https://gildas-lormeau.github.io/zip.js/">zip.js</a></th><td>Copyright (c) 2023, Gildas Lormeau</td><td><a href="https://raw.githubusercontent.com/gildas-lormeau/zip.js/master/LICENSE">BSD 3-Clause License</a></td></tr>
+    <tr><th><a href="https://github.com/nodeca/pako">pako</a></th><td>Authors: Andrey Tupitsin, Vitaly Puzrin<br />(Original zlib implementation is by Jean-loup Gailly and Mark Adler)</td><td><a href="https://github.com/nodeca/pako/blob/master/LICENSE">MIT License</a></td></tr>
     <tr><th><a href='https://knockoutjs.com/'>Knockout</a></th><td>Copyright (c) 2010 Steven Sanderson, the Knockout.js team, and other contributors</td><td><a href='https://raw.githubusercontent.com/knockout/knockout/master/LICENSE'>MIT license</a></td></tr>
     <tr><th><a href='https://jquery.com/'>jQuery</a></th><td>Copyright OpenJS Foundation and other contributors</td><td><a href='https://raw.githubusercontent.com/jquery/jquery/main/LICENSE.txt'>MIT license</a></td></tr>
 </table>

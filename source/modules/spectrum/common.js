@@ -3,6 +3,7 @@ var OPT_INTRQ_PERIOD = "INTRQ_PERIOD";
 var OPT_EXTENDED_MEMORY = "EXTENDED_MEMORY";
 var OPT_SEMICOLORS = "SEMICOLORS";
 var OPT_RENDERING_PARAMS = "RENDERING_PARAMS";
+var OPT_TAPE_BOOST_FACTOR = "TAPE_BOOST_FACTOR";
 
 var VAL_EXTENDED_MEMORY_OFF = 0;
 var VAL_EXTENDED_MEMORY_PENTAGON = 1;
@@ -37,6 +38,15 @@ var VAL_CHANNELS_ACB = 1;
 var VAL_THREADING_SINGLE = 0;
 var VAL_THREADING_MULTIPLE = 1;
 
+var VAL_TR_EMPTY = 0;
+var VAL_TR_INITIALIZED = 1;
+var VAL_TR_SUSPENDED = 2;
+var VAL_TR_PLAYBACK = 3;
+
+var VAL_TAPACT_NO = 1;
+var VAL_TAPACT_SIMPLE_TAPES = 2;
+var VAL_TAPACT_ALL_TAPES = 3;
+
 var DiskImageFormat = {
 	FDI: 'FDI',
 	TRD: 'TRD',
@@ -52,6 +62,22 @@ var DiskImageFormat = {
 		return match[1].toUpperCase();
 	}
 };
+
+var TapeFormat = {
+	TAP: 'TAP',
+	SPC: 'SPC',
+	STA: 'STA',
+	LTP: 'LTP',
+	ZXT: 'ZXT',
+	TZX: 'TZX',
+
+	getFromFileName: function(filename) {
+		var match = (/^[^\\\/]*\.(TAP|SPC|STA|LTP|ZXT|TZX)$/i).exec(filename);
+		if (!match)
+			throw new Error(ZX_Lang.ERR_TAPE_FORMAT_NOT_SUPPORTED);
+		return match[1].toUpperCase();
+	}
+}
 
 function extend(Child, Parent) {
 	var F = function() { };
@@ -659,6 +685,35 @@ function MemoryStream(data) {
 	}
 }
 
+function BitReader(data, bitCount) {
+	var _position = 0;
+	var _bit = 0;
+	var _bitsMask = [0x00, 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF];
+	var _count = bitCount !== undefined ? bitCount : data.length * 8;
+
+	this.get_position = function () {
+		return _position * 8 + _bit;
+	}
+	this.get_length = function () {
+		return _count;
+	}
+	this.read = function(n) {
+		var value = 0;
+		while (n && _position < data.length) {
+			var k = Math.min(n, 8 - _bit);
+			value = (value << k) | (data[_position] >> (8 - _bit - k)) & _bitsMask[k];
+			n -= k;
+			_bit = (_bit + k) & 0x07;
+			if (!_bit) {
+				_position++;
+			}
+		}
+		if (!n)
+			return value;
+		return -1;
+	}
+}
+
 function CRCWrapper(stream, crc) {
 	this._stream = stream;
 	this._crc = crc;
@@ -1048,3 +1103,129 @@ function LZSSDecompressionStream(underlyingStream) {
 
 	init();
 }
+
+var TAPE_EVENT = {
+	SELECTION: 1,
+	DESCRIPTION: 2,
+	MESSAGE: 3,
+	ARCHIVE_INFO: 4,
+	HARDWARE_INFO: 5,
+	CUSTOM_INFO: 6,
+	SNAPSHOT_RESTORATION: 7
+};
+
+function TapeInfo() {
+	this.__classes = ['TypeInfo'];
+	this.format = null;
+	this.formatVersion = null;
+	this.size = null;
+	this.blocks = [];
+	this.currentIndex = null;
+}
+
+function TapeBlockInfo() {
+	this.__classes = ['TypeBlockInfo'];
+	this.index = null;
+	this.id = null;
+	this.idDescription = null;
+	this.size = null;
+}
+
+function TapeDataBlockInfo() {
+	TapeDataBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeDataBlockInfo');
+	this.postPause = null;
+}
+extend(TapeDataBlockInfo, TapeBlockInfo);
+
+function TapeHeaderBlockInfo() {
+	TapeHeaderBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeHeaderBlockInfo');
+	this.type = null;
+	this.typeDescription = null;
+	this.filename = null;
+	this.binLength = null;
+	this.param1 = null;
+	this.param2 = null;
+}
+extend(TapeHeaderBlockInfo, TapeDataBlockInfo);
+
+function TapeGroupBlockInfo() {
+	TapeGroupBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeGroupBlockInfo');
+	this.name = null;
+}
+extend(TapeGroupBlockInfo, TapeBlockInfo);
+
+function TapeDescriptionBlockInfo() {
+	TapeDescriptionBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeDescriptionBlockInfo');
+	this.description = null;
+}
+extend(TapeDescriptionBlockInfo, TapeBlockInfo);
+
+function TapeHardwareTypeBlockInfo() {
+	TapeHardwareTypeBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeHardwareTypeBlockInfo');
+	this.records = [];
+}
+extend(TapeHardwareTypeBlockInfo, TapeBlockInfo);
+
+function TapeHardwareTypeBlockInfoRecord() {
+	this.__classes = ['TapeHardwareTypeBlockInfoRecord'];
+	this.type = null;
+	this.typeDescription = null;
+	this.id = null;
+	this.idDescription = null;
+	this.relation = null;
+	this.relationDescription = null;
+}
+
+function TapeArchiveBlockInfo() {
+	TapeArchiveBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeArchiveBlockInfo');
+	this.records = [];
+}
+extend(TapeArchiveBlockInfo, TapeBlockInfo);
+
+function TapeArchiveBlockInfoRecord() {
+	this.__classes = ['TapeArchiveBlockInfoRecord'];
+	this.infoId = null;
+	this.infoIdDescription = null;
+	this.infoText = null;
+}
+
+function TapeMessageBlockInfo() {
+	TapeMessageBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeMessageBlockInfo');
+	this.message = null;
+	this.duration = null;
+}
+extend(TapeMessageBlockInfo, TapeBlockInfo);
+
+function TapePauseBlockInfo() {
+	TapePauseBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapePauseBlockInfo');
+	this.duration = null;
+}
+extend(TapePauseBlockInfo, TapeBlockInfo);
+
+function TapeSelectBlockInfo() {
+	TapeSelectBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeSelectBlockInfo');
+	this.options = [];
+}
+extend(TapeSelectBlockInfo, TapeBlockInfo);
+
+function TapeSelectBlockInfoOption() {
+	this.__classes = ['TapeSelectBlockInfoOption'];
+	this.blockIndex = null;
+	this.description = null;
+}
+
+function TapeSnapshotBlockInfo() {
+	TapeSnapshotBlockInfo.superclass.constructor.apply(this, arguments);
+	this.__classes.push('TapeSnapshotBlockInfo');
+	this.format = null;
+}
+extend(TapeSnapshotBlockInfo, TapeBlockInfo);

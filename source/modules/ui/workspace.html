@@ -11,6 +11,7 @@
 <include source="virtual_mouse.html" includeType="embed" />
 <include source="about_dialog.html" includeType="embed" />
 <include source="zip_browser.html" includeType="embed" />
+<include source="tape_recorder_dispatcher.html" includeType="embed" />
 
 <style type="text/css">
 	body {
@@ -130,6 +131,7 @@
 			 --><a data-command="snapshot-save" title="Сохранить снимок"><img src="img/save.png" alt="Сохранить снимок" /></a><!--
              --><a data-command="about" title="Об эмуляторе"><img src="img/info.png" alt="Об эмуляторе"/></a>
 			</div>
+            <div id="tapes"></div>
 			<div id="drives"></div>	
 		</div>
 		<div id="center_field">
@@ -157,6 +159,7 @@
         var $display = $workspace.find('#display');
         var $vkeyb = $workspace.find('#vkeyb');
         var $vmouse = $workspace.find('#vmouse');
+        var $tapes = $workspace.find('#tapes');
         var $drives = $workspace.find('#drives');
         var $debug = $workspace.find('#debug');
         var $container = $(document.body);
@@ -165,6 +168,7 @@
         var vkeyb = $vkeyb[0];
         var vmouse = $vmouse[0];
         var debug = $debug[0];
+        var tapes = $tapes[0];
         var drives = $drives[0];
         var container = $container[0];
 
@@ -275,6 +279,10 @@
                 }
             });
 
+            var tapeRecorderDispatcher = new ZX_TapeRecorderDispatcher(tapes);
+            tapeRecorderDispatcher.addTapeRecorderBoxes();
+            tapeRecorderDispatcher.preloadImages();
+            ZXContext.ui.tapeRecorderDispatcher = tapeRecorderDispatcher;
             var driveDispatcher = new ZX_DriveDispatcher(drives);
             driveDispatcher.addDriveBoxes();
             driveDispatcher.preloadImages();

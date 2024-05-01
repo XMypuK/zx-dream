@@ -1,0 +1,69 @@
+<style>
+    .tape-message-dialog { font: 14px Verdana; }
+    .tape-message-dialog > .tape-message { padding: 1em; overflow: auto; white-space: pre; }
+</style>
+
+<template id="tape-message-dialog">
+    <div class="tape-message-dialog">
+        <div class="tape-message" data-bind="text: message"></div>
+    </div>
+</template>
+
+<script type="text/javascript">
+    function TapeMessageDialog() {
+        var $dlg = $("<?=tape-message-dialog?>");
+        var openResult$ = null;
+        var model = this;
+        var closeTimeout = 0;
+        var closeTimeoutId = null;
+
+        this.message = '';
+
+        this.open = function (message, timeout) {
+            if (!openResult$) {
+                this.message = message;
+                closeTimeout = timeout;
+                openResult$ = Promise.withResolvers();
+                init();
+            }
+            return openResult$.promise;
+        }
+
+        function init() {
+            $dlg.dialog({
+                autoOpen: true,
+                title: ZX_Lang.TMSGD_TITLE,
+                modal: true,
+                width: 600,
+                height: 400,
+                buttons: [
+					{ text: ZX_Lang.TMSGD_BTN_CANCEL, click: cancel }
+				],
+                close: function (e) {
+                    $(this).dialog('destroy');
+					$(this).remove(); 
+					if (openResult$) {
+						openResult$.resolve();
+						openResult$ = null;
+					}
+                }
+            });
+            ko.applyBindings(model, $dlg[0]);
+            if (closeTimeout) {
+                closeTimeoutId = setTimeout(cancel, closeTimeout * 1000);
+            }
+        }
+
+        function cancel() {
+            if (closeTimeoutId !== null) {
+                clearTimeout(closeTimeoutId);
+            }
+            if (openResult$) {
+				openResult$.resolve();
+				openResult$ = null;
+			}			
+			$dlg.dialog('close');
+			$dlg = null;
+        }  
+    }
+</script>

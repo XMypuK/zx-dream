@@ -1,0 +1,128 @@
+<style>
+    .tape-recorder-box { display: block; width: 268px; position: relative; font-family: Arial; line-height: 24px; }
+    .tape-recorder-box .action-button { display: inline-block; height: 24px;  padding: 3px 5px; white-space: nowrap; cursor: pointer; border: 1px solid #75a9f9; border-radius: 3px; }
+    .tape-recorder-box .action-button:hover { background-color: #0C59CF; color: #ffffff; }
+    .tape-recorder-box .control-button { display: inline-block; height: 24px; width: 24px; cursor: pointer; padding: 0; margin: 0; border: 0; background: transparent none no-repeat center center; }
+    .tape-recorder-box .control-button.-command_play { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAARUlEQVQ4y2NgoAnYz/CfWKVMlBrCRKlLmCj1DhOlYcJEacAyURo7pBngyMBIvgFYNBNvAA7NxBmARzNhAwhopkpeGHgAAKVwD1HNZQOGAAAAAElFTkSuQmCC"); }
+    .tape-recorder-box .control-button.-command_pause { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAKklEQVQ4y2NgoBAwMjAwMOzfz/AfXcLRESJHSJ6JUheMGjBqwDAxYOABAHx9BhosN+FDAAAAAElFTkSuQmCC"); }
+    .tape-recorder-box .control-button.-command_resume { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAATUlEQVQ4y2NgoBrYz/AfjpHFCAAmogymyAAChjCR5EWKDMBhCBNZgU2RAWiGkGeAIwMj+QYgaSbdADTNpBmARTPxBuDQTJwBeDQPDgAA0vwTEbh4/RkAAAAASUVORK5CYII="); }
+    .tape-recorder-box .control-button.-command_stop { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAJ0lEQVQ4y2NgoBAwMjAwMOxnYPhPqkZHqF4mSl0wasCoAcPEgIEHAL+sAhqHb3dyAAAAAElFTkSuQmCC"); }
+	.tape-recorder-box .icon { display: inline-block; width: 24px; height: 24px; background: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAA1ElEQVRIx+1Uuw3CMBQ8RwySzMDr3JrSG1CwScgmFGzgEo/wSgbwJqEIz5IdQyiMIkW5yp/nO72z3gE7Ng8lC2PMWJPYe6+igJD786MKubmfokgTFSuR51zNv//gMDu5TN/CzAAAIkqu+75P9tZaAIBzDgAwdNfkvtgBM4OIFBEpERKEEBJyqROhHCtY9LaFmceSRW3bxrVzLtaJRcsCt2kc6JnuBUNWPkhdd1zZIhmO2kg60FpDa/1x7JfOSu+bX/KklFMxXgpCs7CrHXTfutyxQbwAzaVKzbSgGCYAAAAASUVORK5CYII=") no-repeat 0 1px; position: relative; top: -2px; vertical-align: top; }
+	.tape-recorder-box .title { display: inline-block; height: 24px; width: 162px; overflow: hidden; padding: 0 3px; font-size: 14px; vertical-align: top; }
+	.tape-recorder-box .status { display: inline-block; width: 16px; height: 24px; background-color: transparent; background-position: center center; background-repeat: no-repeat; vertical-align: top; border-top: 1px solid transparent; border-bottom: 1px solid transparent; }
+	.tape-recorder-box .status.error { background-image: url('../images/error.png'); }
+	.tape-recorder-box .status.loading { background-image: url('../images/process.gif'); }
+    .tape-recorder-box .control { display: inline-block; width: 48px; height: 24px; text-align: right; }
+	.tape-recorder-box .action-list { list-style-type: none; margin: 0; padding: 0; z-index: 1000; display: none; position: absolute; background-color: #ffffff; border: 1px solid #a8a8a8; bottom: 24px; right: 0; }
+    .tape-recorder-box .action-list.-visible { display: block; }
+	.tape-recorder-box .action-list li { padding: 0; margin: 0; }	
+	.tape-recorder-box .action-list a { cursor: pointer; padding: 2px 5px; display: block; }
+	.tape-recorder-box .action-list a:hover { background-color: #0088ff; color: #ffffff; }
+</style>
+
+<template id="tape-recorder-box">
+    <div class="tape-recorder-box"><!--
+        --><a class="action-button" data-bind="css: { '-playback': playbackState() === VAL_TR_PLAYBACK }, click: onActionsClick, attr: { 'title': title }"><!--
+            --><div class="icon"></div><!--
+            --><div class="title" data-bind="text: displayTitle"></div><!--
+            --><div class="status" data-bind="class: statusClass"></div><!--
+            --><div class="control"><!--
+                --><button class="control-button -command_play" data-bind="attr: { title: ZX_Lang.TR_PLAY }, visible: playbackState() === VAL_TR_INITIALIZED, click: onPlayClick, clickBubble: false"></button><!--
+                --><button class="control-button -command_pause" data-bind="attr: { title: ZX_Lang.TR_PAUSE }, visible: playbackState() === VAL_TR_PLAYBACK, click: onPauseClick, clickBubble: false"></button><!--
+                --><button class="control-button -command_resume" data-bind="attr: { title: ZX_Lang.TR_RESUME }, visible: playbackState() === VAL_TR_SUSPENDED, click: onResumeClick, clickBubble: false"></button><!--
+                --><button class="control-button -command_stop" data-bind="attr: { title: ZX_Lang.TR_STOP }, visible: playbackState() === VAL_TR_PLAYBACK || playbackState() === VAL_TR_SUSPENDED, click: onStopClick, clickBubble: false"></button><!--
+            --></div><!--
+        --></a><!--
+        --><ul class="action-list" data-bind="css: { '-visible': actionsVisible }, foreach: actions"><!--
+            --><li><a data-bind="text: title, attr: { 'data-command': command }, click: $parent.onActionItemClick"></a></li><!--
+        --></ul><!--
+    --></div>
+</template>
+
+<script type="text/javascript">
+    var TapeRecorderBoxStatus = {
+        empty: 0,
+        loading: 1,
+        loaded: 2,
+        error: 3
+    };
+
+    function TapeRecorderBox( container, index, onCommand ) {
+        'use strict';
+
+        this.title = ko.observable('');
+        this.status = ko.observable(TapeRecorderBoxStatus.empty);
+        this.playbackState = ko.observable(VAL_TR_EMPTY);
+        this.actions = ko.observableArray([]);
+        this.displayTitle = ko.pureComputed(function () {
+            if (this.status() == TapeRecorderBoxStatus.empty)
+                return ZX_Lang.TR_EMPTY;
+            return this.title();
+        }, this);
+        this.statusClass = ko.pureComputed(function () {
+            switch (this.status()) {
+                case TapeRecorderBoxStatus.empty: return 'empty';
+                case TapeRecorderBoxStatus.loading: return 'loading';
+                case TapeRecorderBoxStatus.loaded: return 'loaded';
+                case TapeRecorderBoxStatus.error: return 'error';
+            }
+            return '';
+        }, this);
+        this.actionsVisible = ko.observable(false);
+        this.actionsVisible.subscribe(function (value) {
+            if (value) {
+                setTimeout(function () {
+                    $(document.body)
+                    .on('click', this.onBodyClick)
+                    .on('keydown', this.onBodyKeyDown);
+                }.bind(this), 0)
+            }
+            else {
+                $(document.body)
+                    .off('click', this.onBodyClick)
+                    .off('keydown', this.onBodyKeyDown);
+            }
+        }.bind(this));
+
+        this.onPlayClick = function () {
+            onCommand('PLAY', index, this);
+        }.bind(this);
+
+        this.onPauseClick = function () {
+            onCommand('PAUSE', index, this);
+        }.bind(this);
+
+        this.onResumeClick = function () {
+            onCommand('PLAY', index, this);
+        }.bind(this);
+
+        this.onStopClick = function () {
+            onCommand('STOP', index, this);
+        }.bind(this);
+
+        this.onActionsClick = function () {
+            if (!this.actionsVisible()) {
+                this.actionsVisible(true);
+            }
+        }.bind(this);
+
+        this.onActionItemClick = function (action) {
+            this.actionsVisible(false);
+            onCommand(action.command, index, this);
+        }.bind(this);
+
+        this.onBodyClick = function (event) {
+            this.actionsVisible(false);
+        }.bind(this);
+
+        this.onBodyKeyDown = function (event) {
+			if (event.keyCode == 27) {
+                this.actionsVisible(false);
+				return false;
+			}
+        }.bind(this);
+
+        var $box = $("<?=tape-recorder-box?>").appendTo(container);
+        ko.applyBindings(this, $box[0]);
+    }
+</script>

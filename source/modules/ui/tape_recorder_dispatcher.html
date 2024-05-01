@@ -1,0 +1,244 @@
+<include source="tape_recorder_box.html" includeType="embed" />
+<include source="tape_info_dialog.html" includeType="embed" />
+<include source="tape_menu_dialog.html" includeType="embed" />
+<include source="tape_message_dialog.html" includeType="embed" />
+
+<script type="text/javascript">
+
+function ZX_TapeRecorderDispatcher(toolbar) {
+    var TR_COMMAND_PLAY = 'PLAY';
+    var TR_COMMAND_PAUSE = 'PAUSE';
+    var TR_COMMAND_STOP = 'STOP';
+    var TR_COMMAND_OPEN_LOCAL = 'open-local';
+    var TR_COMMAND_EJECT = 'eject';
+    var TR_COMMAND_SHOW_TAPE_INFO = 'show-tape-info';
+
+    var tapeRecorderBoxes = [];
+
+    this.addTapeRecorderBoxes = function () {
+        addTapeRecorderBox(toolbar, 0, doTapeRecorderBoxAction);
+    }
+
+    this.preloadImages = function () {
+        preload(0);
+    }
+
+    function addTapeRecorderBox(toolbar, index, handler) {
+        var fragment = document.createDocumentFragment();
+        var tapeRecorderBox = new TapeRecorderBox(fragment, index, handler);
+        tapeRecorderBox.actions.push({ command: TR_COMMAND_OPEN_LOCAL, title: ZX_Lang.TR_MENU_OPEN_FROM_LOCAL });
+        tapeRecorderBox.actions.push({ command: TR_COMMAND_EJECT, title: ZX_Lang.TR_MENU_EJECT });
+        tapeRecorderBox.actions.push({ command: TR_COMMAND_SHOW_TAPE_INFO, title: ZX_Lang.TR_MENU_SHOW_TAPE_INFO });
+        $(toolbar).append(fragment);
+        tapeRecorderBoxes.push(tapeRecorderBox);
+        ZXContext.hwConnector['get_onTape' + index + 'StateChanged']().subscribe(function (state) {
+            onTapeRecorderStateChanged(index, state);
+        });
+        ZXContext.hwConnector['get_onTape' + index + 'TapeEvent']().subscribe(function (event) {
+            onTapeEvent(index, event);
+        });
+    }
+
+    function doTapeRecorderBoxAction(command, tapeIndex, tapeRecorderBox) {
+        switch (command) {
+            case TR_COMMAND_PLAY: ZXContext.hwConnector.playTape(tapeIndex); break;
+            case TR_COMMAND_PAUSE: ZXContext.hwConnector.pauseTape(tapeIndex); break;
+            case TR_COMMAND_STOP: ZXContext.hwConnector.stopTape(tapeIndex); break;
+            case TR_COMMAND_OPEN_LOCAL: openLocal(tapeIndex, tapeRecorderBox); break;
+            case TR_COMMAND_EJECT: eject(tapeIndex, tapeRecorderBox); break;
+            case TR_COMMAND_SHOW_TAPE_INFO: openTapeInfoDialog(tapeIndex, tapeRecorderBox); break;
+        }
+    }
+
+    function onTapeRecorderStateChanged(index, state) {
+        var tapeRecorderBox = tapeRecorderBoxes[index];
+        tapeRecorderBox.playbackState(state.state);
+    }
+
+    function onTapeEvent(index, event) {
+        switch (event.type) {
+            case TAPE_EVENT.MESSAGE: 
+                openTapeMessageDialog(index, event.message, event.duration);
+                break;
+
+            case TAPE_EVENT.SELECTION:
+                openTapeMenuDialog(index, event.options);
+                break;
+
+            case TAPE_EVENT.SNAPSHOT_RESTORATION:
+                Promise.all([]).then(function () {
+                    return ZXContext.hwConnector.restoreSnapshot(event.format, event.snapshot);
+                }).catch(function (errorMessage) {
+                    if (errorMessage) {
+                        handleError(errorMessage);
+                    }
+                });
+                break;
+        }
+    }
+
+    function openTapeMessageDialog(index, message, timeout) {
+        var dlg = new TapeMessageDialog();
+        dlg.open(message, timeout);
+    }
+
+    function openTapeMenuDialog(index, options) {
+        if (!options || !options.length)
+            return;
+        Promise.all([]).then(function () {
+            var dlg = new TapeMenuDialog();
+            return dlg.open(options);
+        }).then(function (result) {
+            if (result && result.selectBlockIndex !== null) {
+                return ZXContext.hwConnector.selectTapeBlock(index, result.selectBlockIndex);
+            }
+        }).catch(function (errorMessage) {
+            if (errorMessage) {
+                handleError(errorMessage);
+            }
+        });
+    }
+
+    function openLocal(tapeIndex, tapeRecorderBox) {
+        var supportedExtensions = ['.tap', '.spc', '.sta', '.ltp', '.zxt', '.tzx'];
+        var $input = $('<input type="file" accept="' + supportedExtensions.join(',') + ',.zip" style="visibility: hidden;" />').appendTo(document.body);
+        $input.on('change', function (e) {
+            var filename = ($input.val() || '').replace(/^.*[\\\/]/, '');
+            if (!filename)
+                return;
+            var tapeRecorderBoxOriginalStatus = tapeRecorderBox.status();
+            Promise.all([]).then(function () {
+                tapeRecorderBox.status(TapeRecorderBoxStatus.loading);
+                if (/\.zip$/i.test(filename)) {
+                    return loadLocalFile($input[0]).then(function (data) {
+                        var zipBrowser = new ZipBrowser();
+                        return zipBrowser.open(data, supportedExtensions);
+                    });
+                }
+                else {
+                    var format = TapeFormat.getFromFileName(filename);
+                    return loadLocalFile($input[0]).then(function (data) {
+                        return {
+                            filename: filename, 
+                            data: data
+                        };
+                    });
+                }
+            }).then(function (imageInfo) {
+                if (!imageInfo) {
+                    tapeRecorderBox.status(tapeRecorderBoxOriginalStatus);
+                    return;
+                }
+                return ZXContext.hwConnector.insertTape(tapeIndex, imageInfo.filename, imageInfo.data).then(function (structure) {
+                    tapeRecorderBox.status(TapeRecorderBoxStatus.loaded);
+                    tapeRecorderBox.title(imageInfo.filename);
+                    ZXContext.settings.set_tape(tapeIndex, 'local:' + imageInfo.filename);
+                    createImageCache(tapeIndex, imageInfo.filename, imageInfo.data);
+                });
+            }).catch(function (errorMessage) {
+                if (errorMessage) {
+                    tapeRecorderBox.status(TapeRecorderBoxStatus.error);
+                    handleError(errorMessage);
+                }
+            }).finally(function () {
+                $input.remove();
+            });
+        });
+        $input.click();
+    }
+
+    function eject(tapeIndex, tapeRecorderBox) {
+        ZXContext.hwConnector.ejectTape(tapeIndex).then(function () {
+            tapeRecorderBox.status(TapeRecorderBoxStatus.empty);
+            tapeRecorderBox.title('');
+            ZXContext.settings.set_tape(tapeIndex, '');
+            clearImageCache(tapeIndex);
+        });
+    }
+
+    function openTapeInfoDialog(tapeIndex, tapeRecorderBox) {
+        Promise.all([]).then(function () {
+            return ZXContext.hwConnector.getTapeStructure(tapeIndex);
+        }).then(function (structure) {
+            var dlg = new TapeInfoDialog();
+            return dlg.open(tapeRecorderBox.title(), structure);
+        }).then(function (result) {
+            if (result && result.selectBlockIndex !== null) {
+                return ZXContext.hwConnector.selectTapeBlock(tapeIndex, result.selectBlockIndex);
+            }
+        }).catch(function (errorMessage) {
+            if (errorMessage) {
+                handleError(errorMessage);
+            }
+        });
+    }
+
+    function preload(tapeIndex) {
+		var prefixAndFilename = ZXContext.settings.get_tape(tapeIndex);
+		if (!prefixAndFilename)
+			return;
+        var tapeRecorderBox = tapeRecorderBoxes[tapeIndex];
+        tapeRecorderBox.status(TapeRecorderBoxStatus.loading);
+		Promise.all([]).then(function () {
+            var semicolonIndex = prefixAndFilename.indexOf(':');
+            var prefix = (semicolonIndex > 0) ? prefixAndFilename.substr(0, semicolonIndex) : '';
+            var filename = (semicolonIndex >= 0) ? prefixAndFilename.substr(semicolonIndex + 1) : prefixAndFilename;
+            var load = (prefix === 'local')
+                ? loadImageCache(tapeIndex).then(function (imageInfo) { return imageInfo.data; })
+                : loadServerFile(filename);
+            return load.then(function (data) {
+                return ZXContext.hwConnector.insertTape(tapeIndex, filename, data);
+            }).then(function (structure) {
+                tapeRecorderBox.status(TapeRecorderBoxStatus.loaded);
+                tapeRecorderBox.title(filename);
+            });
+        })
+        .catch(function (errorMessage) {
+            if (errorMessage) {
+                tapeRecorderBox.status(TapeRecorderBoxStatus.error);
+                handleError(errorMessage);
+            }
+        });
+	}
+
+    function loadImageCache(tapeIndex) {
+        return new Promise(function (resolve, reject) {
+            if (!localStorage) {
+                reject(ZX_Lang.ERR_LOCAL_STORAGE_NOT_SUPPORTED);
+                return;
+            }
+
+			var cacheKey = 'tape' + tapeIndex + "_cache";
+			var cacheData = localStorage[cacheKey];
+			if (!cacheData) 
+				throw new Error(ZX_Lang.ERR_LOCAL_STORAGE_HAS_NO_IMAGE);
+			var dataSeparator = cacheData.indexOf(':');
+			if (dataSeparator <= 0 || dataSeparator == cacheData.length - 1)
+				throw new Error(ZX_Lang.ERR_LOCAL_STORAGE_HAS_INVALID_IMAGE);
+			var filename = cacheData.substr(0, dataSeparator);
+			var base64Data = cacheData.substr(dataSeparator + 1);
+			var data = base64Decode(base64Data);
+            resolve({
+				filename: filename,
+				data: data
+			});
+        });
+	}
+
+    function createImageCache(tapeIndex, filename, data) {
+		if (localStorage) {
+            var cacheKey = 'tape' + tapeIndex + "_cache";
+            var cacheData = filename + ":" + base64Encode(data);
+            localStorage[cacheKey] = cacheData;
+        }
+    }
+
+    function clearImageCache(tapeIndex) {
+		if (localStorage) {
+            var cacheKey = 'tape' + tapeIndex + "_cache";
+            delete localStorage[cacheKey];
+        }
+    }
+}
+
+</script>

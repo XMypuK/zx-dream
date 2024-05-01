@@ -14,6 +14,16 @@ Object.assign(HWConnector.prototype, {
             rendererType: settings.get_rendererType(),
             renderOnAnimationFrame: settings.get_renderOnAnimationFrame()
         });
+        ZXContext.hw.tapeRecorders[0].applySettings(
+            settings.get_tapePrePauseCounterPulseDuration(),
+            settings.get_tapeDefaultPause(),
+            settings.get_tapeAutoPlayOnStandardRoutine(),
+            settings.get_tapeAutoStopAfterDataBlock(),
+            settings.get_tapeAutoStopOnLongPostPause(),
+            settings.get_tapeAutoStopOnLongPostPauseDuration(),
+            settings.get_tapeAutoStopOnZeroPostPause(),
+            settings.get_tapeBoostFactor()
+        );
         ZXContext.hw.psg.applySettings(
             settings.get_beeper(),
             settings.get_beeperVolume(),
@@ -109,6 +119,80 @@ Object.assign(HWConnector.prototype, {
         ZXContext.hw.drives[driveIndex].eject();
         return Promise.resolve();
     },
+    insertTape: function (index, filename, data) {
+        try {
+            var format = TapeFormat.getFromFileName(filename);
+            switch (format) {
+                case 'TAP':
+                case 'SPC':
+                case 'STA':
+                case 'LTP':
+                case 'ZXT':
+                case 'TZX':
+                    ZXContext.hw.tapeRecorders[index].insertTape(data, format);
+                    return Promise.resolve();
+                default:
+                    throw new Error(ZX_Lang.ERR_IMAGE_FORMAT_NOT_SUPPORTED + ' (' + format + ')');
+            }
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    ejectTape: function (index) {
+        try {
+            ZXContext.hw.tapeRecorders[index].ejectTape();
+            return Promise.resolve();
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    playTape: function (index) {
+        try {
+            ZXContext.hw.tapeRecorders[index].play();
+            return Promise.resolve();
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    pauseTape: function (index) {
+        try {
+            ZXContext.hw.tapeRecorders[index].pause();
+            return Promise.resolve();
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    stopTape: function (index) {
+        try {
+            ZXContext.hw.tapeRecorders[index].stop();
+            return Promise.resolve();
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    getTapeStructure: function (index) {
+        try {
+            var structure = ZXContext.hw.tapeRecorders[index].getStructure();
+            return Promise.resolve(structure);
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    selectTapeBlock: function (index, blockIndex) {
+        try {
+            ZXContext.hw.tapeRecorders[index].selectBlock(blockIndex);
+            return Promise.resolve();
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
     run: function () {
         ZXContext.hw.clock.run();
         return Promise.resolve();
@@ -145,5 +229,11 @@ Object.assign(HWConnector.prototype, {
     },
     get_onPsgDataReady: function () {
         return ZXContext.hw.psg.get_onDataReady();
+    },
+    get_onTape0StateChanged: function () {
+        return ZXContext.hw.tapeRecorders[0].get_onStateChanged();
+    },
+    get_onTape0TapeEvent: function () {
+        return ZXContext.hw.tapeRecorders[0].get_onTapeEvent();
     }
 });

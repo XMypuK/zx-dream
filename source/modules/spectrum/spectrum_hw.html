@@ -40,6 +40,9 @@ ZXContext.hw.betadisk = new ZX_BetaDisk();
 ZXContext.hw.joystick = new ZX_Joystick();
 ZXContext.hw.dummyGS = new ZX_DummyGS();
 ZXContext.hw.psg = new ZX_PSG();
+ZXContext.hw.tapeRecorders = [
+    new ZX_TapeRecorder()
+];
 
 ZXContext.hw.cpu.connect(ZXContext.hw.bus);
 ZXContext.hw.clock.connect(ZXContext.hw.bus, ZXContext.hw.cpu);
@@ -54,9 +57,10 @@ ZXContext.hw.betadisk.connect(ZXContext.hw.bus, ZXContext.hw.clock,	ZXContext.hw
 ZXContext.hw.joystick.connect(ZXContext.hw.bus);
 ZXContext.hw.dummyGS.connect(ZXContext.hw.bus);
 ZXContext.hw.psg.connect(ZXContext.hw.bus, ZXContext.hw.clock);
+ZXContext.hw.tapeRecorders[0].connect(ZXContext.hw.bus, ZXContext.hw.clock);
 ZXContext.hwConnector = new HWConnector();
 ZXContext.hwConnectorDedicated = new HWConnectorDedicated(self, ZXContext.hwConnector);
-ZXContext.hwConnectorDedicated.notifWorkerReady();
+ZXContext.hwConnectorDedicated.notifyWorkerReady();
 
 Promise.all([
     ZXContext.hwConnector.hwReady(),

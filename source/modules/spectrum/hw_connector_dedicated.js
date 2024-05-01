@@ -91,7 +91,7 @@ Object.assign(HWConnectorDedicated.prototype, {
     get_mainReady: function () {
         return this._mainReadyPromise.promise;
     },
-    notifWorkerReady: function () {
+    notifyWorkerReady: function () {
         this._workerContext.postMessage({
             type: HWCONNECTOR_MESSAGE_TYPE.workerReady
         });

@@ -1,0 +1,246 @@
+<style>
+    .tape-info-dialog { }
+    .tape-info-dialog > .tape-info { padding: 1em; }
+    .tape-info-dialog .tape-prop { font: 14px Verdana; }
+    .tape-info-dialog .tape-prop > .prop-header { font-weight: bold; }
+    .tape-info-dialog .tape-prop > .prop-header:after { display: inline; content: ': '; }
+    .tape-info-dialog .tape-prop > .prop-data { }
+    .tape-info-dialog .block-table { border: 1px solid #444444; border-collapse: collapse; }
+    .tape-info-dialog .block-table .header-row { text-align: left; vertical-align: top; }
+    .tape-info-dialog .block-table .header-row > th { border-bottom: 1px solid #444444; border-left: 1px solid #444444; background-color: #444444; color: #f7f7f7; padding: 0.2em 0.5em; }
+    .tape-info-dialog .block-table .header-row > .block-size { text-align: right; }
+    .tape-info-dialog .block-table .data-row > td { text-align: left; vertical-align: top; border-left: 1px solid #444444; border-bottom: 1px solid #dfdfdf; padding: 0.2em 0.5em; }
+    .tape-info-dialog .block-table .data-row:nth-child(2n) > td { background-color: #f7f7f7; }
+    .tape-info-dialog .block-table .data-row:last-child > td { border-bottom: 0; }
+    .tape-info-dialog .block-table .data-row > .block-index { text-align: center; }
+    .tape-info-dialog .block-table .data-row > .block-index:hover { background-color: #a0ffa0; cursor: pointer; }
+    .tape-info-dialog .block-table .data-row.-current > .block-index { background-color: #00bf00; }
+    .tape-info-dialog .block-table .data-row > .block-id { white-space: nowrap; }
+    .tape-info-dialog .block-table .data-row > .block-size { text-align: right; }
+    .tape-info-dialog .block-table .data-row > .block-info { padding: 0; }
+    .tape-info-dialog .block-prop-table { border-collapse: collapse; }
+    .tape-info-dialog .block-prop-table .block-prop-row > th { padding: 0.2em 0.5em; width: 150px; font-weight: normal; border-bottom: 1px solid #dfdfdf; background-color: #f0f0f0; }
+    .tape-info-dialog .block-prop-table .block-prop-row > th > .block-prop-header { }
+    .tape-info-dialog .block-prop-table .block-prop-row > th > .block-prop-header:after { display: inline; content: ': '; }
+    .tape-info-dialog .block-prop-table .block-prop-row > td { padding: 0.2em 0.5em; border-bottom: 1px solid #f0f0f0; }
+    .tape-info-dialog .block-prop-table .block-prop-row:last-child > * { border-bottom: 0; }
+    .tape-info-dialog .hardware-table { border-collapse: collapse; border: 1px solid #dfdfdf; }
+    .tape-info-dialog .hardware-table .header-row > th { background: #cccccc; border-left: 1px solid #cccccc; border-bottom: 1px solid #cccccc; color: #444444; font-weight: normal; }
+    .tape-info-dialog .hardware-table .data-row > td { border-left: 1px solid #dfdfdf; }
+</style>
+
+<template id="tape-info-dialog">
+    <div class="tape-info-dialog">
+        <div class="tape-info">
+            <!-- ko if: structure -->
+            <div class="tape-prop -prop_filename"><span class="prop-header" data-bind="text: ZX_Lang.TID_PROP_FILENAME"></span><span class="prop-data" data-bind="text: filename"></span></div>
+            <div class="tape-prop -prop_format"><span class="prop-header" data-bind="text: ZX_Lang.TID_PROP_FORMAT"></span><span class="prop-data" data-bind="text: structure.format"></span></div>
+            <!-- ko if: structure.formatVersion -->
+            <div class="tape-prop -prop_format-version"><span class="prop-header" data-bind="text: ZX_Lang.TID_PROP_FORMAT_VERSION"></span><span class="prop-data" data-bind="text: structure.formatVersion"></span></div>
+            <!-- /ko -->
+            <div class="tape-prop -prop_size"><span class="prop-header" data-bind="text: ZX_Lang.TID_PROP_SIZE"></span><span class="prop-data" data-bind="text: structure.size"></span></div>
+            <div class="tape-prop -prop_blocks">
+                <span class="prop-header" data-bind="text: ZX_Lang.TID_PROP_BLOCKS"></span>
+                <div class="prop-data">
+                    <table class="block-table">
+                        <thead>
+                            <tr class="header-row">
+                                <th class="block-index" data-bind="text: ZX_Lang.TID_PROP_INDEX"></th>
+                                <th class="block-id" data-bind="text: ZX_Lang.TID_PROP_ID"></th>
+                                <th class="block-size" data-bind="text: ZX_Lang.TID_PROP_SIZE"></th>
+                                <th class="block-info" data-bind="text: ZX_Lang.TID_PROP_INFO"></th>
+                            </tr>
+                        </thead>
+                        <tbody data-bind="foreach: structure.blocks">
+                            <tr class="data-row" data-bind="css: { '-current': index === ($root.selectBlockIndex() !== null ? $root.selectBlockIndex() : $root.structure.currentIndex) }">
+                                <td class="block-index" data-bind="click: $root.onBlockIndexClick, attr: { 'title': ZX_Lang.TID_PROMPT_GO_TO_THIS_BLOCK }"><a data-bind="text: index, click: $root.onBlockIndexClick, attr: { 'title': ZX_Lang.TID_PROMPT_GO_TO_THIS_BLOCK }"></a></td>
+                                <td class="block-id"><span data-bind="text: idDescription || (id ? '(' + id + ')' : ''), attr: { 'title': id }"></span></td>
+                                <td class="block-size"><span data-bind="text: size"></span></td>
+                                <td class="block-info">
+                                    <div class="block-info-content">
+                                        <table class="block-prop-table">
+                                            <tbody>
+                                                <!-- ko if: $data.__classes.indexOf('TapeHeaderBlockInfo') >= 0 -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_header-type" data-bind="text: ZX_Lang.TID_PROP_DATA_TYPE"></span></th>
+                                                    <td><span class="block-prop-data -prop_header-type" data-bind="text: typeDescription || (type ? '(' + type + ')' : ''), attr: { 'title': type }"></span></td>
+                                                </tr>
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_filename" data-bind="text: ZX_Lang.TID_PROP_FILENAME"></span></th>
+                                                    <td><span class="block-prop-data -prop_filename" data-bind="text: filename"></span></td>
+                                                </tr>
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_bin-length" data-bind="text: ZX_Lang.TID_PROP_DATA_LENGTH"></span></th>
+                                                    <td><span class="block-prop-data -prop_bin-length" data-bind="text: binLength"></span></td>
+                                                </tr>                                                
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_param1" data-bind="text: ZX_Lang.TID_PROP_PARAM1"></span></th>
+                                                    <td><span class="block-prop-data -prop_param1" data-bind="text: param1"></span></td>
+                                                </tr>
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_param1" data-bind="text: ZX_Lang.TID_PROP_PARAM2"></span></th>
+                                                    <td><span class="block-prop-data -prop_param1" data-bind="text: param2"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeDataBlockInfo') >= 0 && $data.postPause !== null -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_post-pause" data-bind="text: ZX_Lang.TID_PROP_POST_PAUSE"></span></th>
+                                                    <td><span class="block-prop-data -prop_post-pause" data-bind="text: postPause"></span> <span data-bind="text: ZX_Lang.TID_UNIT_MS"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeDescriptionBlockInfo') >= 0 -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_description" data-bind="text: ZX_Lang.TID_PROP_DESCRIPTION"></span></th>
+                                                    <td><span class="block-prop-data -prop_description" data-bind="text: description"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeMessageBlockInfo') >= 0 -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_message" data-bind="text: ZX_Lang.TID_PROP_MESSAGE"></span></th>
+                                                    <td><span class="block-prop-data -prop_message" data-bind="text: message"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeGroupBlockInfo') >= 0 -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_name" data-bind="text: ZX_Lang.TID_PROP_NAME"></span></th>
+                                                    <td><span class="block-prop-data -prop_name" data-bind="text: name"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapePauseBlockInfo') >= 0 -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_pause" data-bind="text: ZX_Lang.TID_PROP_PAUSE"></span></th>
+                                                    <td><span class="block-prop-data -prop_pause" data-bind="text: duration"></span> <span data-bind="text: ZX_Lang.TID_UNIT_MS"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeArchiveBlockInfo') >= 0 -->
+                                                <!-- ko foreach: records -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_arc-record" data-bind="text: infoIdDescription || (infoId ? '(' + infoId + ')' : ''), attr: { 'title': infoId }"></span></th>
+                                                    <td><span class="block-prop-data -prop_arc-record" data-bind="text: infoText"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeHardwareTypeBlockInfo') >= 0 -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_hardware" data-bind="text: ZX_Lang.TID_PROP_HARDWARE"></span></th>
+                                                    <td>
+                                                        <div class="block-prop-data -prop_hardware">
+                                                            <table class="hardware-table">
+                                                                <thead>
+                                                                    <tr class="header-row">
+                                                                        <th data-bind="text: ZX_Lang.TID_PROP_HARDWARE_TYPE"></th>
+                                                                        <th data-bind="text: ZX_Lang.TID_PROP_HARDWARE_ID"></th>
+                                                                        <th data-bind="text: ZX_Lang.TID_PROP_HARDWARE_RELATION"></th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody data-bind="foreach: records">
+                                                                    <tr class="data-row">
+                                                                        <td data-bind="text: typeDescription || (type ? '(' + type + ')' : ''), attr: { 'title': type }"></td>
+                                                                        <td data-bind="text: idDescription || (id ? '(' + id + ')' : ''), attr: { 'title': id }"></td>
+                                                                        <td data-bind="text: relationDescription || (relation ? '(' + relation + ')' : ''), attr: { 'title': relation }"></td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeSelectBlockInfo') >= 0 -->
+                                                <!-- ko foreach: options -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_select-option" data-bind="text: 'Block #' + blockIndex"></span></th>
+                                                    <td><span class="block-prop-data -prop_select-option" data-bind="text: description"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                                <!-- /ko -->
+                                                <!-- ko if: $data.__classes.indexOf('TapeSnapshotBlockInfo') >= 0 -->
+                                                <tr class="block-prop-row">
+                                                    <th><span class="block-prop-header -prop_format" data-bind="text: ZX_Lang.TID_PROP_FORMAT"></span></th>
+                                                    <td><span class="block-prop-data -prop_format" data-bind="text: format"></span></td>
+                                                </tr>
+                                                <!-- /ko -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- /ko -->
+            <!-- ko ifnot: structure -->
+            <div data-bind="text: ZX_Lang.TID_NO_INFO"></div>
+            <!-- /ko -->
+        </div>
+    </div>
+</template>
+
+<script type="text/javascript">
+    function TapeInfoDialog() {
+        var $dlg = $("<?=tape-info-dialog?>");
+        var openResult$ = null;
+        var model = this;
+
+        this.filename = null;
+        this.structure = null;
+        this.selectBlockIndex = ko.observable(null);
+
+        this.open = function (filename, structure) {
+            if (!openResult$) {
+                this.filename = filename;
+                this.structure = structure;
+                openResult$ = Promise.withResolvers();
+                init();
+            }
+            return openResult$.promise;
+        }
+
+        function init() {
+            $dlg.dialog({
+                autoOpen: true,
+                title: ZX_Lang.TID_TITLE,
+                modal: true,
+                width: 800,
+                height: 600,
+                buttons: [
+					{ text: ZX_Lang.TID_BTN_APPLY, click: apply },
+					{ text: ZX_Lang.TID_BTN_CANCEL, click: cancel }
+				],
+                close: function (e) {
+                    $(this).dialog('destroy');
+					$(this).remove(); 
+					if (openResult$) {
+						openResult$.resolve();
+						openResult$ = null;
+					}
+                }
+            });
+            ko.applyBindings(model, $dlg[0]);
+        }
+
+        this.onBlockIndexClick = function (block) {
+            model.selectBlockIndex(block.index);
+        }
+
+        function apply() {
+			if (openResult$) {
+				openResult$.resolve({ 
+                    selectBlockIndex: (model.selectBlockIndex() !== null && model.selectBlockIndex() !== model.structure.currentIndex) ? model.selectBlockIndex() : null
+                });
+				openResult$ = null;
+			}
+			$dlg.dialog('close');
+			$dlg = null;
+        }
+
+        function cancel() {
+            if (openResult$) {
+				openResult$.resolve();
+				openResult$ = null;
+			}			
+			$dlg.dialog('close');
+			$dlg = null;
+        }        
+    }
+</script>

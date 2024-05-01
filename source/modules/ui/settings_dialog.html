@@ -149,6 +149,43 @@
 					</tr>
 				</table>
 			</div>
+			<div class="settigns__section settings-section" data-bind="css: { '-active': activeSection() == 'tape-recorder' }">
+				<table>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_PRE_PAUSE_COUNTER_PULSE"></th>
+						<td><input type="text" data-bind="textInput: tapePrePauseCounterPulseDuration" /></td>
+					</tr>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_DEFAULT_PAUSE"></th>
+						<td><input type="text" data-bind="textInput: tapeDefaultPause" /></td>
+					</tr>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_AUTOPLAY_ON_STANDARD_LOADER"></th>
+						<td><input type="checkbox" data-bind="checked: tapeAutoPlayOnStandardRoutine"></td>
+					</tr>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_PAUSE_AFTER_DATA_BLOCK"></th>
+						<td><select data-bind="options: tapeAutoStopAfterDataBlockOptions, optionsValue: 'value', optionsText: 'text', value: tapeAutoStopAfterDataBlock"></select></td>
+					</tr>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_PAUSE_ON_LONG_BLOCK_POST_PAUSE"></th>
+						<td><select data-bind="options: tapeAutoStopOnLongPostPauseOptions, optionsValue: 'value', optionsText: 'text', value: tapeAutoStopOnLongPostPause"></select></td>
+					</tr>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_LONG_PAUSE_DURATION"></th>
+						<td><input type="text" data-bind="textInput: tapeAutoStopOnLongPostPauseDuration"></td>
+					</tr>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_PAUSE_ON_ZERO_BLOCK_POST_PAUSE"></th>
+						<td><input type="checkbox" data-bind="checked: tapeAutoStopOnZeroPostPause"></td>
+					</tr>
+					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_BOOST_FACTOR"></th>
+						<td><input type="text" data-bind="textInput: tapeBoostFactor"></td>
+					</tr>					
+				</table>
+				<div class="note" data-bind="text: ZX_Lang.SETTINGS_TAPE_PAUSE_NOTE"></div>
+			</div>			
 			<div class="settings__section settings-section" data-bind="css: { '-active': activeSection() == 'misc' }">
 				<table>
 					<tr>
@@ -286,11 +323,31 @@
 		this.threadingOptions = ko.observableArray(threadingOptions);
 		this.threading = ko.observable(ZXContext.settings.get_threading());
 
+		this.tapePrePauseCounterPulseDuration = ko.observable(ZXContext.settings.get_tapePrePauseCounterPulseDuration());
+		this.tapeDefaultPause = ko.observable(ZXContext.settings.get_tapeDefaultPause());
+		this.tapeAutoPlayOnStandardRoutine = ko.observable(ZXContext.settings.get_tapeAutoPlayOnStandardRoutine());
+		this.tapeAutoStopAfterDataBlockOptions = ko.observableArray([
+			{ value: VAL_TAPACT_NO, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_NO },
+			{ value: VAL_TAPACT_SIMPLE_TAPES, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_SIMPLE_TAPES },
+			{ value: VAL_TAPACT_ALL_TAPES, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_ALL_TAPES }
+		]);
+		this.tapeAutoStopAfterDataBlock = ko.observable(ZXContext.settings.get_tapeAutoStopAfterDataBlock());
+		this.tapeAutoStopOnLongPostPauseOptions = ko.observableArray([
+		{ value: VAL_TAPACT_NO, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_NO },
+			{ value: VAL_TAPACT_SIMPLE_TAPES, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_SIMPLE_TAPES },
+			{ value: VAL_TAPACT_ALL_TAPES, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_ALL_TAPES }
+		]);
+		this.tapeAutoStopOnLongPostPause = ko.observable(ZXContext.settings.get_tapeAutoStopOnLongPostPause());
+		this.tapeAutoStopOnLongPostPauseDuration = ko.observable(ZXContext.settings.get_tapeAutoStopOnLongPostPauseDuration());
+		this.tapeAutoStopOnZeroPostPause = ko.observable(ZXContext.settings.get_tapeAutoStopOnZeroPostPause());
+		this.tapeBoostFactor = ko.observable(ZXContext.settings.get_tapeBoostFactor());
+
 		this.sectionOptions = ko.observableArray([
 			{ value: 'bus', text: ZX_Lang.SETTINGS_SECTION_BUS },
 			{ value: 'memory', text: ZX_Lang.SETTINGS_SECTION_MEMORY },
 			{ value: 'display', text: ZX_Lang.SETTINGS_SECTION_DISPLAY },
 			{ value: 'audio', text: ZX_Lang.SETTINGS_SECTION_AUDIO },
+			{ value: 'tape-recorder', text: ZX_Lang.SETTINGS_SECTION_TAPE },
 			{ value: 'misc', text: ZX_Lang.SETTINGS_SECTION_MISC }
 		]);
 		this.activeSection = ko.observable('bus');
@@ -370,6 +427,14 @@
 			ZXContext.settings.set_psgTurboSound(+model.psgTurboSound());
 			ZXContext.settings.set_psgChannelLayout(+model.psgChannelLayout());
 			ZXContext.settings.set_psgVolume(+model.psgVolume());
+			ZXContext.settings.set_tapePrePauseCounterPulseDuration(+model.tapePrePauseCounterPulseDuration() || 0);
+			ZXContext.settings.set_tapeDefaultPause(+model.tapeDefaultPause() || ZX_Settings.defaultValues.tapeDefaultPause);
+			ZXContext.settings.set_tapeAutoPlayOnStandardRoutine(model.tapeAutoPlayOnStandardRoutine());
+			ZXContext.settings.set_tapeAutoStopAfterDataBlock(+model.tapeAutoStopAfterDataBlock() || ZX_Settings.defaultValues.tapeAutoStopAfterDataBlock);
+			ZXContext.settings.set_tapeAutoStopOnLongPostPause(+model.tapeAutoStopOnLongPostPause() || ZX_Settings.defaultValues.tapeAutoStopOnLongPostPause);
+			ZXContext.settings.set_tapeAutoStopOnLongPostPauseDuration(+model.tapeAutoStopOnLongPostPauseDuration() || ZX_Settings.defaultValues.tapeAutoStopOnLongPostPauseDuration);
+			ZXContext.settings.set_tapeAutoStopOnZeroPostPause(model.tapeAutoStopOnZeroPostPause());
+			ZXContext.settings.set_tapeBoostFactor(+model.tapeBoostFactor() || ZX_Settings.defaultValues.tapeBoostFactor);
 			ZXContext.settings.set_threading(+model.threading());
 
 			if (openResult$) {

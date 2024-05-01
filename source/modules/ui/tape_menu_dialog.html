@@ -1,0 +1,101 @@
+<style>
+    .tape-menu-dialog { font: 14px Verdana; }
+    .tape-menu-dialog > .tape-menu { padding: 1em; }
+    .tape-menu-dialog .menu-table { border: 1px solid #444444; border-collapse: collapse; }
+    .tape-menu-dialog .menu-header > th { text-align: center; vertical-align: top; border-bottom: 1px solid #444444; border-left: 1px solid #444444; background-color: #444444; color: #f7f7f7; padding: 0.2em 0.5em; }
+    .tape-menu-dialog .menu-header > th.col-description { text-align: left; }
+    .tape-menu-dialog .menu-row > td { text-align: center; vertical-align: top; border-left: 1px solid #444444; border-bottom: 1px solid #dfdfdf; padding: 0.2em 0.5em; cursor: pointer; }
+    .tape-menu-dialog .menu-row > td.col-description { text-align: left; }
+    .tape-menu-dialog .menu-row:nth-child(2n) > td { background-color: #f7f7f7; }
+    .tape-menu-dialog .menu-row:last-child > td { border-bottom: 0; }
+    .tape-menu-dialog .menu-row:hover > td { background-color: #a0ffa0; }
+    .tape-menu-dialog .menu-row.-selected > td { background-color: #00bf00; }
+</style>
+
+<template id="tape-menu-dialog">
+    <div class="tape-menu-dialog">
+        <div class="tape-menu">
+            <table class="menu-table">
+                <tr class="menu-header">
+                    <th class="col-number" data-bind="text: ZX_Lang.TMD_PROP_NUM"></th>
+                    <th class="col-description" data-bind="text: ZX_Lang.TMD_PROP_DESCRIPTION"></th>
+                    <th class="col-block" data-bind="text: ZX_Lang.TMD_PROP_BLOCK"></th>
+                </tr>
+                <!-- ko foreach: options -->
+                <tr class="menu-row" data-bind="css: { '-selected': $data == $parent.selection() }, click: $parent.selectOption">
+                    <td class="col-number" data-bind="text: $index() + 1"></td>
+                    <td class="col-description" data-bind="text: description"></td>
+                    <td class="col-block" data-bind="text: block"></td>
+                </tr>
+                <!-- /ko -->
+            </table>
+        </div>
+    </div>
+</template>
+
+<script type="text/javascript">
+    function TapeMenuDialog() {
+        var $dlg = $("<?=tape-menu-dialog?>");
+        var openResult$ = null;
+        var model = this;
+
+        this.options = ko.observableArray([]);
+        this.selection = ko.observable(null);
+        this.selectOption = function (option) {
+            this.selection(option);
+        }.bind(this);
+
+        this.open = function (options) {
+            if (!openResult$) {
+                this.options(options);
+                openResult$ = Promise.withResolvers();
+                init();
+            }
+            return openResult$.promise;
+        }
+
+        function init() {
+            $dlg.dialog({
+                autoOpen: true,
+                title: ZX_Lang.TMD_TITLE,
+                modal: true,
+                width: 800,
+                height: 600,
+                buttons: [
+					{ text: ZX_Lang.TMD_BTN_APPLY, click: apply },
+					{ text: ZX_Lang.TMD_BTN_CANCEL, click: cancel }
+				],
+
+                close: function (e) {
+                    $(this).dialog('destroy');
+					$(this).remove(); 
+					if (openResult$) {
+						openResult$.resolve();
+						openResult$ = null;
+					}
+                }
+            });
+            ko.applyBindings(model, $dlg[0]);
+        }
+
+        function apply() {
+			if (openResult$) {
+				openResult$.resolve({ 
+                    selectBlockIndex: (model.selection() !== null) ? model.selection().block : null
+                });
+				openResult$ = null;
+			}
+			$dlg.dialog('close');
+			$dlg = null;
+        }
+
+        function cancel() {
+            if (openResult$) {
+				openResult$.resolve();
+				openResult$ = null;
+			}			
+			$dlg.dialog('close');
+			$dlg = null;
+        }  
+    }
+</script>

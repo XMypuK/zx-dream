@@ -8,10 +8,6 @@ function ZX_PortFE() {
 		_bus.var_write('port_fe_value', data);
 	}
 
-	function io_read_fe(address) {
-		return 0xBF; // на входе магнитофонного входа 0
-	}
-
 	function var_write_port_fe_value(name, value) {
 		port_value = value;
 	}
@@ -29,7 +25,6 @@ function ZX_PortFE() {
 		// в Pentagon128 проверка доступа к порту
 		// осуществляется только по линии A0
 		bus.on_io_write(io_write_fe, { mask: 0x01, value: 0x00 });
-		bus.on_io_read(io_read_fe, { mask: 0x01, value: 0x00 });
 		bus.on_var_write(var_write_port_fe_value, 'port_fe_value');
 		bus.on_var_read(var_read_port_fe_value, 'port_fe_value');
 		bus.on_reset(reset);
