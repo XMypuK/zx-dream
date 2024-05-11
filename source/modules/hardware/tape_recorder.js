@@ -16,11 +16,16 @@ function ZX_TapeRecorder() {
     this.get_prePauseCounterPulseDuration = get_prePauseCounterPulseDuration;
     this.get_defaultPause = get_defaultPause;
     this.get_autoPlayOnStandardRoutine = get_autoPlayOnStandardRoutine;
+    this.get_autoPlayOnCustomLoader = get_autoPlayOnCustomLoader;
     this.get_autoStopAfterDataBlock = get_autoStopAfterDataBlock;
     this.get_autoStopOnLongPostPause = get_autoStopOnLongPostPause;
     this.get_autoStopOnLongPostPauseDuration = get_autoStopOnLongPostPauseDuration;
     this.get_autoStopOnZeroPostPause = get_autoStopOnZeroPostPause;
     this.get_boostFactor = get_boostFactor;
+    this.get_globalAutoPlay = get_globalAutoPlay;
+    this.set_globalAutoPlay = set_globalAutoPlay;
+    this.get_globalAutoStop = get_globalAutoStop;
+    this.set_globalAutoStop = set_globalAutoStop;
 
     var TSTATES_PER_MS = 3500;
     
@@ -63,6 +68,7 @@ function ZX_TapeRecorder() {
 
     var _bus;
     var _clock;
+    var _cpu;
     var _state = VAL_TR_EMPTY;
     var _pulseEnumerator = null;
     var _baseTstates = 0;
@@ -71,19 +77,45 @@ function ZX_TapeRecorder() {
     var _prePauseCounterPulseDuration = 1;
     var _defaultPause = 1500;
     var _autoPlayOnStandardRoutine = true;
+    var _autoPlayOnCustomLoader = true;
     var _autoStopAfterDataBlock = VAL_TAPACT_SIMPLE_TAPES;
     var _autoStopOnLongPostPause = VAL_TAPACT_SIMPLE_TAPES;
     var _autoStopOnLongPostPauseDuration = 3500;
     var _autoStopOnZeroPostPause = true;
     var _boostFactor = 8;
+    var _globalAutoPlay = true;
+    var _globalAutoStop = true;
+    var _stoppedByUser = false;
 
-    function connect(bus, clock) {
+    var _ld_points = 0;
+    var _ld_pointsTrigger = 7;
+    var _ld_tstatesLast = 0;
+    var _ld_maxPeriod = 100;
+    var _ld_keyboardRoutines = new Map();
+    var _ld_keyboardRoutinesPatterns = [
+        [0xDB, 0xFE, 0xF6, 0xE0],
+        [0xDB, 0xFE, 0xE6, 0x1F],
+        [0xDB, 0xFE, 0x2F, 0xE6, 0x1F]
+    ];
+
+    function connect(bus, clock, cpu) {
         _bus = bus;
         _clock = clock;
+        _cpu = cpu;
         bus.on_io_read(io_read_fe, { mask: 0x01, value: 0x00 });
-        bus.on_instruction_read(instruction_read_0556, { mask: 0xFFFF, value: 0x0556 });
+        bus.on_instruction_read(std_load_routing, { mask: 0xFFFF, value: 0x05E7 });
         bus.on_var_write(write_7ffd, 'port_7ffd_value');
         bus.on_var_write(write_intrq, 'intrq');
+        bus.on_reset(reset);
+    }
+
+    function reset() {
+        _ld_points = 0;
+        _ld_keyboardRoutines.clear();
+        _stoppedByUser = false;
+        if (_state == VAL_TR_FINISHED) {
+            setState(VAL_TR_INITIALIZED);
+        }
     }
 
     function insertTape(data, format) {
@@ -97,7 +129,7 @@ function ZX_TapeRecorder() {
         switch (format) {
             case TapeFormat.TZX: 
                 _pulseEnumerator = new TZXPulseEnumerator(data, options);
-                _pulseEnumerator.set_mode48(!!(ZXContext.hw.bus.var_read('port_7ffd_value') & 0x20));
+                _pulseEnumerator.set_mode48(!!(_bus.var_read('port_7ffd_value') & 0x20));
                 break;
             default: 
                 _pulseEnumerator = new PulseEnumerator(data, options);
@@ -116,25 +148,36 @@ function ZX_TapeRecorder() {
         setState(VAL_TR_EMPTY);
     }
 
-    function play() {
+    function play(userAction) {
         if (_state === VAL_TR_EMPTY)
             throw new Error(ZX_Lang.ERR_TR_EMPTY);
         _baseTstates = _clock.get_tstates();
         setState(VAL_TR_PLAYBACK);
+        if (userAction) {
+            _stoppedByUser = false;
+        }
     }
 
-    function pause() {
+    function pause(userAction) {
         if (_state === VAL_TR_EMPTY)
             throw new Error(ZX_Lang.ERR_TR_EMPTY);
+        var prevState = _state;
         _pulseEnumerator.resetBlock();
         setState(VAL_TR_SUSPENDED);
+        if (userAction && prevState === VAL_TR_PLAYBACK) {
+            _stoppedByUser = true;
+        }
     }
 
-    function stop() {
+    function stop(userAction) {
         if (_state === VAL_TR_EMPTY)
             throw new Error(ZX_Lang.ERR_TR_EMPTY);
+        var prevState = _state;
         _pulseEnumerator.reset();
         setState(VAL_TR_INITIALIZED);
+        if (userAction && prevState === VAL_TR_PLAYBACK) {
+            _stoppedByUser = true;
+        }
     }
 
     function getStructure() {
@@ -152,6 +195,7 @@ function ZX_TapeRecorder() {
         }
         _pulseEnumerator.selectBlock(index);
         setState(VAL_TR_SUSPENDED);
+        _stoppedByUser = false;
     }
 
     function get_state() {
@@ -170,20 +214,26 @@ function ZX_TapeRecorder() {
         prePauseCounterPulseDuration,
         defaultPause,
         autoPlayOnStandardRoutine,
+        autoPlayOnCustomLoader,
         autoStopAfterDataBlock,
         autoStopOnLongPostPause,
         autoStopOnLongPostPauseDuration,
         autoStopOnZeroPostPause,
-        boostFactor) {
+        boostFactor,
+        globalAutoPlay,
+        globalAutoStop) {
 
         _prePauseCounterPulseDuration = prePauseCounterPulseDuration;
         _defaultPause = defaultPause;
         _autoPlayOnStandardRoutine = autoPlayOnStandardRoutine;
+        _autoPlayOnCustomLoader = autoPlayOnCustomLoader;
         _autoStopAfterDataBlock = autoStopAfterDataBlock;
         _autoStopOnLongPostPause = autoStopOnLongPostPause;
         _autoStopOnLongPostPauseDuration = autoStopOnLongPostPauseDuration;
         _autoStopOnZeroPostPause = autoStopOnZeroPostPause;
         _boostFactor = boostFactor;
+        _globalAutoPlay = globalAutoPlay;
+        _globalAutoStop = globalAutoStop;
         
         propogateSettingsToPulseEnumerator();
     }
@@ -199,8 +249,8 @@ function ZX_TapeRecorder() {
         _pulseEnumerator.set_defaultPause(_defaultPause);
         switch (_autoStopAfterDataBlock) {
             case VAL_TAPACT_NO: _pulseEnumerator.set_autoStopAfterDataBlock(false); break;
-            case VAL_TAPACT_ALL_TAPES: _pulseEnumerator.set_autoStopAfterDataBlock(true); break;
-            case VAL_TAPACT_SIMPLE_TAPES: _pulseEnumerator.set_autoStopAfterDataBlock(structureIsSimple); break;
+            case VAL_TAPACT_ALL_TAPES: _pulseEnumerator.set_autoStopAfterDataBlock(_globalAutoStop); break;
+            case VAL_TAPACT_SIMPLE_TAPES: _pulseEnumerator.set_autoStopAfterDataBlock(structureIsSimple && _globalAutoStop); break;
         }
 
         if (!(_pulseEnumerator instanceof TZXPulseEnumerator))
@@ -208,8 +258,8 @@ function ZX_TapeRecorder() {
         
         switch (_autoStopOnLongPostPause) {
             case VAL_TAPACT_NO: _pulseEnumerator.set_autoStopOnLongPostPauseDuration(0); break;
-            case VAL_TAPACT_ALL_TAPES: _pulseEnumerator.set_autoStopOnLongPostPauseDuration(_autoStopOnLongPostPauseDuration); break;
-            case VAL_TAPACT_SIMPLE_TAPES: _pulseEnumerator.set_autoStopOnLongPostPauseDuration(structureIsSimple ? _autoStopOnLongPostPauseDuration : 0); break;
+            case VAL_TAPACT_ALL_TAPES: _pulseEnumerator.set_autoStopOnLongPostPauseDuration(_globalAutoStop ? _autoStopOnLongPostPauseDuration : 0); break;
+            case VAL_TAPACT_SIMPLE_TAPES: _pulseEnumerator.set_autoStopOnLongPostPauseDuration(_globalAutoStop && structureIsSimple ? _autoStopOnLongPostPauseDuration : 0); break;
         }
         _pulseEnumerator.set_autoStopOnZeroPostPause(_pulseEnumerator.set_autoStopOnZeroPostPause());
     }
@@ -224,6 +274,10 @@ function ZX_TapeRecorder() {
 
     function get_autoPlayOnStandardRoutine() {
         return _autoPlayOnStandardRoutine;
+    }
+
+    function get_autoPlayOnCustomLoader() {
+        return _autoPlayOnCustomLoader;
     }
 
     function get_autoStopAfterDataBlock() {
@@ -244,6 +298,23 @@ function ZX_TapeRecorder() {
 
     function get_boostFactor() {
         return _boostFactor;
+    }
+
+    function get_globalAutoPlay() {
+        return _globalAutoPlay;
+    }
+
+    function set_globalAutoPlay(value) {
+        _globalAutoPlay = value;
+    }
+
+    function get_globalAutoStop() {
+        return _globalAutoStop;
+    }
+
+    function set_globalAutoStop(value) {
+        _globalAutoStop = value;
+        propogateSettingsToPulseEnumerator();
     }
 
     function isSimpleStructure(structure) {
@@ -337,19 +408,64 @@ function ZX_TapeRecorder() {
         }
         else {
             _pulseEnumerator.reset();
-            setState(VAL_TR_INITIALIZED);
+            setState(VAL_TR_FINISHED);
         }
         return 0xBF;
     }
 
     function io_read_fe(address) {
-        if (_state !== VAL_TR_PLAYBACK)
-            return 0xBF;
-        return readTape();
+        if (_state === VAL_TR_PLAYBACK) {
+            return readTape();
+        }
+        else if (_state !== VAL_TR_EMPTY && _state !== VAL_TR_FINISHED && _autoPlayOnCustomLoader && _globalAutoPlay && !_stoppedByUser) {
+            var addrHi = address >> 8;
+            var tstates;
+            var pc;
+            var positive = addrHi !== 0xBF 
+                && addrHi !== 0xDF 
+                && addrHi !== 0xEF 
+                && addrHi !== 0xF7 
+                && addrHi !== 0xFB 
+                && addrHi !== 0xFD 
+                && addrHi !== 0xFE
+                && (addrHi !== 0x00 || _ld_keyboardRoutines.get(pc = _cpu.get_state().pc) !== true);
+            if (positive && addrHi === 0x00 && _ld_keyboardRoutines.get(pc) !== false) {
+                var matches = _ld_keyboardRoutinesPatterns.map(function () { return true });
+                for (var instrIndex = 0, offset = -2; instrIndex < 5; instrIndex++, offset++) {
+                    var instr = _bus.mem_read((pc + offset) & 0xFFFF);
+                    for (var patIndex = 0; patIndex < matches.length; patIndex++) {
+                        var pattern = _ld_keyboardRoutinesPatterns[patIndex];
+                        if (matches[patIndex] && instrIndex < pattern.length && instr !== pattern[instrIndex])  {
+                            matches[patIndex] = false;
+                        }
+                    }
+                }
+                var isKeyboardRoutine = matches.indexOf(true) >= 0;
+                _ld_keyboardRoutines.set(pc, isKeyboardRoutine);
+                positive = !isKeyboardRoutine;
+            }
+            if (positive) {
+                tstates = _clock.get_tstates();
+                var period = tstates - _ld_tstatesLast;
+                _ld_tstatesLast = tstates;
+                positive = period <= _ld_maxPeriod;
+            }
+            if (positive) {
+                _ld_points++;
+                if (_ld_points === _ld_pointsTrigger) {
+                    _ld_points = 0;
+                    play();
+                }
+            }
+            else if (_ld_points > 0) {
+                _ld_points--;
+            }
+        }
+        return 0xBF;
     }
 
-    function instruction_read_0556(address) {
-        if (!_autoPlayOnStandardRoutine || _state === VAL_TR_EMPTY)
+    function std_load_routing(address) {
+        if (!_autoPlayOnStandardRoutine || !_globalAutoPlay || _state === VAL_TR_EMPTY || _state === VAL_TR_FINISHED || _stoppedByUser)
             return;
         var rom_trdos = _bus.var_read('rom_trdos');
         if (rom_trdos)
@@ -357,12 +473,8 @@ function ZX_TapeRecorder() {
         var rom_sos128 = !(_bus.var_read('port_7ffd_value') & 0x10);
         if (rom_sos128)
             return;
-        if (_state === VAL_TR_PLAYBACK) {
-            if (_pulseEnumerator.get_autoStopChance()) {
-                _pulseEnumerator.supressAutoStop();
-            }
-        }
-        else {
+        if (_state !== VAL_TR_PLAYBACK) {
+            _ld_points = 0;
             play();
         }
     }
@@ -450,7 +562,12 @@ function ZX_TapeRecorder() {
             tapeInfo.formatVersion = null;
             tapeInfo.size = _size;
             tapeInfo.blocks = _blocks.map(function (b) {
-                var isHeader = (b.data.length === 19 || b.data.length === 18 && _format == TapeFormat.STA) && !(b.data[0] & 0x80);
+                // 1. Standard header length is 19 bytes, but some tapes have few more extra bytes appended.
+                // 2. Bit 7 of header flag have to be 0. (Actually, the whole byte should be 0, but there may be exceptions.)
+                // 3. Valid block type codes are in a range of 0..3.
+                var isHeader = (b.data.length >= 19 && b.data.length <= 21 || b.data.length === 18 && _format == TapeFormat.STA) 
+                    && !(b.data[0] & 0x80) 
+                    && b.data[1] >= 0 && b.data[1] <= 3;
                 var info = createBlockInfo(b, isHeader ? TapeHeaderBlockInfo : TapeDataBlockInfo);
                 info.size = b.data.length + 2;
                 if (isHeader) {

@@ -52,3 +52,22 @@ ko.bindingHandlers.slider = {
         $(element).slider('value', ko.unwrap(valueAccessor()));
     }
 };
+
+ko.bindingHandlers.switch = {
+    init: function (element, valueAccessor) {
+        var value = valueAccessor();
+        var $el = $(element);
+        $el.addClass('ui-slider ui-corner-all ui-slider-horizontal ui-widget ui-widget-content');
+        $el.append('<span tabindex="0" class="ui-slider-handle ui-corner-all ui-state-default"></span>');
+        var value = valueAccessor();
+        $el.toggleClass('-checked', ko.unwrap(value));
+        if (ko.isObservable(value)) {
+            $el.on('mousedown', function (event) {
+                value(!value());
+            });
+        }
+    },
+    update: function (element, valueAccessor) {
+        $(element).toggleClass('-checked', ko.unwrap(valueAccessor()));
+    }
+};

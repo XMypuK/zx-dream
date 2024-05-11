@@ -18,11 +18,14 @@ Object.assign(HWConnector.prototype, {
             settings.get_tapePrePauseCounterPulseDuration(),
             settings.get_tapeDefaultPause(),
             settings.get_tapeAutoPlayOnStandardRoutine(),
+            settings.get_tapeAutoPlayOnCustomLoader(),
             settings.get_tapeAutoStopAfterDataBlock(),
             settings.get_tapeAutoStopOnLongPostPause(),
             settings.get_tapeAutoStopOnLongPostPauseDuration(),
             settings.get_tapeAutoStopOnZeroPostPause(),
-            settings.get_tapeBoostFactor()
+            settings.get_tapeBoostFactor(),
+            settings.get_tapeGlobalAutoPlay(),
+            settings.get_tapeGlobalAutoStop()
         );
         ZXContext.hw.psg.applySettings(
             settings.get_beeper(),
@@ -150,7 +153,7 @@ Object.assign(HWConnector.prototype, {
     },
     playTape: function (index) {
         try {
-            ZXContext.hw.tapeRecorders[index].play();
+            ZXContext.hw.tapeRecorders[index].play(true);
             return Promise.resolve();
         }
         catch (error) {
@@ -159,7 +162,7 @@ Object.assign(HWConnector.prototype, {
     },
     pauseTape: function (index) {
         try {
-            ZXContext.hw.tapeRecorders[index].pause();
+            ZXContext.hw.tapeRecorders[index].pause(true);
             return Promise.resolve();
         }
         catch (error) {
@@ -168,7 +171,7 @@ Object.assign(HWConnector.prototype, {
     },
     stopTape: function (index) {
         try {
-            ZXContext.hw.tapeRecorders[index].stop();
+            ZXContext.hw.tapeRecorders[index].stop(true);
             return Promise.resolve();
         }
         catch (error) {
@@ -187,6 +190,24 @@ Object.assign(HWConnector.prototype, {
     selectTapeBlock: function (index, blockIndex) {
         try {
             ZXContext.hw.tapeRecorders[index].selectBlock(blockIndex);
+            return Promise.resolve();
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    setTapeGlobalAutoPlay: function (index, value) {
+        try {
+            ZXContext.hw.tapeRecorders[index].set_globalAutoPlay(value);
+            return Promise.resolve();
+        }
+        catch (error) {
+            return Promise.reject(error);
+        }
+    },
+    setTapeGlobalAutoStop: function (index, value) {
+        try {
+            ZXContext.hw.tapeRecorders[index].set_globalAutoStop(value);
             return Promise.resolve();
         }
         catch (error) {

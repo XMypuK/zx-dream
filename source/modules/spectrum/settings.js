@@ -114,6 +114,13 @@ Object.assign(ZX_Settings.prototype, {
 	set_tapeAutoPlayOnStandardRoutine: function (value) {
 		this._container.tapeAutoPlayOnStandardRoutine = value;
 	},
+	// Автовоспроизведение при входе в нестандартную процедуру загрузки (при возможности детектирования)
+	get_tapeAutoPlayOnCustomLoader: function () {
+		return this._container.tapeAutoPlayOnCustomLoader;
+	},
+	set_tapeAutoPlayOnCustomLoader: function (value) {
+		this._container.tapeAutoPlayOnCustomLoader = value;
+	},
 	// Автопауза после каждого блока данных
 	get_tapeAutoStopAfterDataBlock: function () {
 		return this._container.tapeAutoStopAfterDataBlock;
@@ -148,6 +155,20 @@ Object.assign(ZX_Settings.prototype, {
 	},
 	set_tapeBoostFactor: function (value) {
 		this._container.tapeBoostFactor = value;
+	},
+	// Автовоспроизведение глобально
+	get_tapeGlobalAutoPlay: function () {
+		return this._container.tapeGlobalAutoPlay;
+	},
+	set_tapeGlobalAutoPlay: function (value) {
+		this._container.tapeGlobalAutoPlay = value;
+	},
+	// Автопауза глобально
+	get_tapeGlobalAutoStop: function () {
+		return this._container.tapeGlobalAutoStop;
+	},
+	set_tapeGlobalAutoStop: function (value) {
+		this._container.tapeGlobalAutoStop = value;
 	},
 	// бипер
 	get_beeper: function () {
@@ -239,11 +260,14 @@ Object.assign(ZX_Settings.prototype, {
 		this.set_tapePrePauseCounterPulseDuration(ZX_Settings.defaultValues.tapePrePauseCounterPulseDuration);
 		this.set_tapeDefaultPause(ZX_Settings.defaultValues.tapeDefaultPause);
 		this.set_tapeAutoPlayOnStandardRoutine(ZX_Settings.defaultValues.tapeAutoPlayOnStandardRoutine);
+		this.set_tapeAutoPlayOnCustomLoader(ZX_Settings.defaultValues.tapeAutoPlayOnCustomLoader);
 		this.set_tapeAutoStopAfterDataBlock(ZX_Settings.defaultValues.tapeAutoStopAfterDataBlock);
 		this.set_tapeAutoStopOnLongPostPause(ZX_Settings.defaultValues.tapeAutoStopOnLongPostPause);
 		this.set_tapeAutoStopOnLongPostPauseDuration(ZX_Settings.defaultValues.tapeAutoStopOnLongPostPauseDuration);
 		this.set_tapeAutoStopOnZeroPostPause(ZX_Settings.defaultValues.tapeAutoStopOnZeroPostPause);
 		this.set_tapeBoostFactor(ZX_Settings.defaultValues.tapeBoostFactor);
+		this.set_tapeGlobalAutoPlay(ZX_Settings.defaultValues.tapeGlobalAutoPlay);
+		this.set_tapeGlobalAutoStop(ZX_Settings.defaultValues.tapeGlobalAutoStop);
 		this.set_beeper(ZX_Settings.defaultValues.beeper);
 		this.set_beeperVolume(ZX_Settings.defaultValues.beeperVolume);
 		this.set_psg(ZX_Settings.defaultValues.psg);
@@ -264,7 +288,7 @@ ZX_Settings.defaultValues = {
 	scaleValue: 2,
 	tstatesPerIntrq: 71680,
 	tstatesPerIntrqTurbo: 143360,
-	turboMode: true,
+	turboMode: false,
 	intrqPeriod: 20.48,
 	extendedMemory: 1,
 	renderOnAnimationFrame: false,
@@ -276,11 +300,14 @@ ZX_Settings.defaultValues = {
 	tapePrePauseCounterPulseDuration: 1,
 	tapeDefaultPause: 1500,
 	tapeAutoPlayOnStandardRoutine: true,
-	tapeAutoStopAfterDataBlock: VAL_TAPACT_NO,
-	tapeAutoStopOnLongPostPause: VAL_TAPACT_SIMPLE_TAPES,
+	tapeAutoPlayOnCustomLoader: true,
+	tapeAutoStopAfterDataBlock: VAL_TAPACT_SIMPLE_TAPES,
+	tapeAutoStopOnLongPostPause: VAL_TAPACT_ALL_TAPES,
 	tapeAutoStopOnLongPostPauseDuration: 3500,
 	tapeAutoStopOnZeroPostPause: true,
 	tapeBoostFactor: 16,
+	tapeGlobalAutoPlay: true,
+	tapeGlobalAutoStop: true,
 	beeper: true,
 	beeperVolume: 0.25,
 	psg: VAL_PSG_YM_2149,
@@ -317,11 +344,14 @@ function ZX_StorableSettings() {
 		this._container.tapePrePauseCounterPulseDuration = this.readFromStorage('tapePrePauseCounterPulseDuration');
 		this._container.tapeDefaultPause = this.readFromStorage('tapeDefaultPause');
 		this._container.tapeAutoPlayOnStandardRoutine = this.readFromStorage('tapeAutoPlayOnStandardRoutine');
+		this._container.tapeAutoPlayOnCustomLoader = this.readFromStorage('tapeAutoPlayOnCustomLoader');
 		this._container.tapeAutoStopAfterDataBlock = this.readFromStorage('tapeAutoStopAfterDataBlock');
 		this._container.tapeAutoStopOnLongPostPause = this.readFromStorage('tapeAutoStopOnLongPostPause');
 		this._container.tapeAutoStopOnLongPostPauseDuration = this.readFromStorage('tapeAutoStopOnLongPostPauseDuration');
 		this._container.tapeAutoStopOnZeroPostPause = this.readFromStorage('tapeAutoStopOnZeroPostPause');
 		this._container.tapeBoostFactor = this.readFromStorage('tapeBoostFactor');
+		this._container.tapeGlobalAutoPlay = this.readFromStorage('tapeGlobalAutoPlay');
+		this._container.tapeGlobalAutoStop = this.readFromStorage('tapeGlobalAutoStop');
 		this._container.beeper = this.readFromStorage('beeper');
 		this._container.beeperVolume = this.readFromStorage('beeperVolume');
 		this._container.psg = this.readFromStorage('psg');
@@ -422,6 +452,10 @@ Object.assign(ZX_StorableSettings.prototype, {
 		ZX_StorableSettings.superclass.set_tapeAutoPlayOnStandardRoutine.call(this, value);
 		this.writeToStorage('tapeAutoPlayOnStandardRoutine', value);
 	},
+	set_tapeAutoPlayOnCustomLoader: function (value) {
+		ZX_StorableSettings.superclass.set_tapeAutoPlayOnCustomLoader.call(this, value);
+		this.writeToStorage('tapeAutoPlayOnCustomLoader', value);
+	},
 	set_tapeAutoStopAfterDataBlock: function (value) {
 		ZX_StorableSettings.superclass.set_tapeAutoStopAfterDataBlock.call(this, value);
 		this.writeToStorage('tapeAutoStopAfterDataBlock', value);
@@ -441,6 +475,14 @@ Object.assign(ZX_StorableSettings.prototype, {
 	set_tapeBoostFactor: function (value) {
 		ZX_StorableSettings.superclass.set_tapeBoostFactor.call(this, value);
 		this.writeToStorage('tapeBoostFactor', value);
+	},
+	set_tapeGlobalAutoPlay: function (value) {
+		ZX_StorableSettings.superclass.set_tapeGlobalAutoPlay.call(this, value);
+		this.writeToStorage('tapeGlobalAutoPlay', value);
+	},
+	set_tapeGlobalAutoStop: function (value) {
+		ZX_StorableSettings.superclass.set_tapeGlobalAutoStop.call(this, value);
+		this.writeToStorage('tapeGlobalAutoStop', value);
 	},
 	set_beeper: function (value) {
 		ZX_StorableSettings.superclass.set_drive.call(this, value);

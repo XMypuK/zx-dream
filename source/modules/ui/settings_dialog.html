@@ -164,6 +164,10 @@
 						<td><input type="checkbox" data-bind="checked: tapeAutoPlayOnStandardRoutine"></td>
 					</tr>
 					<tr>
+						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_AUTOPLAY_ON_CUSTOM_LOADER"></th>
+						<td><input type="checkbox" data-bind="checked: tapeAutoPlayOnCustomLoader"></td>
+					</tr>
+					<tr>
 						<th data-bind="text: ZX_Lang.SETTINGS_TAPE_PAUSE_AFTER_DATA_BLOCK"></th>
 						<td><select data-bind="options: tapeAutoStopAfterDataBlockOptions, optionsValue: 'value', optionsText: 'text', value: tapeAutoStopAfterDataBlock"></select></td>
 					</tr>
@@ -326,6 +330,7 @@
 		this.tapePrePauseCounterPulseDuration = ko.observable(ZXContext.settings.get_tapePrePauseCounterPulseDuration());
 		this.tapeDefaultPause = ko.observable(ZXContext.settings.get_tapeDefaultPause());
 		this.tapeAutoPlayOnStandardRoutine = ko.observable(ZXContext.settings.get_tapeAutoPlayOnStandardRoutine());
+		this.tapeAutoPlayOnCustomLoader = ko.observable(ZXContext.settings.get_tapeAutoPlayOnCustomLoader());
 		this.tapeAutoStopAfterDataBlockOptions = ko.observableArray([
 			{ value: VAL_TAPACT_NO, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_NO },
 			{ value: VAL_TAPACT_SIMPLE_TAPES, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_SIMPLE_TAPES },
@@ -430,6 +435,7 @@
 			ZXContext.settings.set_tapePrePauseCounterPulseDuration(+model.tapePrePauseCounterPulseDuration() || 0);
 			ZXContext.settings.set_tapeDefaultPause(+model.tapeDefaultPause() || ZX_Settings.defaultValues.tapeDefaultPause);
 			ZXContext.settings.set_tapeAutoPlayOnStandardRoutine(model.tapeAutoPlayOnStandardRoutine());
+			ZXContext.settings.set_tapeAutoPlayOnCustomLoader(model.tapeAutoPlayOnCustomLoader());
 			ZXContext.settings.set_tapeAutoStopAfterDataBlock(+model.tapeAutoStopAfterDataBlock() || ZX_Settings.defaultValues.tapeAutoStopAfterDataBlock);
 			ZXContext.settings.set_tapeAutoStopOnLongPostPause(+model.tapeAutoStopOnLongPostPause() || ZX_Settings.defaultValues.tapeAutoStopOnLongPostPause);
 			ZXContext.settings.set_tapeAutoStopOnLongPostPauseDuration(+model.tapeAutoStopOnLongPostPauseDuration() || ZX_Settings.defaultValues.tapeAutoStopOnLongPostPauseDuration);

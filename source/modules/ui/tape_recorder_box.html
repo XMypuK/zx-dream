@@ -1,7 +1,7 @@
 <style>
     .tape-recorder-box { display: block; width: 268px; position: relative; font-family: Arial; line-height: 24px; }
     .tape-recorder-box .action-button { display: inline-block; height: 24px;  padding: 3px 5px; white-space: nowrap; cursor: pointer; border: 1px solid #75a9f9; border-radius: 3px; }
-    .tape-recorder-box .action-button:hover { background-color: #0C59CF; color: #ffffff; }
+    .tape-recorder-box .action-button:hover { background-color: #0C59CF; color: #FFFFFF; }
     .tape-recorder-box .control-button { display: inline-block; height: 24px; width: 24px; cursor: pointer; padding: 0; margin: 0; border: 0; background: transparent none no-repeat center center; }
     .tape-recorder-box .control-button.-command_play { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAARUlEQVQ4y2NgoAnYz/CfWKVMlBrCRKlLmCj1DhOlYcJEacAyURo7pBngyMBIvgFYNBNvAA7NxBmARzNhAwhopkpeGHgAAKVwD1HNZQOGAAAAAElFTkSuQmCC"); }
     .tape-recorder-box .control-button.-command_pause { background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAKklEQVQ4y2NgoBAwMjAwMOzfz/AfXcLRESJHSJ6JUheMGjBqwDAxYOABAHx9BhosN+FDAAAAAElFTkSuQmCC"); }
@@ -27,7 +27,7 @@
             --><div class="title" data-bind="text: displayTitle"></div><!--
             --><div class="status" data-bind="class: statusClass"></div><!--
             --><div class="control"><!--
-                --><button class="control-button -command_play" data-bind="attr: { title: ZX_Lang.TR_PLAY }, visible: playbackState() === VAL_TR_INITIALIZED, click: onPlayClick, clickBubble: false"></button><!--
+                --><button class="control-button -command_play" data-bind="attr: { title: ZX_Lang.TR_PLAY }, visible: playbackState() === VAL_TR_INITIALIZED || playbackState() === VAL_TR_FINISHED, click: onPlayClick, clickBubble: false"></button><!--
                 --><button class="control-button -command_pause" data-bind="attr: { title: ZX_Lang.TR_PAUSE }, visible: playbackState() === VAL_TR_PLAYBACK, click: onPauseClick, clickBubble: false"></button><!--
                 --><button class="control-button -command_resume" data-bind="attr: { title: ZX_Lang.TR_RESUME }, visible: playbackState() === VAL_TR_SUSPENDED, click: onResumeClick, clickBubble: false"></button><!--
                 --><button class="control-button -command_stop" data-bind="attr: { title: ZX_Lang.TR_STOP }, visible: playbackState() === VAL_TR_PLAYBACK || playbackState() === VAL_TR_SUSPENDED, click: onStopClick, clickBubble: false"></button><!--

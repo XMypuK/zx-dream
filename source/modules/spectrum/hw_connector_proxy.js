@@ -149,6 +149,12 @@ Object.assign(HWConnectorProxy.prototype, {
     selectTapeBlock: function (index, blockIndex) {
         return this._rpc('selectTapeBlock', [index, blockIndex]);
     },
+    setTapeGlobalAutoPlay: function (index, value) {
+        return this._rpc('setTapeGlobalAutoPlay', [index, value]);
+    },
+    setTapeGlobalAutoStop: function (index, value) {
+        return this._rpc('setTapeGlobalAutoStop', [index, value]);
+    },
     run: function () {
         return this._rpc('run', []);
     },
