@@ -88,9 +88,19 @@ function ZX_Display () {
 		}
 	}
 
-	function beginRedraw(intrqVar, intrqActive) {
+	function scheduleRedraw(intrqVar, intrqActive) {
 		if (!intrqActive)
 			return;
+		// Probable renering windows:
+		// Spectrum 48: 	4.096 - 24.064
+		// Spectrum 128:	4.104 - 24.364
+		// Pentagon 48/128: 5.12  - 25.6
+		//
+		// static rendering delay as a temporary solution for Arkanoid :)
+		_clock.setTimeout(beginRedraw, 6.6); 
+	}
+
+	function beginRedraw() {
 		var layer = +!!(_port_7ffd_value & 0x08);
 		var data = layer ? _screen7Data : _screen5Data;
 		var dirty = layer ? _screen7Dirty : _screen5Dirty;
@@ -245,7 +255,7 @@ function ZX_Display () {
 		bus.on_mem_write(write, { range: { begin: 0xC000, end: 0xDAFF } });
 		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
 		bus.on_var_write(var_write_port_fe_value, 'port_fe_value');
-		bus.on_var_write(beginRedraw, 'intrq');
+		bus.on_var_write(scheduleRedraw, 'intrq');
 		bus.on_var_write(function (name, value) {
 			this.set_border_text('~ ' + value.frequency .toFixed(2) + ' MHz  ' + Math.round(value.fps) + ' FPS');
 		}.bind(this), 'performance');
