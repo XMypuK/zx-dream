@@ -1,13 +1,13 @@
 function ZX_Keyboard() {
 	"use strict";
 	
-	var _keyStates = [ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff ];
+	var _keyStates = [ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF ];
 	var _onKeysStateChanged = new ZX_Event();
 
 	function switchKeys(keys, pressed) {
 		for ( var i = 0; i < keys.length; i++ ) {
 			if ( pressed ) {
-				_keyStates[keys[i].index] &= ((0x01 << keys[i].bit) ^ 0xff);
+				_keyStates[keys[i].index] &= ((0x01 << keys[i].bit) ^ 0xFF);
 			}
 			else {
 				_keyStates[keys[i].index] |= (0x01 << keys[i].bit);
