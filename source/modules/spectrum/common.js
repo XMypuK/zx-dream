@@ -350,6 +350,9 @@ function loadLocalFile(fileinput) {
 			}
 			else {
 				// загрузка с диска через сервер
+				if (!fileinput.name) {
+					fileinput.name = 'clientFile';
+				}
 				var iframe = document.createElement('iframe');
 				iframe.id = 'file_load_frame';
 				iframe.name = 'file_load_frame';
@@ -363,7 +366,9 @@ function loadLocalFile(fileinput) {
 				form.appendChild(fileinput);
 
 				iframe.addEventListener('load', function (e) {
-					var base64 = (iframe.textContent || '').replace(/^\s+|\s+$/g, '');
+					if (!iframe.contentWindow.location.host)
+						return;
+					var base64 = (iframe.contentDocument.documentElement.textContent || '').replace(/^\s+|\s+$/g, '');
 					var data = base64Decode(base64);
 					iframe.remove();
 					form.remove();
