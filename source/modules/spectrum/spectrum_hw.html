@@ -66,6 +66,7 @@ Promise.all([
     ZXContext.hwConnector.hwReady(),
     ZXContext.hwConnectorDedicated.get_mainReady()
 ]).then(function () {
+    ZXContext.hw.bus.reset(ZXContext.settings.get_resetMode());
     ZXContext.hw.clock.run();
 });
 

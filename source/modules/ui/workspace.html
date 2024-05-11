@@ -125,7 +125,7 @@
 	<div id="main_container">
 		<div id="left_field">
 			<div id="commands">
-				<a data-command="reset" title="Сброс"><img src="img/reset.png" alt="Сброс" /></a><!--
+				<a data-command="reset" title="Сброс"><img src="img/reset_128.png" alt="Сброс" /></a><!--
 			 --><a data-command="settings" title="Настройки"><img src="img/properties.png" alt="Настройки"/></a><!--
 			 --><a data-command="snapshot-open" title="Загрузить снимок"><img src="img/open.png" alt="Загрузить снимок" /></a><!--
 			 --><a data-command="snapshot-save" title="Сохранить снимок"><img src="img/save.png" alt="Сохранить снимок" /></a><!--
@@ -300,7 +300,7 @@
         }
 
         function reset() {
-            ZXContext.hwConnector.reset();
+            ZXContext.hwConnector.reset(ZXContext.settings.get_resetMode());
         }
 
         function openSnapshot() {

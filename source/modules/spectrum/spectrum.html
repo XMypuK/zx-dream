@@ -67,6 +67,7 @@ $(window).load(function() {
 	ZXContext.hwConnector.hwReady().then(start);
 
 	function start() {
+		ZXContext.hw.bus.reset(ZXContext.settings.get_resetMode());
 		if ( ZXContext.debugMode ) {
 			var $debug = $(ZXContext.ui.workspace.get_debug());
 			$debug.show();

@@ -19,8 +19,11 @@ function ZX_Port7FFD() {
 		return port_value;
 	}
 
-	function reset() {
-		_bus.var_write('port_7ffd_value', 0x00);
+	function reset(mode) {
+		var value = (mode === RESET_MODE_SOS48 ? 0x20 : 0x00)
+			| (mode === RESET_MODE_SOS128 ? 0x00 : 0x10);
+
+		_bus.var_write('port_7ffd_value', value);
 	}
 
 	this.connect = function (bus) {

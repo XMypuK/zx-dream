@@ -48,6 +48,11 @@ var VAL_TAPACT_NO = 1;
 var VAL_TAPACT_SIMPLE_TAPES = 2;
 var VAL_TAPACT_ALL_TAPES = 3;
 
+var RESET_MODE_SOS128 = 0;
+var RESET_MODE_SOS48 = 1;
+var RESET_MODE_TRDOS = 2;
+var RESET_MODE_EXT = 3;
+
 var DiskImageFormat = {
 	FDI: 'FDI',
 	TRD: 'TRD',

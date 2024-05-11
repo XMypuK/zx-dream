@@ -169,11 +169,13 @@ function ZX_Bus() {
 		}
 	}
 
-	function reset() {
+	function reset(mode) {
+		mode = mode || RESET_MODE_SOS128;
 		for ( var i = 0; i < resetHandlers.length; i++ ) {
-			resetHandlers[i]();
+			resetHandlers[i](mode);
 		}
 	}
+
 
 	function opt(name, value) {
 		var namedHandlers = namedOptHandlers[name] || [];

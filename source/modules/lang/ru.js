@@ -276,6 +276,11 @@ var ZX_Lang = {
 
     WORKSPACE_LOG: 'Журнал',
 
+    RESET_MODE_SOS128: 'SOS 128',
+    RESET_MODE_SOS48: 'SOS 48',
+    RESET_MODE_TRDOS: 'TR-DOS',
+    RESET_MODE_EXT: 'Расширение',
+
     AUDIO_WORKLET_JS: '/js/spectrum_audio.js',
     WORKER_JS: '/js/spectrum_hw.js'
 };

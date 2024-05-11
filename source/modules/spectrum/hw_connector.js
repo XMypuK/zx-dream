@@ -60,8 +60,8 @@ Object.assign(HWConnector.prototype, {
         offset && ZXContext.hw.mouse.wheel(offset);
         return Promise.resolve();
     },
-    reset: function () {
-        ZXContext.hw.bus.reset();
+    reset: function (mode) {
+        ZXContext.hw.bus.reset(mode);
         return Promise.resolve();
     },
     restoreSnapshot: function (format, data) {

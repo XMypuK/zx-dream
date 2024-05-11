@@ -93,9 +93,9 @@ function ZX_ROM() {
 		return _rom_turbo;
 	}
 
-	function reset() {
-		_bus.var_write('rom_trdos', false);
-		_bus.var_write('rom_turbo', false);
+	function reset(mode) {
+		_bus.var_write('rom_trdos', mode === RESET_MODE_TRDOS);
+		_bus.var_write('rom_turbo', mode === RESET_MODE_EXT);
 	}
 
 	this.get_ready$ = function () { 

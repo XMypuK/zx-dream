@@ -104,8 +104,8 @@ Object.assign(HWConnectorProxy.prototype, {
     wheelMouse: function (offset) {
         return this._rpc('wheelMouse', [offset]);
     },
-    reset: function () {
-        return this._rpc('reset', []);
+    reset: function (mode) {
+        return this._rpc('reset', [mode]);
     },
     restoreSnapshot: function (format, data) {
         return this._rpc('restoreSnapshot', [format, data]);

@@ -240,11 +240,19 @@ Object.assign(ZX_Settings.prototype, {
 	set_audioBufferSize: function(value) {
 		this._container.audioBufferSize = value;
 	},
+	// Многопоточность
 	get_threading: function () {
 		return this._container.threading;
 	},
 	set_threading: function(value) {
 		this._container.threading = value;
+	},
+	// Режим перезагрузки
+	get_resetMode: function () {
+		return this._container.resetMode;
+	},
+	set_resetMode: function(value) {
+		this._container.resetMode = value;
 	},
 	reset: function () {
 		this.set_tstatesPerIntrq(ZX_Settings.defaultValues.tstatesPerIntrq);
@@ -279,6 +287,7 @@ Object.assign(ZX_Settings.prototype, {
 		this.set_audioRenderer(ZX_Settings.defaultValues.audioRenderer);
 		this.set_audioBufferSize(ZX_Settings.defaultValues.audioBufferSize);
 		this.set_threading(ZX_Settings.defaultValues.threading);
+		this.set_resetMode(ZX_Settings.defaultValues.resetMode);
 	}
 });
 ZX_Settings.defaultValues = {
@@ -318,7 +327,8 @@ ZX_Settings.defaultValues = {
 	psgVolume: 0.5,
 	audioRenderer: (isScriptProcessorNodeSupported() ? VAL_AUDIO_RENDERER_SPN : (isAudioWorkletNodeSupported() ? VAL_AUDIO_RENDERER_WLN : VAL_AUDIO_RENDERER_UNDEFINED)),
 	audioBufferSize: 0,
-	threading: VAL_THREADING_SINGLE
+	threading: VAL_THREADING_SINGLE,
+	resetMode: RESET_MODE_SOS128
 };
 
 function ZX_StorableSettings() {
@@ -363,6 +373,7 @@ function ZX_StorableSettings() {
 		this._container.audioRenderer = this.readFromStorage('audioRenderer');
 		this._container.audioBufferSize = this.readFromStorage('audioBufferSize');
 		this._container.threading = this.readFromStorage('threading');
+		this._container.resetMode = this.readFromStorage('resetMode');
 	};
 }
 extend(ZX_StorableSettings, ZX_Settings);
@@ -527,5 +538,9 @@ Object.assign(ZX_StorableSettings.prototype, {
 	set_threading: function(value) {
 		ZX_StorableSettings.superclass.set_threading.call(this, value);
 		this.writeToStorage('threading', value);
+	},
+	set_resetMode: function (value) {
+		ZX_StorableSettings.superclass.set_resetMode.call(this, value);
+		this.writeToStorage('resetMode', value);
 	}
 });
