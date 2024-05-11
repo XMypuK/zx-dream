@@ -51,11 +51,11 @@
                     width: 600,
                     height: 400,
                     close: function (e) {
-                        $(this).dialog('destroy').remove();
                         if (this._openResult$) {
                             this._openResult$.resolve();
                             this._openResult$ = null;
                         }
+                        $(this._$dlg).dialog('destroy').remove();
                     }.bind(this)
                 });
                 this._$dlg.on('keydown', function (e) { e.stopPropagation(); });
