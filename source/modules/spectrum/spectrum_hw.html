@@ -37,7 +37,7 @@ ZXContext.hw.drives = [
     new ZX_Floppy()
 ];
 ZXContext.hw.betadisk = new ZX_BetaDisk();
-ZXContext.hw.joystick = new ZX_Joystick();
+ZXContext.hw.kempstonJoystick = new ZX_KempstonJoystick();
 ZXContext.hw.dummyGS = new ZX_DummyGS();
 ZXContext.hw.psg = new ZX_PSG();
 ZXContext.hw.tapeRecorders = [
@@ -54,7 +54,7 @@ ZXContext.hw.port_7ffd.connect(ZXContext.hw.bus);
 ZXContext.hw.keyboard.connect(ZXContext.hw.bus);
 ZXContext.hw.mouse.connect(ZXContext.hw.bus);
 ZXContext.hw.betadisk.connect(ZXContext.hw.bus, ZXContext.hw.clock, ZXContext.hw.drives);
-ZXContext.hw.joystick.connect(ZXContext.hw.bus);
+ZXContext.hw.kempstonJoystick.connect(ZXContext.hw.bus);
 ZXContext.hw.dummyGS.connect(ZXContext.hw.bus);
 ZXContext.hw.psg.connect(ZXContext.hw.bus, ZXContext.hw.clock);
 ZXContext.hw.tapeRecorders[0].connect(ZXContext.hw.bus, ZXContext.hw.clock, ZXContext.hw.cpu);

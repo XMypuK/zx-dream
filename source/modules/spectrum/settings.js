@@ -1,3 +1,36 @@
+function ZX_GamepadsSettings() {
+	this.__type = 'ZX_GamepadsSettings';
+	this.devices = [];
+}
+Object.assign(ZX_GamepadsSettings.prototype, {
+	getDevice: function (index, id) {
+		var devIndex = this.devices.findIndex(d => d.index === index && d.id === id);
+		if (devIndex >= 0)
+			return this.devices[devIndex];
+		return null;
+	},
+	storeDevice: function (device) {
+		var devIndex = this.devices.findIndex(d => d.index === device.index && d.id === device.id);
+		if (devIndex >= 0)
+			this.devices[devIndex] = device;
+		else
+			this.devices.push(device);
+	},
+	removeDevice: function (index, id) {
+		var devIndex = this.devices.findIndex(d => d.index === index && d.id === id);
+		if (devIndex >= 0)
+			this.devices.splice(devIndex, 1);
+	}
+});
+JSONSerializer.registerType('ZX_GamepadsSettings', ZX_GamepadsSettings);
+function ZX_GamepadDeviceSettings(index, id) {
+	this.__type = 'ZX_GamepadDeviceSettings';
+	this.index = index;
+	this.id = id;
+	this.map = null;
+}
+JSONSerializer.registerType('ZX_GamepadDeviceSettings', ZX_GamepadDeviceSettings);
+
 function ZX_Settings() {
 	this._container = Object.assign({}, ZX_Settings.defaultValues);
 }
@@ -254,6 +287,12 @@ Object.assign(ZX_Settings.prototype, {
 	set_resetMode: function(value) {
 		this._container.resetMode = value;
 	},
+	get_gamepads: function() {
+		return JSONSerializer.deserialize(this._container.gamepads);
+	},
+	set_gamepads: function (value) {
+		this._container.gamepads = JSONSerializer.serialize(value);
+	},
 	reset: function () {
 		this.set_tstatesPerIntrq(ZX_Settings.defaultValues.tstatesPerIntrq);
 		this.set_tstatesPerIntrqTurbo(ZX_Settings.defaultValues.tstatesPerIntrqTurbo);
@@ -288,6 +327,7 @@ Object.assign(ZX_Settings.prototype, {
 		this.set_audioBufferSize(ZX_Settings.defaultValues.audioBufferSize);
 		this.set_threading(ZX_Settings.defaultValues.threading);
 		this.set_resetMode(ZX_Settings.defaultValues.resetMode);
+		this.set_gamepads(ZX_Settings.defaultValues.gamepads);
 	}
 });
 ZX_Settings.defaultValues = {
@@ -328,7 +368,8 @@ ZX_Settings.defaultValues = {
 	audioRenderer: (isScriptProcessorNodeSupported() ? VAL_AUDIO_RENDERER_SPN : (isAudioWorkletNodeSupported() ? VAL_AUDIO_RENDERER_WLN : VAL_AUDIO_RENDERER_UNDEFINED)),
 	audioBufferSize: 0,
 	threading: VAL_THREADING_SINGLE,
-	resetMode: RESET_MODE_SOS128
+	resetMode: RESET_MODE_SOS128,
+	gamepads: JSONSerializer.serialize(new ZX_GamepadsSettings())
 };
 
 function ZX_StorableSettings() {
@@ -374,6 +415,7 @@ function ZX_StorableSettings() {
 		this._container.audioBufferSize = this.readFromStorage('audioBufferSize');
 		this._container.threading = this.readFromStorage('threading');
 		this._container.resetMode = this.readFromStorage('resetMode');
+		this._container.gamepads = this.readFromStorage('gamepads');
 	};
 }
 extend(ZX_StorableSettings, ZX_Settings);
@@ -542,5 +584,9 @@ Object.assign(ZX_StorableSettings.prototype, {
 	set_resetMode: function (value) {
 		ZX_StorableSettings.superclass.set_resetMode.call(this, value);
 		this.writeToStorage('resetMode', value);
+	},
+	set_gamepads: function (value) {
+		ZX_StorableSettings.superclass.set_gamepads.call(this, value);
+		this.writeToStorage('gamepads', this._container.gamepads);
 	}
 });

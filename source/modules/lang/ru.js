@@ -95,7 +95,7 @@ var ZX_Lang = {
     TOOLBAR_SETTINGS: 'Настройки',
     TOOLBAR_SOUND: 'Звук',
     TOOLBAR_FULLSCREEN: 'Полноэкранный режим',
-    
+
     SETTINGS_TITLE: 'Настройки',
     SETTINGS_RESET_BUTTON: 'Сбросить все настройки',
     SETTINGS_APPLY_BUTTON: 'Применить',
@@ -151,6 +151,9 @@ var ZX_Lang = {
     SETTINGS_MOUSE_CAPTURE: 'Захват мыши при клике по дисплею',
     SETTINGS_MOUSE_ENABLE_ACCELERATION: 'Ускорение указателя ОС',
     SETTINGS_MOUSE_SENSITIVITY: 'Чувствительность',
+    SETTINGS_GAMEPADS: 'Игровые контролеры',
+    SETTINGS_GAMEPADS_DEVICE: 'Устройство',
+    SETTINGS_GAMEPADS_MAP: 'Сопоставление',
     SETTINGS_THREADING: 'Многопоточность',
     SETTINGS_THREADING_OFF: 'выключена',
     SETTINGS_THREADING_ON: 'включена',

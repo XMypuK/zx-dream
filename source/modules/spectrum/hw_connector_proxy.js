@@ -155,6 +155,12 @@ Object.assign(HWConnectorProxy.prototype, {
     setTapeGlobalAutoStop: function (index, value) {
         return this._rpc('setTapeGlobalAutoStop', [index, value]);
     },
+    setKempstonJoystickKeyState: function (key, pressed) {
+        return this._rpc('setKempstonJoystickKeyState', [key, pressed]);
+    },
+    getKempstonJoystickKeyState: function (key) {
+        return this._rpc('getKempstonJoystickKeyState', [key]);
+    },
     run: function () {
         return this._rpc('run', []);
     },

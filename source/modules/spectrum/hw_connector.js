@@ -214,6 +214,13 @@ Object.assign(HWConnector.prototype, {
             return Promise.reject(error);
         }
     },
+    setKempstonJoystickKeyState: function(key, pressed) {
+        ZXContext.hw.kempstonJoystick.setKeyState(key, pressed);
+        return Promise.resolve();
+    },
+    getKempstonJoystickKeyState: function (key) {
+        return Promise.resolve(ZXContext.hw.kempstonJoystick.getKeyState(key));
+    },
     run: function () {
         ZXContext.hw.clock.run();
         return Promise.resolve();

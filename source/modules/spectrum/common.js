@@ -53,6 +53,198 @@ var RESET_MODE_SOS48 = 1;
 var RESET_MODE_TRDOS = 2;
 var RESET_MODE_EXT = 3;
 
+var GAMEPAD_BUTTONS = {
+	RC_BOTTOM: 0,
+	RC_RIGHT: 1,
+	RC_LEFT: 2,
+	RC_TOP: 3,
+	F_TOP_LEFT: 4,
+	F_TOP_RIGHT: 5,
+	F_BOTTOM_LEFT: 6,
+	F_BOTTOM_RIGHT: 7,
+	CC_LEFT: 8,
+	CC_RIGHT: 9,
+	LC_STICK: 10,
+	RC_STICK: 11,
+	LC_TOP: 12,
+	LC_BOTTOM: 13,
+	LC_LEFT: 14,
+	LC_RIGHT: 15,
+	CC_CENTER: 16
+};
+
+var GAMEPAD_AXES = {
+	LC_HOR: 0,
+	LC_VER: 1,
+	RC_HOR: 2,
+	RC_VER: 3
+};
+
+var KEMPSTON_KEY = {
+	RIGHT: 0,
+	LEFT: 1,
+	DOWN: 2,
+	UP: 3,
+	FIRE: 4,
+	EXT1: 5,
+	EXT2: 6,
+	EXT3: 7
+};
+
+var GAMEPAD_MAP_DEVICE = {
+	KEMPSTON: 0,
+	KEYBOARD: 1
+};
+
+function JSONSerializer() {
+	this.__type = 'JSONSerializer';
+}
+Object.assign(JSONSerializer, {
+	__types: {},
+	registerType: function (name, type) {
+		this.__types[name] = type;
+	},
+	serialize: function (obj) {
+		return JSON.stringify(obj);
+	},
+	deserialize: function (value) {
+		return JSON.parse(value, function (key, value) {
+			var Type = value && value.__type && JSONSerializer.__types[value.__type];
+			if (Type) {
+				var obj = new Type();
+				Object.assign(obj, value);
+				return obj;
+			}
+			return value;
+		});
+	}
+});
+
+function GamepadMap() {
+	this.__type = 'GamepadMap';
+	this.name = 'CUSTOM';
+	this.buttons = [];
+	this.axes = [];
+	this.threshold = 0.5;
+}
+Object.assign(GamepadMap.prototype, {
+	tryCreateButtonEntry: function (buttonCount, button, key) {
+		if (button < buttonCount)
+			this.buttons[button] = key;
+	},
+	tryCreateAxisEntry: function (axisCount, axis, key1, key2) {
+		if (axis < axisCount)
+			this.axes[axis] = [key1, key2];
+	}
+});
+Object.assign(GamepadMap, {
+	createKempstonMap: function (buttonCount, axisCount) {
+		var map = new GamepadMap();
+		map.name = 'KEMPSTON';
+		map.threshold = 0.5;
+		map.buttons = Array(buttonCount).fill(null);
+		map.axes = Array(axisCount).fill(null);
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_LEFT, 'KEMPSTON:LEFT');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_RIGHT,'KEMPSTON:RIGHT');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_TOP, 'KEMPSTON:UP');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_BOTTOM, 'KEMPSTON:DOWN');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_LEFT, 'KEMPSTON:LEFT');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEMPSTON:RIGHT');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEMPSTON:FIRE');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_RIGHT, 'KEMPSTON:EXT1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_LEFT, 'KEMPSTON:EXT2');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_TOP, 'KEMPSTON:EXT3');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEMPSTON:LEFT', 'KEMPSTON:RIGHT');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEMPSTON:UP', 'KEMPSTON:DOWN');
+		return map;
+	},
+	createSinclair1Map: function (buttonCount, axisCount) {
+		var map = new GamepadMap();
+		map.name = 'SINCLAIR1';
+		map.threshold = 0.5;
+		map.buttons = Array(buttonCount).fill(null);
+		map.axes = Array(axisCount).fill(null);
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_LEFT, 'KEYBOARD:4,4');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_RIGHT, 'KEYBOARD:4,3');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_TOP, 'KEYBOARD:4,1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_BOTTOM, 'KEYBOARD:4,2');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_LEFT, 'KEYBOARD:4,4');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEYBOARD:4,3');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEYBOARD:4,0');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:4,4', 'KEYBOARD:4,3');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEYBOARD:4,1', 'KEYBOARD:4,2');
+		return map;
+	},
+	createSinclair2Map: function (buttonCount, axisCount) {
+		var map = new GamepadMap();
+		map.name = 'SINCLAIR2';
+		map.threshold = 0.5;
+		map.buttons = Array(buttonCount).fill(null);
+		map.axes = Array(axisCount).fill(null);
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_LEFT, 'KEYBOARD:3,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_RIGHT, 'KEYBOARD:3,1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_TOP, 'KEYBOARD:3,3');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_BOTTOM, 'KEYBOARD:3,2');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEYBOARD:3,1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEYBOARD:3,4');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:3,0', 'KEYBOARD:3,1');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEYBOARD:3,3', 'KEYBOARD:3,2');
+		return map;
+	},
+	createCursorMap: function (buttonCount, axisCount) {
+		var map = new GamepadMap();
+		map.name = 'CURSOR';
+		map.threshold = 0.5;
+		map.buttons = Array(buttonCount).fill(null);
+		map.axes = Array(axisCount).fill(null);
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_LEFT, 'KEYBOARD:3,4');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_RIGHT, 'KEYBOARD:4,2');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_TOP, 'KEYBOARD:4,3');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_BOTTOM, 'KEYBOARD:4,4');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_LEFT, 'KEYBOARD:3,4');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEYBOARD:4,2');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEYBOARD:4,0');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:3,4', 'KEYBOARD:4,2');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEYBOARD:4,3', 'KEYBOARD:4,4');
+		return map;
+	},
+	createQAOPMMap: function (buttonCount, axisCount) {
+		var map = new GamepadMap();
+		map.name = 'QAOPM';
+		map.threshold = 0.5;
+		map.buttons = Array(buttonCount).fill(null);
+		map.axes = Array(axisCount).fill(null);
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_LEFT, 'KEYBOARD:5,1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_RIGHT, 'KEYBOARD:5,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_TOP, 'KEYBOARD:2,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_BOTTOM, 'KEYBOARD:1,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_LEFT, 'KEYBOARD:5,1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEYBOARD:5,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEYBOARD:7,2');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:5,1', 'KEYBOARD:5,1');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEYBOARD:2,0', 'KEYBOARD:1,0');
+		return map;
+	},
+	createQAOPSpaceMap: function (buttonCount, axisCount) {
+		var map = new GamepadMap();
+		map.name = 'QAOPSPACE';
+		map.threshold = 0.5;
+		map.buttons = Array(buttonCount).fill(null);
+		map.axes = Array(axisCount).fill(null);
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_LEFT, 'KEYBOARD:5,1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_RIGHT, 'KEYBOARD:5,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_TOP, 'KEYBOARD:2,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.LC_BOTTOM, 'KEYBOARD:1,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_LEFT, 'KEYBOARD:5,1');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEYBOARD:5,0');
+		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEYBOARD:7,0');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:5,1', 'KEYBOARD:5,1');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEYBOARD:2,0', 'KEYBOARD:1,0');
+		return map;
+	}
+});
+JSONSerializer.registerType('GamepadMap', GamepadMap);
+
 var DiskImageFormat = {
 	FDI: 'FDI',
 	TRD: 'TRD',

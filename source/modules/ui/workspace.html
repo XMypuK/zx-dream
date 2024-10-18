@@ -1,5 +1,6 @@
 <include source="common.js" includeType="embed" />
 <include source="pc_keyboard.js" includeType="embed" />
+<include source="gamepad.js" includeType="embed" />
 <include source="virtual_display.js" includeType="embed" />
 <include source="audio_output.js" includeType="embed" />
 <include source="drive_dispatcher.html" includeType="embed" />
@@ -243,6 +244,7 @@
             initLayout();
             initVirtualKeyboard();
             initVirtualMouse();
+            initGamepad();
             initVirtualDisplay();
             initAudioOutput();
             applySettings();
@@ -292,6 +294,48 @@
             ZXContext.hwConnector.get_onMouseAction().subscribe(function (state) {
                 if (state.type == 'key') {
                     ZXContext.ui.vmouse.refreshKeyState(state.num, state.pressed);
+                }
+            });
+        }
+
+        function initGamepad() {
+            ZXContext.ui.gamepad = new Gamepad();
+            ZXContext.ui.gamepad.get_onGamepadConnected().subscribe(function (gp) {
+                var gamepads = ZXContext.settings.get_gamepads();
+                var dev = gamepads.getDevice(gp.index, gp.id);
+                if (!dev) {
+                    dev = new ZX_GamepadDeviceSettings(gp.index, gp.id);
+                    var existingMapKinds = new Set(gamepads.devices.map(d => d.map.name));
+                    if (!existingMapKinds.has('KEMPSTON'))
+                        dev.map = GamepadMap.createKempstonMap(gp.buttons.length, gp.axes.length);
+                    else if (!existingMapKinds.has('SINCLAIR1'))
+                        dev.map = GamepadMap.createSinclair1Map(gp.buttons.length, gp.axes.length);
+                    else if (!existingMapKinds.has('SINCLAIR2'))
+                        dev.map = GamepadMap.createSinclair2Map(gp.buttons.length, gp.axes.length);
+                    else
+                        dev.map = GamepadMap.createKempstonMap(gp.buttons.length, gp.axes.length);
+                    gamepads.storeDevice(dev);
+                    ZXContext.settings.set_gamepads(gamepads);
+                }
+                ZXContext.ui.gamepad.setDeviceMap(dev.index, dev.map);
+            });
+            ZXContext.ui.gamepad.get_onGamepadDisconnected().subscribe(function (gp) {
+                ZXContext.ui.gamepad.setDeviceMap(gp.index, null);
+            });
+            ZXContext.ui.gamepad.get_onKeyStateChanged().subscribe(function (args) {
+                var keyParts = args.key.split(':');
+                var device = GAMEPAD_MAP_DEVICE[keyParts[0]];
+                switch (device) {
+                    case GAMEPAD_MAP_DEVICE.KEMPSTON: 
+                        var key = KEMPSTON_KEY[keyParts[1]];
+                        ZXContext.hwConnector.setKempstonJoystickKeyState(key, args.pressed);
+                        break;
+                    case GAMEPAD_MAP_DEVICE.KEYBOARD:
+                        var subkeys = keyParts[1].split(',');
+                        var index = +subkeys[0];
+                        var bit = +subkeys[1];
+                        ZXContext.hwConnector.switchKeyboardKeys([{ index, bit }], args.pressed);
+                        break;
                 }
             });
         }
@@ -435,6 +479,14 @@
             ZXContext.ui.audioOutput.set_bufferSize(ZXContext.settings.get_audioBufferSize());
             if (AudioOutput.isSupported()) {
                 ZXContext.ui.audioOutput.set_state(AudioOutput.STATE.RUNNING);
+            }
+            var navigatorGamepads = navigator.getGamepads && navigator.getGamepads() || [];
+            var gamepadDevices = ZXContext.settings.get_gamepads().devices;
+            for ( var devIndex = 0; devIndex < gamepadDevices.length; devIndex++ ) {
+                var dev = gamepadDevices[devIndex];
+                if (dev.index < navigatorGamepads.length && navigatorGamepads[dev.index] && dev.id === navigatorGamepads[dev.index].id) {
+                    ZXContext.ui.gamepad.setDeviceMap(dev.index, dev.map);
+                }
             }
         }
     }

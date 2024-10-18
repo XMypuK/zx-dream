@@ -45,6 +45,17 @@
 		position: absolute;
 		left: 15px;
 	}
+
+	.settings-dialog .gamepads { border-collapse: collapse; }
+	.settings-dialog .gamepads th, .settings-dialog .gamepads td { padding: 0.2em 0.5em; width: initial; border: 1px solid #f0f0f0; }
+	.settings-dialog .gamepads th { background-color: #f0f0f0; }
+	.settings-dialog .gamepads td:last-child { border-left: none }
+	.settings-dialog .gamepads .-connected::after {
+		content: '(connected)';
+		font-size: 0.7em;
+		color: green;
+		display: inline;
+	}
 </style>
 
 <template id="settings-dialog">
@@ -146,6 +157,29 @@
 					<tr>
 						<th data-bind="text: ZX_Lang.SETTINGS_PSG_PACKET_SIZE"></th>
 						<td><select data-bind="options: psgPacketSizeOptions, optionsValue: 'value', optionsText: 'text', value: psgPacketSize"></select></td>
+					</tr>
+				</table>
+			</div>
+			<div class="settings__section settings-section" data-bind="css: { '-active': activeSection() == 'control' }">
+				<table>
+					<tr>
+						<td colspan="2">
+							<table class="gamepads">
+								<tr>
+									<th class="gamepads__section-header" data-bind="text: ZX_Lang.SETTINGS_GAMEPADS" colspan="3"></th>
+								</tr>
+								<tr>
+									<th class="gamepads__id-header" data-bind="text: ZX_Lang.SETTINGS_GAMEPADS_DEVICE"></th>
+									<th class="gamepads__map-header" data-bind="text: ZX_Lang.SETTINGS_GAMEPADS_MAP"></th>
+								</tr>
+								<!-- ko foreach: gamepads -->
+									<tr>
+										<td class="gamepads__id"><span data-bind="text: index + ': ' + id, css: { '-connected': connected }"></span></td>
+										<td class="gamepads__map"><select data-bind="options: $parent.gamepadMapOptions, optionsValue: 'value', optionsText: 'text', value: map"></select></span></td>
+									</tr>
+								<!-- /ko -->
+							</table>
+						</td>
 					</tr>
 				</table>
 			</div>
@@ -338,7 +372,7 @@
 		]);
 		this.tapeAutoStopAfterDataBlock = ko.observable(ZXContext.settings.get_tapeAutoStopAfterDataBlock());
 		this.tapeAutoStopOnLongPostPauseOptions = ko.observableArray([
-		{ value: VAL_TAPACT_NO, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_NO },
+			{ value: VAL_TAPACT_NO, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_NO },
 			{ value: VAL_TAPACT_SIMPLE_TAPES, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_SIMPLE_TAPES },
 			{ value: VAL_TAPACT_ALL_TAPES, text: ZX_Lang.SETTINGS_TAPE_PAUSE_OPT_ALL_TAPES }
 		]);
@@ -346,12 +380,30 @@
 		this.tapeAutoStopOnLongPostPauseDuration = ko.observable(ZXContext.settings.get_tapeAutoStopOnLongPostPauseDuration());
 		this.tapeAutoStopOnZeroPostPause = ko.observable(ZXContext.settings.get_tapeAutoStopOnZeroPostPause());
 		this.tapeBoostFactor = ko.observable(ZXContext.settings.get_tapeBoostFactor());
+				
+		var navigatorGamepads = (navigator.getGamepads && navigator.getGamepads() || []).filter(gp => gp);
+		var gamepads = ZXContext.settings.get_gamepads().devices.map(dev => ({
+			index: dev.index,
+			id: dev.id,
+			connected: navigatorGamepads.find(nvgp => nvgp.index === dev.index && nvgp.id === dev.id),
+			map: dev.map && dev.map.name || ''
+		}));
+		this.gamepads = ko.observableArray(gamepads);
+		this.gamepadMapOptions = ko.observableArray([
+			{ value: 'KEMPSTON', text: 'Kempston' },
+			{ value: 'SINCLAIR1', text: 'Sinclair 1' },
+			{ value: 'SINCLAIR2', text: 'Sinclair 2' },
+			{ value: 'CURSOR', text: 'Cursor' },
+			{ value: 'QAOPM', text: 'QAOPM' },
+			{ value: 'QAOPSPACE', text: 'QAOPSpace' }
+		]);
 
 		this.sectionOptions = ko.observableArray([
 			{ value: 'bus', text: ZX_Lang.SETTINGS_SECTION_BUS },
 			{ value: 'memory', text: ZX_Lang.SETTINGS_SECTION_MEMORY },
 			{ value: 'display', text: ZX_Lang.SETTINGS_SECTION_DISPLAY },
 			{ value: 'audio', text: ZX_Lang.SETTINGS_SECTION_AUDIO },
+			{ value: 'control', text: ZX_Lang.SETTINGS_SECTION_CONTROL },
 			{ value: 'tape-recorder', text: ZX_Lang.SETTINGS_SECTION_TAPE },
 			{ value: 'misc', text: ZX_Lang.SETTINGS_SECTION_MISC }
 		]);
@@ -442,6 +494,24 @@
 			ZXContext.settings.set_tapeAutoStopOnZeroPostPause(model.tapeAutoStopOnZeroPostPause());
 			ZXContext.settings.set_tapeBoostFactor(+model.tapeBoostFactor() || ZX_Settings.defaultValues.tapeBoostFactor);
 			ZXContext.settings.set_threading(+model.threading());
+
+			var gamepads = ZXContext.settings.get_gamepads();
+			model.gamepads().forEach(gp => {
+				var gpSettings = gamepads.getDevice(gp.index, gp.id);
+				var gpSettingsMap = gpSettings.map && gpSettings.map.name || '';
+				if (gp.map === gpSettingsMap)
+					return;
+				switch (gp.map) {
+					case 'KEMPSTON': gpSettings.map = GamepadMap.createKempstonMap(gpSettings.map.buttons.length, gpSettings.map.axes.length); break;
+					case 'SINCLAIR1': gpSettings.map = GamepadMap.createSinclair1Map(gpSettings.map.buttons.length, gpSettings.map.axes.length); break;
+					case 'SINCLAIR2': gpSettings.map = GamepadMap.createSinclair2Map(gpSettings.map.buttons.length, gpSettings.map.axes.length); break;
+					case 'CURSOR': gpSettings.map = GamepadMap.createCursorMap(gpSettings.map.buttons.length, gpSettings.map.axes.length); break;
+					case 'QAOPM': gpSettings.map = GamepadMap.createQAOPMMap(gpSettings.map.buttons.length, gpSettings.map.axes.length); break;
+					case 'QAOPSPACE': gpSettings.map = GamepadMap.createQAOPSpaceMap(gpSettings.map.buttons.length, gpSettings.map.axes.length); break;
+				}
+				gamepads.storeDevice(gpSettings);
+			});
+			ZXContext.settings.set_gamepads(gamepads);
 
 			if (openResult$) {
 				openResult$resolve(true);
