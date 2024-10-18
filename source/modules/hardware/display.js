@@ -210,14 +210,6 @@ function ZX_Display () {
 
 	this.force_redraw = beginRedraw;
 
-	this.set_border_text = function(text) {
-		var
-			attrs = _port_fe_value & 0x07,
-			textColor = ZX_Display.getColor(!_semicolors, !(attrs & 0x02), !(attrs & 0x04), !(attrs & 0x01));
-
-		_renderer.drawBorderText(text, textColor);
-	}
-
 	function opt_extendedMemory(name, value) {
 		if ( _extendedMemory !== value ) {
 			_extendedMemory = value;
@@ -256,9 +248,6 @@ function ZX_Display () {
 		bus.on_var_write(var_write_port_7ffd_value, 'port_7ffd_value');
 		bus.on_var_write(var_write_port_fe_value, 'port_fe_value');
 		bus.on_var_write(scheduleRedraw, 'intrq');
-		bus.on_var_write(function (name, value) {
-			this.set_border_text('~ ' + value.frequency .toFixed(2) + ' MHz  ' + Math.round(value.fps) + ' FPS');
-		}.bind(this), 'performance');
 		bus.on_opt(opt_extendedMemory, OPT_EXTENDED_MEMORY);
 		bus.on_opt(opt_renderingParams, OPT_RENDERING_PARAMS);
 		bus.on_opt(opt_semicolors, OPT_SEMICOLORS);
@@ -311,9 +300,6 @@ Object.assign(ZX_Display, {
 
 		void drawBorder( vec4 color )
 			Fills the border with the specific color.
-
-		void drawBorderText( string text, vec4 color )
-			Draws the text on the top border area with the specific color.
 
 		void drawData( Number layer, Uint8Array data, Uint8Array dirty, Boolean flashInversion, Boolean semicolors)
 			Renders data which has been changed from the last rendering on the corresponding canvas (it can be output canvas or
@@ -399,34 +385,6 @@ Object.assign(RendererBase.prototype, {
 		ctx.fill();
 
 		this._lastBorderColor = color.slice(0, 4);
-	},
-	drawBorderText: function( text, color ) { 
-		if ( !this._borderCtx )
-			return;
-
-		var
-			scale = this._scale,
-			ctx = this._borderCtx,
-			bw = this._borderWidth * scale,
-			sw = 256 * scale,
-			rectW = bw + sw + bw,
-			rectH = bw,
-			textH = 10,
-			textXMargin = 5 * scale;
-
-		ctx.font = textH + 'px sans-serif';
-		var 
-			textW = ctx.measureText(text).width,
-			textY = +(( rectH - textH ) / 2).toFixed(0),
-			textX = textXMargin;
-
-		ctx.fillStyle = 'rgba(' + this._lastBorderColor.join(',') + ')';
-		ctx.fillRect(textX, textY, this._lastBorderTextWidth, textH);
-
-		ctx.fillStyle = 'rgba(' + color.join(',') + ')';
-		ctx.fillText(text, textX, textY + textH, rectW - 2 * textXMargin);
-
-		this._lastBorderTextWidth = textW;
 	},
 	drawData: function (layer, data, dirty, flashInversion, semicolors) {
 	},

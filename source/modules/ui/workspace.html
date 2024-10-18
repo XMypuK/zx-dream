@@ -50,9 +50,22 @@
 		border-radius: 5px;
 		box-shadow: 1px 1px #a0a0a0;
 		width: 576px;
-		height: 448px;
+		height: 468px;
 		margin: 0 auto;
 	}
+
+    #display > .performance {
+		display: block;
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		height: 20px;
+        color: #000000;
+        padding: 0 1em;
+        text-align: right;
+        font: 10px/20px Verdana;
+    }
 
 	#display .error-message {
 		text-align: center;
@@ -135,8 +148,8 @@
 			<div id="drives"></div>	
 		</div>
 		<div id="center_field">
-			<div id="display"></div>
-			<div id="vkeyb"></div>		
+			<div id="display"><div class="performance"></div></div>
+			<div id="vkeyb"></div>
 		</div>	
 		<div id="right_field">
 			<div id="vmouse"></div>
@@ -163,6 +176,7 @@
         var $drives = $workspace.find('#drives');
         var $debug = $workspace.find('#debug');
         var $container = $(document.body);
+        var $performance = $display.children('.performance');
 
         var display = $display[0];
         var vkeyb = $vkeyb[0];
@@ -210,6 +224,10 @@
         function initLayout() {
             $(window).resize(adjustWorkspaceLayout);
             adjustWorkspaceLayout();
+
+            ZXContext.hwConnector.get_onPerformance().subscribe(function (data) {
+                $performance.text('~ ' + data.frequency.toFixed(2) + ' MHz  ' + Math.round(data.fps) + ' FPS');
+            });
         }
 
         function initKeyboard() {

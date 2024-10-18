@@ -256,5 +256,8 @@ Object.assign(HWConnector.prototype, {
     },
     get_onTape0TapeEvent: function () {
         return ZXContext.hw.tapeRecorders[0].get_onTapeEvent();
+    },
+    get_onPerformance: function () {
+        return HWState.get_instance().get_onPerformance();
     }
 });

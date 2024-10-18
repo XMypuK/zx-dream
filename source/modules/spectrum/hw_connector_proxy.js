@@ -191,6 +191,9 @@ Object.assign(HWConnectorProxy.prototype, {
     get_onTape0TapeEvent: function () {
         return this._getEventProxy('get_onTape0TapeEvent').pub;
     },
+    get_onPerformance: function () {
+        return this._getEventProxy('get_onPerformance').pub;
+    },
     get_workerReady: function () {
         return this._workerReadyPromise.promise;
     },

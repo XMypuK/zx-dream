@@ -36,6 +36,7 @@ function ZX_Clock() {
 	var _maxBoostMs = 50.0;
 	var _maxBoostTstates = _maxBoostMs * _tstatesPerMs;
 
+	var _hwState = HWState.get_instance();
 	var _bus;
 	var _cpu;
 	var _taskQueue = new TaskQueue(_tstatesPerMs);
@@ -112,7 +113,7 @@ function ZX_Clock() {
 		// проверка на необходимость вывода информации о производительности.
 		var performanceElapsed = now - _performanceTimestamp
 		if ( performanceElapsed >= 1000 ) {
-			_bus.var_write('performance', {
+			_hwState.updatePerformance({
 				frequency: _performanceTstates / (performanceElapsed * 1000),
 				fps: _performanceFps * 1000 / performanceElapsed
 			});
@@ -157,7 +158,7 @@ function ZX_Clock() {
 		// проверка на необходимость вывода информации о производительности.
 		var performanceElapsed = now - _performanceTimestamp
 		if ( performanceElapsed >= 1000 ) {
-			_bus.var_write('performance', {
+			_hwState.updatePerformance({
 				frequency: _performanceTstates / (performanceElapsed * 1000),
 				fps: _performanceFps * 1000 / performanceElapsed
 			});
