@@ -149,7 +149,7 @@ var ZX_Lang = {
     SETTINGS_PSG_PACKET_SIZE: 'Размер передаваемого в буфер пакета',
     SETTINGS_MOUSE_CAPTURE: 'Захват мыши при клике по дисплею',
     SETTINGS_MOUSE_ENABLE_ACCELERATION: 'Ускорение указателя ОС',
-    SETTINGS_MOUSE_SENSETIVITY: 'Чувствительность',
+    SETTINGS_MOUSE_SENSITIVITY: 'Чувствительность',
     SETTINGS_THREADING: 'Многопоточность',
     SETTINGS_THREADING_OFF: 'выключена',
     SETTINGS_THREADING_ON: 'включена',
