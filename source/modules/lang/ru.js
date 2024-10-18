@@ -94,7 +94,8 @@ var ZX_Lang = {
     TOOLBAR_SAVE_SNAPSHOT: 'Сохранить снимок',
     TOOLBAR_SETTINGS: 'Настройки',
     TOOLBAR_SOUND: 'Звук',
-
+    TOOLBAR_FULLSCREEN: 'Полноэкранный режим',
+    
     SETTINGS_TITLE: 'Настройки',
     SETTINGS_RESET_BUTTON: 'Сбросить все настройки',
     SETTINGS_APPLY_BUTTON: 'Применить',

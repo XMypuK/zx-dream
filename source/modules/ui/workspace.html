@@ -54,6 +54,11 @@
 		margin: 0 auto;
 	}
 
+    #display > .canvas-wrapper {
+        margin: 0;
+        position: relative;
+    }
+
     #display > .performance {
 		display: block;
 		position: absolute;
@@ -72,6 +77,27 @@
 		color: #ff0000;
 		padding: 2em;
 	}
+
+    #display.-fullscreen {
+        display: block;
+        background-color: #000000;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+    #display.-fullscreen > .canvas-wrapper {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 20px;
+        right: 0;
+        margin: auto;
+    }
+    #display.-fullscreen .performance {
+        background-color: #000000;
+        color: #ffffff;
+    }
 
 	#vkeyb {
 		margin: 5px auto;
@@ -142,6 +168,7 @@
 			 --><a data-command="settings" title="Настройки"><img src="img/properties.png" alt="Настройки"/></a><!--
 			 --><a data-command="snapshot-open" title="Загрузить снимок"><img src="img/open.png" alt="Загрузить снимок" /></a><!--
 			 --><a data-command="snapshot-save" title="Сохранить снимок"><img src="img/save.png" alt="Сохранить снимок" /></a><!--
+             --><a data-command="fullscreen" title="Полноэкранный режим"><img src="img/fullscreen.png" width="32" height="32" alt="Полноэкранный режим" /></a><!--
              --><a data-command="about" title="Об эмуляторе"><img src="img/info.png" alt="Об эмуляторе"/></a>
 			</div>
             <div id="tapes"></div>
@@ -225,6 +252,9 @@
             $(window).resize(adjustWorkspaceLayout);
             adjustWorkspaceLayout();
 
+            document.addEventListener('fullscreenchange', function () {
+                $display.toggleClass('-fullscreen', !!document.fullscreenElement);
+            });
             ZXContext.hwConnector.get_onPerformance().subscribe(function (data) {
                 $performance.text('~ ' + data.frequency.toFixed(2) + ' MHz  ' + Math.round(data.fps) + ' FPS');
             });
@@ -293,6 +323,7 @@
                     case 'settings': openProperties(); break;
                     case 'snapshot-open': openSnapshot(); break;
                     case 'snapshot-save': saveSnapshot(); break;
+                    case 'fullscreen': requestFullScreen(); break;
                     case 'about': about(); break;
                 }
             });
@@ -379,6 +410,12 @@
             }
             catch (error) {
                 handleError(error);
+            }
+        }
+
+        function requestFullScreen() {
+            if (!document.fullscreenElement) {
+                $display[0].requestFullscreen();
             }
         }
 

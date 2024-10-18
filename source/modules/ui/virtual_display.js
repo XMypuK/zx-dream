@@ -78,8 +78,7 @@ Object.assign(VirtualDisplay.prototype, {
 			this._wrapper.style.width = (2 * this._borderWidth + 256) * this._scale + 'px';
 			this._wrapper.style.height = (2 * this._borderWidth + 192) * this._scale + 'px';
 			this._wrapper.style.padding = '0 0 0 0';
-			this._wrapper.style.margin = '0 0 0 0';
-			this._wrapper.style.position = 'relative';
+			this._wrapper.className = 'canvas-wrapper';
 			this._container.appendChild(this._wrapper);
 			this._border && this._wrapper.appendChild(this._border);
 			this._screen5 && this._wrapper.appendChild(this._screen5);
