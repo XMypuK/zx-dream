@@ -19,6 +19,7 @@
 - дисплей с возможностью переключения отображения из 5 или 7 страницы памяти (через порт #7FFD)
 - 40-клавишная клавиатура
 - Kempston-мышка (с виртуальным управлением)
+- Kempston-джойстик (возможность подключения игровых контролеров)
 - Музыкальный сопроцессор AY-3-891x/YM2149 (+ Бипер, + Turbo Sound) (Требуется производительная система. Рекомендуются Edge или Chrome.)
 
 Другие возможности:
@@ -68,6 +69,7 @@ The next hardware emulation was implemented:
 - display with the capability to switch the source memory page: 5 or 7 (via the port #7FFD)
 - 40-key keyboard
 - Kempston-mouse (virtual control)
+- Kempston-joystick (gamepad connection feature)
 - Programmable sound generator AY-3-891x/YM2149 (+ Beeper, + Turbo Sound) (Requires high performance system. Edge or Chrome are recommended.)
 
 Other capabilities:
