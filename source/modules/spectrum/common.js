@@ -221,7 +221,7 @@ Object.assign(GamepadMap, {
 		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_LEFT, 'KEYBOARD:5,1');
 		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEYBOARD:5,0');
 		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEYBOARD:7,2');
-		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:5,1', 'KEYBOARD:5,1');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:5,1', 'KEYBOARD:5,0');
 		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEYBOARD:2,0', 'KEYBOARD:1,0');
 		return map;
 	},
@@ -238,7 +238,7 @@ Object.assign(GamepadMap, {
 		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_LEFT, 'KEYBOARD:5,1');
 		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.F_TOP_RIGHT, 'KEYBOARD:5,0');
 		map.tryCreateButtonEntry(buttonCount, GAMEPAD_BUTTONS.RC_BOTTOM, 'KEYBOARD:7,0');
-		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:5,1', 'KEYBOARD:5,1');
+		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_HOR, 'KEYBOARD:5,1', 'KEYBOARD:5,0');
 		map.tryCreateAxisEntry(axisCount, GAMEPAD_AXES.LC_VER, 'KEYBOARD:2,0', 'KEYBOARD:1,0');
 		return map;
 	}
